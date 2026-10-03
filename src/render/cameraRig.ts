@@ -74,7 +74,7 @@ export function createCameraRig(camera: PerspectiveCamera, getConfig: () => Game
       wantPos.set(mx, c.closeUpHeight * zoom, mz + c.closeUpBack * zoom);
       wantLook.set(mx, 0, mz + REST_LOOK_TOWARD_CAMERA * zoom);
     } else {
-      wantPos.set(t.originX, c.height, t.originZ + c.back);
+      wantPos.set(t.originX + c.aimSideOffset, c.height, t.originZ + c.back);
       wantLook.set(t.originX, 0, t.originZ - c.aimLookAhead);
     }
   }

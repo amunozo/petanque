@@ -57,6 +57,8 @@ export interface GameConfig {
     height: number;
     /** Distance behind the throwing circle. */
     back: number;
+    /** Aim camera shifted sideways (m) so the flight arc is seen at an angle; still looks at the centre line. */
+    aimSideOffset: number;
     /** Follow the thrown ball. */
     follow: boolean;
     /** 0..1 smoothing per frame toward the target (higher = snappier). */
@@ -133,6 +135,7 @@ export const defaultConfig: GameConfig = {
     fovDeg: 58,
     height: 2.3,
     back: 2.0,
+    aimSideOffset: 0.7,
     follow: true,
     followLerp: 0.08,
     closeUpAfterRest: true,
@@ -219,6 +222,7 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'camera.fovDeg', label: 'fov°', min: 30, max: 90, step: 1 },
       { path: 'camera.height', label: 'height', min: 0.5, max: 5, step: 0.05 },
       { path: 'camera.back', label: 'back', min: 0, max: 8, step: 0.1 },
+      { path: 'camera.aimSideOffset', label: 'aim side offset m', min: -2, max: 2, step: 0.1 },
       { path: 'camera.follow', label: 'follow ball', toggle: true },
       { path: 'camera.followLerp', label: 'follow speed', min: 0.01, max: 1, step: 0.01 },
       { path: 'camera.closeUpAfterRest', label: 'close-up after rest', toggle: true },
