@@ -1,4 +1,5 @@
 /** Game HUD (plain DOM, styles in the "Game HUD" section of src/style.css, classes hud-*). */
+import { el, shieldPointer } from './dom';
 
 export interface DistanceRow {
   label: string;
@@ -15,8 +16,14 @@ export interface EndCardData {
   note?: string;
 }
 
+export type HudMode = 'practice' | 'match';
+
 export interface Hud {
   readonly fullscreenButton: HTMLButtonElement;
+  /** Practice shows the status/distance list and "new end"; match hides them (its own HUD takes over). */
+  setMode(mode: HudMode): void;
+  /** The ☰ button in the right column. */
+  onMenu(fn: () => void): void;
   setStatus(text: string): void;
   /** 0..1 while dragging, null hides the meter. */
   setPower(power: number | null): void;
@@ -31,13 +38,6 @@ export interface Hud {
 /** "23 cm" below one metre, "1.24 m" above. */
 export function formatDistance(metres: number): string {
   return metres < 1 ? `${Math.round(metres * 100)} cm` : `${metres.toFixed(2)} m`;
-}
-
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
-  const e = document.createElement(tag);
-  e.className = cls;
-  if (text !== undefined) e.textContent = text;
-  return e;
 }
 
 function iconButton(cls: string, label: string, svgPath: string): HTMLButtonElement {
@@ -62,6 +62,7 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
     '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
   );
   fullscreenButton.hidden = true; // main.ts reveals it where supported
+  const menuButton = iconButton('hud-menu', 'Menu', '<path d="M4 7h16M4 12h16M4 17h16"/>');
   const newEndButton = iconButton('hud-new', 'New end', '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>');
 
   const power = el('div', 'hud-power');
@@ -81,22 +82,28 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   nextButton.type = 'button';
   card.append(cardTitle, cardBest, cardSession, nextButton);
 
-  root.append(info, fullscreenButton, newEndButton, power, card);
+  root.append(info, fullscreenButton, newEndButton, menuButton, power, card);
 
   let newEndFn: () => void = () => undefined;
   let nextFn: () => void = () => undefined;
+  let menuFn: () => void = () => undefined;
   newEndButton.addEventListener('click', () => newEndFn());
+  menuButton.addEventListener('click', () => menuFn());
   nextButton.addEventListener('click', () => nextFn());
 
   // Buttons must not leak touches into the game canvas underneath.
-  for (const target of [newEndButton, fullscreenButton, card]) {
-    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend'] as const) {
-      target.addEventListener(type, (e) => e.stopPropagation());
-    }
+  for (const target of [newEndButton, menuButton, fullscreenButton, card]) {
+    shieldPointer(target);
   }
 
   return {
     fullscreenButton,
+    setMode(mode) {
+      root.classList.toggle('hud-mode-match', mode === 'match');
+    },
+    onMenu(fn) {
+      menuFn = fn;
+    },
     setStatus(text) {
       status.textContent = text;
     },

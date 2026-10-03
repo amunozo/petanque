@@ -10,8 +10,10 @@ import {
   CanvasTexture,
   Color,
   CylinderGeometry,
+  DoubleSide,
   DirectionalLight,
   Fog,
+  Group,
   HemisphereLight,
   Mesh,
   MeshBasicMaterial,
@@ -30,6 +32,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import type { Body } from '../engine/types';
+import type { TeamId } from '../games/petanque/matchTypes';
 import type { Vec3 } from '../engine/vec3';
 import type { GameConfig } from '../tuning/config';
 import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
@@ -41,7 +44,24 @@ const STYLE = {
   boardHeight: 0.08,
   boardThickness: 0.06,
   jackColor: 0xffd23a,
+  /** Boule tint (multiplies the grey metal texture): neutral = practice, A = cool blue steel, B = warm red bronze. */
   bouleColor: 0xffffff,
+  teamBouleColor: { A: 0x9cc4ff, B: 0xffa070 },
+  /** Ring under each scoring boule (lighter than the boule tint so it reads on gravel): unit-radius inner/outer (x boule radius), pulse amount and speed (rad/s), height (m). */
+  teamRingColor: { A: 0x8ab8ff, B: 0xff9060 },
+  scoreRingInner: 1.45,
+  scoreRingOuter: 1.85,
+  scoreRingPulse: 0.1,
+  scoreRingPulseSpeed: 5,
+  scoreRingY: 0.009,
+  /** Jack zone band (valid jack landing area): fill, border colour/opacity, border width (m), arc segments, ground heights (m). */
+  zoneColor: 0xffffff,
+  zoneFillOpacity: 0.24,
+  zoneBorderOpacity: 0.85,
+  zoneBorderWidth: 0.05,
+  zoneSegments: 40,
+  zoneFillY: 0.003,
+  zoneBorderY: 0.004,
   /** The jack is tiny: a ring + beam mark it while the camera is farther than this (m). */
   jackMarkerMinCamDist: 3,
   jackMarkerRingInner: 0.11,
@@ -72,17 +92,34 @@ export interface AimPreviewView {
   points: readonly Vec3[];
 }
 
+/** Which team a body belongs to (null = neutral steel, e.g. practice boules and the jack). */
+export type TeamResolver = (body: Body) => TeamId | null;
+
+/** Valid jack landing area: points whose distance from (originX, originZ) is within [minDist, maxDist] and x within [xMin, xMax]. */
+export interface JackZoneView {
+  originX: number;
+  originZ: number;
+  minDist: number;
+  maxDist: number;
+  xMin: number;
+  xMax: number;
+}
+
 export interface PitchScene {
   resize(): void;
   /** Updates the camera (dt = real seconds since last frame) and draws. */
   render(dt: number): void;
-  /** One mesh per body id; `currentId` is highlighted and followed by the camera. */
-  syncBodies(bodies: readonly Body[], currentId: string | null): void;
+  /** One mesh per body id; `currentId` is highlighted and followed by the camera; `teamOf` tints boules per team. */
+  syncBodies(bodies: readonly Body[], currentId: string | null, teamOf?: TeamResolver): void;
   setCameraMode(mode: CameraMode): void;
   /** null hides the flight arc / landing marker / roll hint. Marker and roll hint obey the live controls config. */
   setAimPreview(p: AimPreviewView | null): void;
   /** Thin line on the ground between two points (jack -> closest boule); null hides it. */
   setResultLine(from: Vec3 | null, to: Vec3 | null): void;
+  /** Pulsing ring on the ground under each listed body (the scoring boules); null/empty hides them. The close-up also frames them. */
+  setScoringHighlight(ids: readonly string[] | null, team: TeamId | null): void;
+  /** Faint band on the ground marking where a jack may come to rest; null hides it. */
+  setJackZone(zone: JackZoneView | null): void;
 }
 
 /** Grey metal with two dark grooves and two dark patches, so rolling spin is visible. */
@@ -182,15 +219,19 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   // ---- bodies --------------------------------------------------------------
   const unitSphere = new SphereGeometry(1, 32, 20);
   const bouleTex = makeBouleTexture();
-  const bouleMat = new MeshStandardMaterial({ color: STYLE.bouleColor, map: bouleTex, metalness: 0.45, roughness: 0.4 });
-  const bouleCurrentMat = new MeshStandardMaterial({
-    color: STYLE.bouleColor,
-    map: bouleTex,
-    metalness: 0.45,
-    roughness: 0.4,
-    emissive: new Color(0x6a4a10),
-    emissiveIntensity: 0.3,
-  });
+  const mkBouleMat = (color: number, current: boolean): MeshStandardMaterial =>
+    new MeshStandardMaterial({
+      color,
+      map: bouleTex,
+      metalness: 0.45,
+      roughness: 0.4,
+      ...(current ? { emissive: new Color(0x6a4a10), emissiveIntensity: 0.3 } : {}),
+    });
+  const bouleMats = {
+    none: { rest: mkBouleMat(STYLE.bouleColor, false), current: mkBouleMat(STYLE.bouleColor, true) },
+    A: { rest: mkBouleMat(STYLE.teamBouleColor.A, false), current: mkBouleMat(STYLE.teamBouleColor.A, true) },
+    B: { rest: mkBouleMat(STYLE.teamBouleColor.B, false), current: mkBouleMat(STYLE.teamBouleColor.B, true) },
+  };
   const jackMat = new MeshStandardMaterial({ color: STYLE.jackColor, roughness: 0.5 });
   const meshes = new Map<string, Mesh>();
   const q = new Quaternion();
@@ -208,10 +249,19 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   markerBeam.visible = false;
   scene.add(markerRing, markerBeam);
 
+  // Scoring rings (pooled; one per highlighted id)
+  const scoreRingGeo = new RingGeometry(STYLE.scoreRingInner, STYLE.scoreRingOuter, 40);
+  scoreRingGeo.rotateX(-Math.PI / 2);
+  const scoreRingMat = new MeshBasicMaterial({ color: STYLE.teamRingColor.A, transparent: true, opacity: 0.95, depthWrite: false, side: DoubleSide });
+  const scoreRings: Mesh[] = [];
+  const ringBase: number[] = [];
+  let highlightIds: readonly string[] = [];
+  let pulseClock = 0;
+
   const focus: CameraFocus = { ball: null, jack: null, frame: [] };
   const camToJack = new Vector3();
 
-  function syncBodies(bodies: readonly Body[], currentId: string | null): void {
+  function syncBodies(bodies: readonly Body[], currentId: string | null, teamOf?: TeamResolver): void {
     const seen = new Set<string>();
     focus.ball = null;
     focus.jack = null;
@@ -223,7 +273,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
       const isJack = b.kind === 'jack';
       let mesh = meshes.get(b.id);
       if (!mesh) {
-        mesh = new Mesh(unitSphere, isJack ? jackMat : bouleMat);
+        mesh = new Mesh(unitSphere, isJack ? jackMat : bouleMats.none.rest);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         scene.add(mesh);
@@ -240,7 +290,10 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
       } else {
         mesh.quaternion.identity();
       }
-      if (!isJack) mesh.material = b.id === currentId ? bouleCurrentMat : bouleMat;
+      if (!isJack) {
+        const set = bouleMats[teamOf?.(b) ?? 'none'];
+        mesh.material = b.id === currentId ? set.current : set.rest;
+      }
       if (b.id === currentId) focus.ball = { x: b.pos.x, y: b.pos.y, z: b.pos.z };
       if (isJack && b.state !== 'out') focus.jack = { x: b.pos.x, y: b.pos.y, z: b.pos.z };
       if (jackBody && !isJack && b.state !== 'out') {
@@ -261,6 +314,25 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
         if (Math.hypot(cur.pos.x - jackBody.pos.x, cur.pos.z - jackBody.pos.z) < STYLE.frameCurrentWithin) focus.frame.push({ ...cur.pos });
       }
     }
+    // End of an end: the close-up also keeps the highlighted (scoring) boules in view.
+    if (jackBody && highlightIds.length > 0) {
+      if (focus.frame.length === 0) focus.frame.push({ ...jackBody.pos });
+      for (const id of highlightIds) {
+        const hb = bodies.find((b) => b.id === id);
+        if (hb && hb.state !== 'out') focus.frame.push({ ...hb.pos });
+      }
+    }
+    // Scoring rings follow their boules.
+    highlightIds.forEach((id, i) => {
+      const hb = bodies.find((b) => b.id === id);
+      const ringMesh = scoreRings[i];
+      if (!ringMesh) return;
+      ringMesh.visible = Boolean(hb) && hb?.state !== 'out';
+      if (hb) {
+        ringMesh.position.set(hb.pos.x, STYLE.scoreRingY, hb.pos.z);
+        ringBase[i] = hb.spec.radius;
+      }
+    });
     for (const [id, mesh] of meshes) {
       if (!seen.has(id)) {
         scene.remove(mesh);
@@ -403,6 +475,92 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     placeRibbon(resultRibbon, from.x, from.z, to.x, to.z, STYLE.resultLineWidth);
   }
 
+  function setScoringHighlight(ids: readonly string[] | null, team: TeamId | null): void {
+    highlightIds = ids ?? [];
+    scoreRingMat.color.setHex(STYLE.teamRingColor[team ?? 'A']);
+    while (scoreRings.length < highlightIds.length) {
+      const m = new Mesh(scoreRingGeo, scoreRingMat);
+      m.visible = false;
+      m.renderOrder = 1;
+      scene.add(m);
+      scoreRings.push(m);
+      ringBase.push(STYLE.scoreRingInner);
+    }
+    scoreRings.forEach((m, i) => {
+      if (i >= highlightIds.length) m.visible = false;
+    });
+  }
+
+  // Jack zone band: fill between the two arcs + thin borders (arcs and side lines), rebuilt on each call.
+  const zoneGroup = new Group();
+  zoneGroup.visible = false;
+  scene.add(zoneGroup);
+  const zoneFillMat = new MeshBasicMaterial({ color: STYLE.zoneColor, transparent: true, opacity: STYLE.zoneFillOpacity, depthWrite: false, side: DoubleSide });
+  const zoneBorderMat = new MeshBasicMaterial({ color: STYLE.zoneColor, transparent: true, opacity: STYLE.zoneBorderOpacity, depthWrite: false, side: DoubleSide });
+
+  /** Triangle strip between two equally long polylines on the ground (x, z pairs) at height y. */
+  function stripGeometry(a: readonly [number, number][], b: readonly [number, number][], y: number): BufferGeometry {
+    const pos: number[] = [];
+    const idx: number[] = [];
+    for (let i = 0; i < a.length; i++) {
+      const pa = a[i] as [number, number];
+      const pb = b[i] as [number, number];
+      pos.push(pa[0], y, pa[1], pb[0], y, pb[1]);
+      if (i > 0) {
+        const k = i * 2;
+        idx.push(k - 2, k - 1, k, k - 1, k + 1, k);
+      }
+    }
+    const g = new BufferGeometry();
+    g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+    g.setIndex(idx);
+    return g;
+  }
+
+  function setJackZone(zone: JackZoneView | null): void {
+    for (const c of [...zoneGroup.children]) {
+      zoneGroup.remove(c);
+      (c as Mesh).geometry.dispose();
+    }
+    if (!zone) {
+      zoneGroup.visible = false;
+      return;
+    }
+    const lo = Math.min(zone.minDist, zone.maxDist);
+    const hi = Math.max(zone.minDist, zone.maxDist);
+    const n = STYLE.zoneSegments;
+    const w = STYLE.zoneBorderWidth / 2;
+    /** Ground point at distance r from the circle for each x across [xMin, xMax] (clamped so |x - originX| <= r). */
+    const arc = (r: number): [number, number][] => {
+      const pts: [number, number][] = [];
+      for (let i = 0; i <= n; i++) {
+        const x = zone.xMin + ((zone.xMax - zone.xMin) * i) / n;
+        const dx = Math.min(Math.abs(x - zone.originX), r);
+        pts.push([x, zone.originZ - Math.sqrt(r * r - dx * dx)]);
+      }
+      return pts;
+    };
+    const inner = arc(lo);
+    const outer = arc(hi);
+    const add = (g: BufferGeometry, mat: MeshBasicMaterial): void => {
+      const m = new Mesh(g, mat);
+      m.renderOrder = 1;
+      zoneGroup.add(m);
+    };
+    add(stripGeometry(inner, outer, STYLE.zoneFillY), zoneFillMat);
+    // Borders: arcs (offset radially) and the two side lines (offset in x).
+    add(stripGeometry(arc(lo - w), arc(lo + w), STYLE.zoneBorderY), zoneBorderMat);
+    add(stripGeometry(arc(hi - w), arc(hi + w), STYLE.zoneBorderY), zoneBorderMat);
+    const side = (x: number): void => {
+      const a = inner[x === zone.xMin ? 0 : n] as [number, number];
+      const b = outer[x === zone.xMin ? 0 : n] as [number, number];
+      add(stripGeometry([[a[0] - w, a[1]], [b[0] - w, b[1]]], [[a[0] + w, a[1]], [b[0] + w, b[1]]], STYLE.zoneBorderY), zoneBorderMat);
+    };
+    side(zone.xMin);
+    side(zone.xMax);
+    zoneGroup.visible = true;
+  }
+
   function resize(): void {
     const w = Math.max(1, canvas.clientWidth);
     const h = Math.max(1, canvas.clientHeight);
@@ -418,6 +576,11 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     resize,
     render(dt) {
       rig.update(dt, focus);
+      if (highlightIds.length > 0) {
+        pulseClock += dt;
+        const k = 1 + STYLE.scoreRingPulse * Math.sin(pulseClock * STYLE.scoreRingPulseSpeed);
+        scoreRings.forEach((m, i) => m.scale.setScalar((ringBase[i] ?? 0.0375) * k));
+      }
       // The jack marker is only needed while the camera is far from the jack.
       const show =
         focus.jack !== null &&
@@ -430,5 +593,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     setCameraMode: (mode) => rig.setMode(mode),
     setAimPreview,
     setResultLine,
+    setScoringHighlight,
+    setJackZone,
   };
 }

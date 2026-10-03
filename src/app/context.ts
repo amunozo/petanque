@@ -1,0 +1,40 @@
+/** What the app modes (practice, match) share: view, HUD, config and input plumbing. */
+import type { AimPreview, LoftPicker, ThrowIntent } from '../input';
+import type { PitchScene } from '../render';
+import type { ConfigStore, GameConfig } from '../tuning';
+import type { Haptics } from './haptics';
+import type { Hud } from './hud';
+import type { MatchHud } from './matchHud';
+
+export interface AppContext {
+  app: HTMLElement;
+  store: ConfigStore;
+  /** Live config (mutated in place by the tuning panel). */
+  cfg: GameConfig;
+  scene: PitchScene;
+  hud: Hud;
+  matchHud: MatchHud;
+  haptics: Haptics;
+  loftPicker: LoftPicker;
+  /** Re-evaluates whether throw gestures / the touch cue are active (call after any state change). */
+  refreshInput(): void;
+  /** Counts a throw for the "touch here" cue. */
+  noteThrow(): void;
+  /** Fresh seed for a new session (the `?seed=` URL param for the first one, for reproducible runs). */
+  newSeed(): number;
+}
+
+export interface Mode {
+  /** Show this mode's UI and start a fresh session. */
+  enter(): void;
+  /** Hide this mode's UI and drop any simulation in progress. */
+  exit(): void;
+  /** May a throw gesture start now (menu / panel / dialogs are checked by the caller)? */
+  canAim(): boolean;
+  /** Leaving would lose progress, so the menu button asks first. */
+  inProgress(): boolean;
+  onPreview(p: AimPreview | null): void;
+  onThrow(intent: ThrowIntent): void;
+  /** Once per animation frame: advance the simulation and sync the view's bodies. */
+  frame(dtReal: number): void;
+}

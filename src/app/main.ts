@@ -1,35 +1,24 @@
 /**
- * Practice mode wiring: config store + tuning panel + input -> game state
- * (games/petanque/practice) -> engine stepping (fixed timestep accumulator) ->
- * three.js view + DOM HUD. Config is read live (store.config is mutated in place).
+ * App wiring: config store + tuning panel + input + start menu. The menu picks a
+ * mode (practice / 2-player match, each in its own file); main owns what they
+ * share: the three.js view, the HUD, gesture routing and the frame loop.
+ * Config is read live (store.config is mutated in place).
  */
 import '../style.css';
-import { isSettled, step, type SimEvent, type ThrowParams, type Vec3, type World } from '../engine';
-import {
-  beginThrow,
-  closestBoule,
-  createPractice,
-  distancesToJack,
-  JACK_ID,
-  newEnd,
-  predictRestPoint,
-  previewThrow,
-  settleThrow,
-  type PracticeState,
-} from '../games/petanque';
 import { createLoftPicker, createThrowController, type AimPreview, type ThrowIntent } from '../input';
 import { createPitchScene } from '../render';
-import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema, type LoftPreset } from '../tuning';
+import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema } from '../tuning';
+import type { AppContext, Mode } from './context';
 import { createHaptics } from './haptics';
+import { createHud } from './hud';
+import { createMatchHud } from './matchHud';
+import { createMatchMode } from './matchMode';
+import { confirmDialog, createMenu } from './menu';
+import { createPracticeMode } from './practiceMode';
 import { createTouchHint } from './touchHint';
-import { createHud, formatDistance, type DistanceRow } from './hud';
 
 /** Longest real-time gap one frame may simulate (after a tab switch etc.). */
 const MAX_FRAME_SECONDS = 0.25;
-/** Hard cap on physics steps per frame (avoids a spiral of death on slow devices). */
-const MAX_STEPS_PER_FRAME = 600;
-/** A throw that has not settled after this much simulated time is forced to rest. */
-const MAX_THROW_SECONDS = 40;
 
 const byId = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -46,141 +35,114 @@ const cfg = store.config;
 
 const scene = createPitchScene(canvas, () => store.config);
 const hud = createHud(hudRoot, __BUILD_ID__);
-
-// "Touch here" cue: full (with text) before the first throw, faint for the next few.
+const matchHud = createMatchHud(hudRoot);
+const menu = createMenu(app, __BUILD_ID__);
 const touchHint = createTouchHint(app);
-let throwsDone = 0;
-let dragging = false;
-function refreshTouchHint(): void {
-  touchHint.update(state.phase === 'aiming' && !dragging && !panel.isOpen(), throwsDone);
-}
 const haptics = createHaptics(() => cfg.controls.haptics);
 const loftPicker = createLoftPicker('half');
 app.append(loftPicker.element);
 
-// ---- game session state -----------------------------------------------------
-const seedParam = Number(new URLSearchParams(location.search).get('seed'));
-const seed = Number.isFinite(seedParam) && seedParam !== 0 ? seedParam : Date.now() >>> 0;
+// ---- session / mode plumbing -----------------------------------------------------
+const params = new URLSearchParams(location.search);
+const seedParam = Number(params.get('seed'));
+let seedPending = Number.isFinite(seedParam) && seedParam !== 0 ? seedParam : null;
 
-let state: PracticeState = createPractice(seed, cfg);
-let world: World | null = null;
-let accumulator = 0;
-let sessionBest: number | null = null;
+let mode: Mode | null = null;
+let throwsDone = 0;
+let dragging = false;
+let dialogOpen = false;
 
-const lastThrowId = (): string | null => state.throws[state.throws.length - 1]?.id ?? null;
+const ctx: AppContext = {
+  app,
+  store,
+  cfg,
+  scene,
+  hud,
+  matchHud,
+  haptics,
+  loftPicker,
+  refreshInput: () => refreshInput(),
+  noteThrow: () => {
+    throwsDone++;
+  },
+  newSeed: () => {
+    const s = seedPending ?? Date.now() >>> 0;
+    seedPending = null; // `?seed=` applies to the first session only
+    return s;
+  },
+};
 
-function updateStatus(): void {
-  const total = cfg.practice.boulesPerEnd;
-  const n = Math.min(total, state.throws.length + (state.phase === 'aiming' ? 1 : 0));
-  hud.setStatus(state.phase === 'endOver' ? `End ${state.endNumber} · done` : `End ${state.endNumber} · Boule ${n}/${total}`);
-}
+const panel = createTuningPanel(store, tuningSchema, { onOpenChange: () => refreshInput() });
+const practice = createPracticeMode(ctx);
+const match = createMatchMode(ctx, () => goMenu());
 
-function showResult(): void {
-  const d = distancesToJack(state);
-  const best = closestBoule(state);
-  const rows: DistanceRow[] = d.entries.map((e) => ({
-    label: `Boule ${e.throwNumber}:`,
-    text: e.out ? 'OUT' : e.distance === null ? '-' : formatDistance(e.distance),
-    closest: best !== null && best.id === e.id,
-    out: e.out,
-  }));
-  if (d.jackOut) rows.unshift({ label: 'Jack:', text: 'OUT', closest: false, out: true });
-  hud.setDistances(rows);
+/** Can the player start a throw gesture right now? */
+const inputOpen = (): boolean => mode !== null && mode.canAim() && !panel.isOpen() && !menu.isOpen() && !dialogOpen;
 
-  const jack = state.bodies.find((b) => b.id === JACK_ID);
-  const closest = best ? state.bodies.find((b) => b.id === best.id) : undefined;
-  scene.setResultLine(jack && closest ? jack.pos : null, jack && closest ? closest.pos : null);
-
-  if (state.phase === 'endOver') {
-    if (best && best.distance !== null && (sessionBest === null || best.distance < sessionBest)) sessionBest = best.distance;
-    hud.showEndCard({
-      best: best && best.distance !== null ? formatDistance(best.distance) : null,
-      sessionBest: sessionBest === null ? null : formatDistance(sessionBest),
-      ...(d.jackOut ? { note: 'Jack out' } : best ? {} : { note: 'All boules out' }),
-    });
-  }
-}
-
-function resetView(): void {
-  hud.setDistances(null);
-  hud.setPower(null);
-  hud.showEndCard(null);
-  app.classList.remove('is-endover');
-  scene.setResultLine(null, null);
-  scene.setAimPreview(null);
-  scene.setCameraMode('aim');
-}
-
-function startNewEnd(): void {
-  world = null;
-  accumulator = 0;
-  state = newEnd(state, cfg);
-  resetView();
-  updateStatus();
-  updateInputEnabled();
-}
-
-function onThrow(intent: ThrowIntent): void {
-  if (state.phase !== 'aiming' || panel.isOpen()) return;
-  throwsDone++;
-  const r = beginThrow(state, intent, cfg);
-  state = r.state;
-  world = r.world;
-  accumulator = 0;
-  hud.setDistances(null);
-  hud.setPower(null);
-  scene.setAimPreview(null);
-  scene.setResultLine(null, null);
-  scene.setCameraMode('flight');
-  updateStatus();
-  updateInputEnabled();
-}
-
-// Roll-out prediction (lone-boule simulation): cached on rounded (aim, power, loft, tuning) so it
-// only reruns when the preview meaningfully changes.
-let restKey = '';
-let restPoint: Vec3 | null = null;
-store.subscribe(() => {
-  restKey = ''; // any tuning change invalidates the cache
-});
-function restFor(p: AimPreview, loft: LoftPreset, params: ThrowParams): Vec3 | null {
-  if (cfg.controls.rollHintFrac <= 0) return null;
-  const key = `${Math.round(p.aim * 1000)}|${Math.round(p.power * 200)}|${loft}`;
-  if (key !== restKey) {
-    restKey = key;
-    restPoint = predictRestPoint(params, cfg);
-  }
-  return restPoint;
-}
-
-function onPreview(p: AimPreview | null): void {
-  if (!p || state.phase !== 'aiming') {
-    hud.setPower(null);
-    scene.setAimPreview(null);
-    return;
-  }
-  scene.setCameraMode('aim');
-  hud.setPower(cfg.controls.showPowerMeter ? p.power : null);
-  const loft = loftPicker.get();
-  const { params, flight } = previewThrow({ aim: p.aim, power: p.power, loft }, cfg);
-  scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, rest: restFor(p, loft, params), points: flight.points });
-}
-
-// ---- input ------------------------------------------------------------------
-const panel = createTuningPanel(store, tuningSchema, { onOpenChange: () => updateInputEnabled() });
 const controller = createThrowController(canvas, () => store.config, () => loftPicker.get(), {
-  onPreview,
-  onThrow,
+  onPreview: (p: AimPreview | null) => {
+    if (!inputOpen()) {
+      mode?.onPreview(null);
+      return;
+    }
+    mode?.onPreview(p);
+  },
+  onThrow: (intent: ThrowIntent) => {
+    if (inputOpen()) mode?.onThrow(intent);
+  },
 });
 
-function updateInputEnabled(): void {
-  controller.setEnabled(state.phase === 'aiming' && !panel.isOpen());
-  refreshTouchHint();
+function refreshInput(): void {
+  const open = inputOpen();
+  controller.setEnabled(open);
+  // "Touch here" cue: full (with text) before the first throw, faint for the next few.
+  touchHint.update(open && !dragging, throwsDone);
 }
+
+function enterMode(next: Mode): void {
+  mode = next;
+  menu.hide();
+  next.enter();
+  refreshInput();
+}
+
+function goMenu(): void {
+  mode?.exit();
+  mode = null;
+  scene.setAimPreview(null);
+  scene.setCameraMode('aim');
+  menu.show();
+  refreshInput();
+}
+
+async function requestMenu(): Promise<void> {
+  if (!mode || dialogOpen) return;
+  if (mode.inProgress()) {
+    dialogOpen = true;
+    refreshInput();
+    const leave = await confirmDialog(app, {
+      title: 'Leave the match?',
+      text: 'The current match will be lost.',
+      confirmLabel: 'Leave',
+      cancelLabel: 'Keep playing',
+    });
+    dialogOpen = false;
+    if (!leave) {
+      refreshInput();
+      return;
+    }
+  }
+  goMenu();
+}
+
+menu.setMatchInfo(`First to ${cfg.match.pointsToWin}`);
+menu.onPractice(() => enterMode(practice));
+menu.onMatch(() => enterMode(match));
+hud.onMenu(() => void requestMenu());
 
 // Any touch on the field while aiming brings the camera back behind the circle.
 canvas.addEventListener('pointerdown', () => {
-  if (state.phase === 'aiming' && !panel.isOpen()) scene.setCameraMode('aim');
+  if (inputOpen()) scene.setCameraMode('aim');
 });
 
 // The cue hides while a finger is down (pointer capture keeps up/cancel on the canvas).
@@ -189,14 +151,11 @@ const trackFinger = (e: PointerEvent, isDown: boolean): void => {
   if (isDown) fingers.add(e.pointerId);
   else fingers.delete(e.pointerId);
   dragging = fingers.size > 0;
-  refreshTouchHint();
+  refreshInput();
 };
 canvas.addEventListener('pointerdown', (e) => trackFinger(e, true));
 canvas.addEventListener('pointerup', (e) => trackFinger(e, false));
 canvas.addEventListener('pointercancel', (e) => trackFinger(e, false));
-
-hud.onNewEnd(startNewEnd);
-hud.onNextEnd(startNewEnd);
 
 // ---- fullscreen (hidden where unsupported, e.g. iOS Safari) -----------------------
 if (document.fullscreenEnabled && typeof app.requestFullscreen === 'function') {
@@ -219,46 +178,20 @@ window.visualViewport?.addEventListener('resize', resize);
 window.addEventListener('orientationchange', resize);
 
 // ---- main loop ----------------------------------------------------------------
-function settle(w: World): void {
-  state = settleThrow(state, w, cfg);
-  world = null;
-  accumulator = 0;
-  scene.setCameraMode('rest');
-  app.classList.toggle('is-endover', state.phase === 'endOver');
-  showResult();
-  updateStatus();
-  updateInputEnabled();
-}
-
-function simulate(dtReal: number): void {
-  const w = world;
-  if (!w || state.phase !== 'inFlight') return;
-  accumulator += dtReal * cfg.camera.playbackSpeed;
-  const dt = cfg.physics.fixedDt;
-  const frameEvents: SimEvent[] = [];
-  let steps = 0;
-  while (accumulator >= dt && steps < MAX_STEPS_PER_FRAME) {
-    for (const e of step(w, cfg.physics)) frameEvents.push(e);
-    accumulator -= dt;
-    steps++;
-    if (isSettled(w) || w.time > MAX_THROW_SECONDS) break;
-  }
-  if (steps >= MAX_STEPS_PER_FRAME) accumulator = 0; // drop the backlog instead of spiralling
-  haptics.handle(frameEvents);
-  if (isSettled(w) || w.time > MAX_THROW_SECONDS) settle(w);
-}
-
 let lastFrame = performance.now();
 function frame(now: number): void {
   const dtReal = Math.min(MAX_FRAME_SECONDS, Math.max(0, (now - lastFrame) / 1000));
   lastFrame = now;
-  simulate(dtReal);
-  scene.syncBodies(world ? world.bodies : state.bodies, lastThrowId());
+  if (mode) mode.frame(dtReal);
+  else scene.syncBodies([], null);
   scene.render(dtReal);
   requestAnimationFrame(frame);
 }
 
 resize();
-updateStatus();
-updateInputEnabled();
+// `?mode=practice|match` skips the menu (handy for dev and screenshots).
+const startMode = params.get('mode');
+if (startMode === 'practice') enterMode(practice);
+else if (startMode === 'match') enterMode(match);
+else goMenu();
 requestAnimationFrame(frame);
