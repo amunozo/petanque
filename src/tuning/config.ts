@@ -89,6 +89,19 @@ export interface GameConfig {
     jackMaxDist: number;
     boulesPerEnd: number;
   };
+  /** Scene look: low late-afternoon sun, exposure, haze. Read live by src/render/lighting.ts. */
+  look: {
+    /** Sun height above the horizon (degrees). */
+    sunElevationDeg: number;
+    /** Sun direction around the court: 0 = behind the player (+Z), 90 = from the right (+X), -90 = from the left. */
+    sunAzimuthDeg: number;
+    /** Directional light intensity. */
+    sunIntensity: number;
+    /** Tone-mapping exposure. */
+    exposure: number;
+    /** Exponential fog density (1/m): higher = hazier distance. */
+    fogDensity: number;
+  };
   /** Rules of a full match (see games/petanque/match.ts). */
   match: MatchRules;
   /** Computer opponent per difficulty (see games/petanque/ai.ts). */
@@ -161,6 +174,7 @@ export const defaultConfig: GameConfig = {
     closeUpMaxZoomOut: 5,
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
+  look: { sunElevationDeg: 34, sunAzimuthDeg: 62, sunIntensity: 3.0, exposure: 1, fogDensity: 0.022 },
   match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
   ai: {
     easy: { aimErrorDeg: 3, powerErrorPct: 8, canShoot: false, maxSimulations: 30 },
@@ -255,6 +269,16 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'camera.closeUpHeight', label: 'close-up height', min: 0.4, max: 4, step: 0.05 },
       { path: 'camera.closeUpBack', label: 'close-up back', min: 0.3, max: 4, step: 0.05 },
       { path: 'camera.closeUpMaxZoomOut', label: 'close-up max zoom-out', min: 1, max: 6, step: 0.1 },
+    ],
+  },
+  {
+    title: 'Look',
+    fields: [
+      { path: 'look.sunElevationDeg', label: 'sun height°', min: 8, max: 80, step: 1 },
+      { path: 'look.sunAzimuthDeg', label: 'sun direction°', min: -180, max: 180, step: 1 },
+      { path: 'look.sunIntensity', label: 'sun intensity', min: 0, max: 8, step: 0.1 },
+      { path: 'look.exposure', label: 'exposure', min: 0.3, max: 2.5, step: 0.05 },
+      { path: 'look.fogDensity', label: 'haze', min: 0, max: 0.08, step: 0.002 },
     ],
   },
   {

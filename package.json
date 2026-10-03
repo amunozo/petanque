@@ -1,6 +1,6 @@
 {
   "name": "petanque",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "art": "sh -c 'if [ -x art/.venv/bin/python ]; then art/.venv/bin/python art/build.py \"$@\"; else python3 art/build.py \"$@\"; fi' --"
   },
   "dependencies": {
     "three": "^0.186.1"

@@ -1,24 +1,21 @@
 /**
- * Three.js game view (placeholder primitives). Reads simulation state, never
- * mutates it. The pitch is built once from config.physics.arena / throw origin;
- * everything else (camera, preview toggles, ball radii) is read live.
+ * Three.js game view. Reads simulation state, never mutates it. The court, boards and
+ * trees come from the Blender-made models (scenery.ts), light and sky from lighting.ts;
+ * the boules, jack and aiming overlays are still primitives built here. The pitch is built
+ * once from config.physics.arena / throw origin; everything else (camera, preview toggles,
+ * ball radii, look) is read live.
  */
 import {
-  BoxGeometry,
   BufferAttribute,
   BufferGeometry,
   CanvasTexture,
   Color,
   CylinderGeometry,
   DoubleSide,
-  DirectionalLight,
-  Fog,
   Group,
-  HemisphereLight,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
-  PCFShadowMap,
   PerspectiveCamera,
   Points,
   PointsMaterial,
@@ -36,13 +33,14 @@ import type { TeamId } from '../games/petanque/matchTypes';
 import type { Vec3 } from '../engine/vec3';
 import type { GameConfig } from '../tuning/config';
 import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
+import { createDevStats } from './devStats';
+import { createLighting } from './lighting';
+import { loadScenery } from './scenery';
 
 /** Look-and-feel constants of the placeholder art (not game feel). */
 const STYLE = {
   maxPixelRatio: 2,
   throwCircleRadius: 0.25,
-  boardHeight: 0.08,
-  boardThickness: 0.06,
   jackColor: 0xffd23a,
   /** Boule tint (multiplies the grey metal texture): neutral = practice, A = cool blue steel, B = warm red bronze. */
   bouleColor: 0xffffff,
@@ -150,61 +148,14 @@ function makeBouleTexture(): CanvasTexture {
 export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => GameConfig): PitchScene {
   const cfg0 = getConfig();
   const arena = cfg0.physics.arena;
-  const width = arena.maxX - arena.minX;
-  const length = arena.maxZ - arena.minZ;
-  const cx = (arena.minX + arena.maxX) / 2;
-  const cz = (arena.minZ + arena.maxZ) / 2;
 
   const renderer = new WebGLRenderer({ canvas, antialias: true });
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = PCFShadowMap;
-
   const scene = new Scene();
-  scene.background = new Color(0x9ec9e8);
-  scene.fog = new Fog(0x9ec9e8, 14, 32);
-
-  const camera = new PerspectiveCamera(cfg0.camera.fovDeg, 1, 0.05, 60);
+  const camera = new PerspectiveCamera(cfg0.camera.fovDeg, 1, 0.05, 90);
   const rig = createCameraRig(camera, getConfig);
-
-  scene.add(new HemisphereLight(0xcfe6ff, 0x8a7a5a, 1.4));
-  const sun = new DirectionalLight(0xfff2dd, 2.4);
-  sun.position.set(cx + 3, 8, cz + 3);
-  sun.target.position.set(cx, 0, cz);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  const sc = sun.shadow.camera;
-  sc.left = -(width / 2 + 1);
-  sc.right = width / 2 + 1;
-  sc.top = length / 2 + 1.5;
-  sc.bottom = -(length / 2 + 1.5);
-  sc.near = 1;
-  sc.far = 24;
-  sun.shadow.bias = -0.0005;
-  scene.add(sun, sun.target);
-
-  // Surrounding lawn
-  const lawn = new Mesh(new PlaneGeometry(60, 60), new MeshStandardMaterial({ color: 0x4f8a45, roughness: 1 }));
-  lawn.rotation.x = -Math.PI / 2;
-  lawn.position.set(cx, -0.002, cz);
-  lawn.receiveShadow = true;
-  scene.add(lawn);
-
-  // Gravel pitch = the arena footprint
-  const ground = new Mesh(new PlaneGeometry(width, length), new MeshStandardMaterial({ color: 0xd2b887, roughness: 1 }));
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.set(cx, 0, cz);
-  ground.receiveShadow = true;
-  scene.add(ground);
-
-  // Side boards: inner faces at x = minX / maxX
-  const boardMat = new MeshStandardMaterial({ color: 0x7a5a38, roughness: 0.9 });
-  for (const x of [arena.minX - STYLE.boardThickness / 2, arena.maxX + STYLE.boardThickness / 2]) {
-    const board = new Mesh(new BoxGeometry(STYLE.boardThickness, STYLE.boardHeight, length), boardMat);
-    board.position.set(x, STYLE.boardHeight / 2, cz);
-    board.castShadow = true;
-    board.receiveShadow = true;
-    scene.add(board);
-  }
+  const lighting = createLighting(scene, renderer, getConfig, arena);
+  loadScenery(scene, arena);
+  const devStats = createDevStats(renderer);
 
   // Throwing circle at the throw origin
   const ring = new Mesh(
@@ -238,12 +189,12 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   const axis = new Vector3();
 
   // Jack marker (the jack itself is only ~3 cm wide, invisible from the aim view)
-  const markerMat = new MeshBasicMaterial({ color: STYLE.jackColor, transparent: true, opacity: 0.7, depthWrite: false });
+  const markerMat = new MeshBasicMaterial({ color: STYLE.jackColor, transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false });
   const markerRing = new Mesh(new RingGeometry(STYLE.jackMarkerRingInner, STYLE.jackMarkerRingOuter, 32), markerMat);
   markerRing.rotation.x = -Math.PI / 2;
   const markerBeam = new Mesh(
     new CylinderGeometry(0.01, 0.01, STYLE.jackMarkerBeamHeight, 8),
-    new MeshBasicMaterial({ color: STYLE.jackColor, transparent: true, opacity: 0.55, depthWrite: false }),
+    new MeshBasicMaterial({ color: STYLE.jackColor, transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false }),
   );
   markerRing.visible = false;
   markerBeam.visible = false;
@@ -252,7 +203,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   // Scoring rings (pooled; one per highlighted id)
   const scoreRingGeo = new RingGeometry(STYLE.scoreRingInner, STYLE.scoreRingOuter, 40);
   scoreRingGeo.rotateX(-Math.PI / 2);
-  const scoreRingMat = new MeshBasicMaterial({ color: STYLE.teamRingColor.A, transparent: true, opacity: 0.95, depthWrite: false, side: DoubleSide });
+  const scoreRingMat = new MeshBasicMaterial({ color: STYLE.teamRingColor.A, transparent: true, opacity: 0.95, depthWrite: false, side: DoubleSide, toneMapped: false });
   const scoreRings: Mesh[] = [];
   const ringBase: number[] = [];
   let highlightIds: readonly string[] = [];
@@ -349,7 +300,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   const flat = new PlaneGeometry(1, 1);
   flat.rotateX(-Math.PI / 2);
   const mkRibbon = (color: number, opacity: number): Mesh => {
-    const m = new Mesh(flat, new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
+    const m = new Mesh(flat, new MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false }));
     m.visible = false;
     scene.add(m);
     return m;
@@ -367,7 +318,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
 
   const landingMarker = new Mesh(
     new RingGeometry(STYLE.landingRingInner, STYLE.landingRingOuter, 40),
-    new MeshBasicMaterial({ color: 0xff7a2f, transparent: true, opacity: 0.9, depthWrite: false }),
+    new MeshBasicMaterial({ color: 0xff7a2f, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false }),
   );
   landingMarker.rotation.x = -Math.PI / 2;
   landingMarker.visible = false;
@@ -399,7 +350,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     geo.setDrawRange(0, 0);
     const points = new Points(
       geo,
-      new PointsMaterial({ map: dotTex, size: STYLE.dotPx, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false }),
+      new PointsMaterial({ map: dotTex, size: STYLE.dotPx, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, toneMapped: false }),
     );
     points.frustumCulled = false;
     points.visible = false;
@@ -495,8 +446,8 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   const zoneGroup = new Group();
   zoneGroup.visible = false;
   scene.add(zoneGroup);
-  const zoneFillMat = new MeshBasicMaterial({ color: STYLE.zoneColor, transparent: true, opacity: STYLE.zoneFillOpacity, depthWrite: false, side: DoubleSide });
-  const zoneBorderMat = new MeshBasicMaterial({ color: STYLE.zoneColor, transparent: true, opacity: STYLE.zoneBorderOpacity, depthWrite: false, side: DoubleSide });
+  const zoneFillMat = new MeshBasicMaterial({ color: STYLE.zoneColor, transparent: true, opacity: STYLE.zoneFillOpacity, depthWrite: false, side: DoubleSide, toneMapped: false });
+  const zoneBorderMat = new MeshBasicMaterial({ color: STYLE.zoneColor, transparent: true, opacity: STYLE.zoneBorderOpacity, depthWrite: false, side: DoubleSide, toneMapped: false });
 
   /** Triangle strip between two equally long polylines on the ground (x, z pairs) at height y. */
   function stripGeometry(a: readonly [number, number][], b: readonly [number, number][], y: number): BufferGeometry {
@@ -587,7 +538,9 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
         camToJack.set(focus.jack.x, focus.jack.y, focus.jack.z).sub(camera.position).length() > STYLE.jackMarkerMinCamDist;
       markerRing.visible = show;
       markerBeam.visible = show;
+      lighting.update(camera);
       renderer.render(scene, camera);
+      devStats.frame();
     },
     syncBodies,
     setCameraMode: (mode) => rig.setMode(mode),

@@ -1,0 +1,2 @@
+# Blender as a Python module. Needs Python 3.11 exactly (the wheel is cp311).
+bpy==5.0.1
