@@ -21,9 +21,9 @@ Set `BUILD_ID=...` when building to change the id shown on screen (defaults to `
 
 ## Live versions
 
-- Latest (`main` and `ccr-*` branch pushes): https://amunozo.github.io/petanque/
+- Latest (`main` and `ccr-*` branch pushes): https://www.amunozo.com/petanque/
 - Frozen versions, one per `package.json` version (bump it to freeze a phase):
-  https://amunozo.github.io/petanque/v/v<version>/, e.g. https://amunozo.github.io/petanque/v/v0.0.0/
+  https://www.amunozo.com/petanque/v/v<version>/, e.g. https://www.amunozo.com/petanque/v/v0.0.0/
 
 The build id (tag, or `<branch>@<short sha>`) is shown in the top-left corner so you
 can confirm which version is loaded. There is deliberately no service worker, so a

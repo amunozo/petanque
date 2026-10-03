@@ -36,7 +36,7 @@ src/
   `gh-pages` branch: branch pushes -> site root (latest) AND
   `v/v<package.json version>/` (frozen per phase: bump the version to start a
   new one). Git tags can't be pushed from the cloud dev env.
-  Live at https://amunozo.github.io/petanque/
+  Live at https://www.amunozo.com/petanque/
 - The build id (commit sha or tag) is shown on screen so testers can confirm
   they have the latest version.
 
