@@ -35,6 +35,7 @@ jobs:
         id: build
         run: |
           SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+          echo "version=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             echo "id=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
@@ -53,6 +54,16 @@ jobs:
           folder: dist
           clean-exclude: |
             v/**
+
+      # Also keep a frozen copy per package.json version (git tags can't be
+      # pushed from the dev environment). Bump the version to freeze a phase.
+      - name: Deploy branch build to v/<package version>/
+        if: github.ref_type != 'tag'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          target-folder: v/${{ steps.build.outputs.version }}
 
       - name: Deploy tagged build to v/<tag>/
         if: github.ref_type == 'tag'

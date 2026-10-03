@@ -33,7 +33,9 @@ src/
 
 ## Deploy
 - `.github/workflows/deploy.yml` builds on push and publishes to the
-  `gh-pages` branch: branch pushes -> site root (latest); tags `v*` ->
-  `v/<tag>/` (frozen versions). Live at https://amunozo.github.io/petanque/
+  `gh-pages` branch: branch pushes -> site root (latest) AND
+  `v/v<package.json version>/` (frozen per phase: bump the version to start a
+  new one). Git tags can't be pushed from the cloud dev env.
+  Live at https://amunozo.github.io/petanque/
 - The build id (commit sha or tag) is shown on screen so testers can confirm
   they have the latest version.
