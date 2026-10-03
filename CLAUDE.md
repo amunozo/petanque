@@ -39,3 +39,10 @@ src/
   Live at https://amunozo.github.io/petanque/
 - The build id (commit sha or tag) is shown on screen so testers can confirm
   they have the latest version.
+
+## Git
+- Commits are authored by Alberto (`54112057+amunozo@users.noreply.github.com`).
+  Never add Claude/AI attribution: no `Co-Authored-By` or `Claude-Session`
+  trailers, no "Generated with Claude Code" in PR bodies. Enforced by
+  `.claude/settings.json` (attribution off + SessionStart git config) and
+  `.githooks/commit-msg`.
