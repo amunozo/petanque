@@ -1,0 +1,63 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - 'ccr-*'
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Compute build id
+        id: build
+        run: |
+          SHORT_SHA="$(git rev-parse --short=7 HEAD)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "id=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "id=${GITHUB_REF_NAME}@${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - run: npm run build
+        env:
+          BUILD_ID: ${{ steps.build.outputs.id }}
+
+      - name: Deploy branch build to site root
+        if: github.ref_type != 'tag'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          clean-exclude: |
+            v/**
+
+      - name: Deploy tagged build to v/<tag>/
+        if: github.ref_type == 'tag'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          target-folder: v/${{ github.ref_name }}
