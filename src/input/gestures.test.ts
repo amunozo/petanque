@@ -8,13 +8,14 @@ import {
   type Sample,
 } from './gestures';
 
-const cfg = { ...defaultConfig.controls }; // fullPowerDragPx 260, maxAim 20, sens 0.6, flick 2500
+const cfg = { ...defaultConfig.controls }; // maxAim 20, sens 0.6, flick 2500
 const DEG = Math.PI / 180;
 const start = { x: 200, y: 400 };
+const FULL = 260; // px pull for power 1 in these tests
 
 describe('slingshotIntent', () => {
   it('straight down pull: aim 0, power by distance', () => {
-    const i = slingshotIntent(start, { x: 200, y: 530 }, cfg, 'half');
+    const i = slingshotIntent(start, { x: 200, y: 530 }, cfg, 'half', FULL);
     expect(i).not.toBeNull();
     expect(i?.aim).toBe(0);
     expect(i?.power).toBeCloseTo(0.5, 5);
@@ -22,8 +23,8 @@ describe('slingshotIntent', () => {
   });
 
   it('drag down-right throws LEFT (positive aim); down-left throws right (negative)', () => {
-    const right = slingshotIntent(start, { x: 240, y: 500 }, cfg, 'roll');
-    const left = slingshotIntent(start, { x: 160, y: 500 }, cfg, 'roll');
+    const right = slingshotIntent(start, { x: 240, y: 500 }, cfg, 'roll', FULL);
+    const left = slingshotIntent(start, { x: 160, y: 500 }, cfg, 'roll', FULL);
     expect(right?.aim).toBeGreaterThan(0);
     expect(left?.aim).toBeLessThan(0);
     expect(right?.aim).toBeCloseTo(-(left?.aim ?? 0), 10);
@@ -31,39 +32,39 @@ describe('slingshotIntent', () => {
   });
 
   it('applies sensitivity', () => {
-    const a = slingshotIntent(start, { x: 240, y: 500 }, { ...cfg, maxAimDeg: 90, aimSensitivity: 1 }, 'roll');
-    const b = slingshotIntent(start, { x: 240, y: 500 }, { ...cfg, maxAimDeg: 90, aimSensitivity: 0.5 }, 'roll');
+    const a = slingshotIntent(start, { x: 240, y: 500 }, { ...cfg, maxAimDeg: 90, aimSensitivity: 1 }, 'roll', FULL);
+    const b = slingshotIntent(start, { x: 240, y: 500 }, { ...cfg, maxAimDeg: 90, aimSensitivity: 0.5 }, 'roll', FULL);
     expect((a?.aim ?? 0) / (b?.aim ?? 1)).toBeCloseTo(2, 10);
   });
 
   it('clamps aim to +-maxAimDeg', () => {
-    const r = slingshotIntent(start, { x: 600, y: 420 }, cfg, 'roll');
-    const l = slingshotIntent(start, { x: -200, y: 420 }, cfg, 'roll');
+    const r = slingshotIntent(start, { x: 600, y: 420 }, cfg, 'roll', FULL);
+    const l = slingshotIntent(start, { x: -200, y: 420 }, cfg, 'roll', FULL);
     expect(r?.aim).toBeCloseTo(20 * DEG, 10);
     expect(l?.aim).toBeCloseTo(-20 * DEG, 10);
   });
 
-  it('clamps power to 1 and scales with fullPowerDragPx', () => {
-    expect(slingshotIntent(start, { x: 200, y: 900 }, cfg, 'lob')?.power).toBe(1);
-    const half = slingshotIntent(start, { x: 200, y: 400 + 130 }, { ...cfg, fullPowerDragPx: 130 }, 'lob');
-    expect(half?.power).toBe(1);
+  it('clamps power to 1 and scales with the resolved full-power px', () => {
+    expect(slingshotIntent(start, { x: 200, y: 900 }, cfg, 'lob', FULL)?.power).toBe(1);
+    expect(slingshotIntent(start, { x: 200, y: 400 + 130 }, cfg, 'lob', 130)?.power).toBe(1);
+    expect(slingshotIntent(start, { x: 200, y: 400 + 130 }, cfg, 'lob', 520)?.power).toBeCloseTo(0.25, 10);
   });
 
   it('dead zone: tiny pulls are cancelled', () => {
-    expect(slingshotIntent(start, { x: 200, y: 405 }, cfg, 'roll')).toBeNull();
-    expect(slingshotIntent(start, { x: 205, y: 411 }, cfg, 'roll')).toBeNull();
-    expect(slingshotIntent(start, { x: 200, y: 412 }, cfg, 'roll')).not.toBeNull();
-    expect(slingshotIntent(start, start, cfg, 'roll')).toBeNull();
+    expect(slingshotIntent(start, { x: 200, y: 405 }, cfg, 'roll', FULL)).toBeNull();
+    expect(slingshotIntent(start, { x: 205, y: 411 }, cfg, 'roll', FULL)).toBeNull();
+    expect(slingshotIntent(start, { x: 200, y: 412 }, cfg, 'roll', FULL)).not.toBeNull();
+    expect(slingshotIntent(start, start, cfg, 'roll', FULL)).toBeNull();
   });
 
   it('upward and sideways drags are the cancel zone', () => {
-    expect(slingshotIntent(start, { x: 200, y: 300 }, cfg, 'roll')).toBeNull();
-    expect(slingshotIntent(start, { x: 260, y: 350 }, cfg, 'roll')).toBeNull();
-    expect(slingshotIntent(start, { x: 400, y: 402 }, cfg, 'roll')).toBeNull();
+    expect(slingshotIntent(start, { x: 200, y: 300 }, cfg, 'roll', FULL)).toBeNull();
+    expect(slingshotIntent(start, { x: 260, y: 350 }, cfg, 'roll', FULL)).toBeNull();
+    expect(slingshotIntent(start, { x: 400, y: 402 }, cfg, 'roll', FULL)).toBeNull();
   });
 
   it('never yields -0 aim', () => {
-    const i = slingshotIntent(start, { x: 200, y: 500 }, cfg, 'roll');
+    const i = slingshotIntent(start, { x: 200, y: 500 }, cfg, 'roll', FULL);
     expect(Object.is(i?.aim, 0)).toBe(true);
   });
 });
@@ -71,12 +72,12 @@ describe('slingshotIntent', () => {
 describe('slingshotPreview', () => {
   it('mirrors the intent and carries raw points', () => {
     const cur = { x: 230, y: 480 };
-    const p = slingshotPreview(start, cur, cfg, 'roll');
-    const i = slingshotIntent(start, cur, cfg, 'roll');
+    const p = slingshotPreview(start, cur, cfg, 'roll', FULL);
+    const i = slingshotIntent(start, cur, cfg, 'roll', FULL);
     expect(p).toEqual({ aim: i?.aim, power: i?.power, start, current: cur });
   });
   it('is null in the cancel zone', () => {
-    expect(slingshotPreview(start, { x: 200, y: 380 }, cfg, 'roll')).toBeNull();
+    expect(slingshotPreview(start, { x: 200, y: 380 }, cfg, 'roll', FULL)).toBeNull();
   });
 });
 

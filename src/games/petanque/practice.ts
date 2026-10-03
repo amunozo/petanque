@@ -16,6 +16,7 @@ import {
   nextNormal,
   nextRandom,
   predictFlight,
+  simulateToRest,
   seedToState,
   launch,
   type Body,
@@ -23,6 +24,7 @@ import {
   type RngState,
   type ThrowIntent,
   type ThrowParams,
+  type Vec3,
   type World,
 } from '../../engine';
 import type { GameConfig } from '../../tuning/config';
@@ -208,4 +210,15 @@ export function previewThrow(
 ): { params: ThrowParams; flight: FlightPrediction } {
   const params = intentToThrow(intent, cfg.throw, { aim: 0, power: 0 });
   return { params, flight: predictFlight(params, cfg.physics, cfg.balls.boule.radius, sampleInterval) };
+}
+
+/**
+ * Where a boule thrown with `params` would come to rest if it were alone on the
+ * pitch (no other balls, no noise): a deterministic lone-boule simulation.
+ * Pair it with previewThrow's landing point to show the roll-out.
+ */
+export function predictRestPoint(params: ThrowParams, cfg: PracticeConfig): Vec3 {
+  const probe = createBody('predict', 'predict', cfg.balls.boule, params.origin);
+  const { world } = simulateToRest(launch({ time: 0, bodies: [] }, probe, params), cfg.physics);
+  return { ...(world.bodies[0] as Body).pos };
 }

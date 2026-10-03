@@ -4,7 +4,7 @@
  * three.js view + DOM HUD. Config is read live (store.config is mutated in place).
  */
 import '../style.css';
-import { isSettled, step, type SimEvent, type World } from '../engine';
+import { isSettled, step, type SimEvent, type ThrowParams, type Vec3, type World } from '../engine';
 import {
   beginThrow,
   closestBoule,
@@ -12,14 +12,16 @@ import {
   distancesToJack,
   JACK_ID,
   newEnd,
+  predictRestPoint,
   previewThrow,
   settleThrow,
   type PracticeState,
 } from '../games/petanque';
 import { createLoftPicker, createThrowController, type AimPreview, type ThrowIntent } from '../input';
 import { createPitchScene } from '../render';
-import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema } from '../tuning';
+import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema, type LoftPreset } from '../tuning';
 import { createHaptics } from './haptics';
+import { createTouchHint } from './touchHint';
 import { createHud, formatDistance, type DistanceRow } from './hud';
 
 /** Longest real-time gap one frame may simulate (after a tab switch etc.). */
@@ -45,15 +47,13 @@ const cfg = store.config;
 const scene = createPitchScene(canvas, () => store.config);
 const hud = createHud(hudRoot, __BUILD_ID__);
 
-// First-throw hint: shown until the player's first throw of this page load.
-const hint = document.createElement('div');
-hint.className = 'throw-hint';
-hint.innerHTML = 'Put your finger anywhere,<br><b>pull down</b> and <b>let go</b> to throw<span class="throw-hint-arrow">↓</span>';
-app.append(hint);
-let hasThrown = false;
-const setHint = (visible: boolean): void => {
-  hint.hidden = hasThrown || !visible;
-};
+// "Touch here" cue: full (with text) before the first throw, faint for the next few.
+const touchHint = createTouchHint(app);
+let throwsDone = 0;
+let dragging = false;
+function refreshTouchHint(): void {
+  touchHint.update(state.phase === 'aiming' && !dragging && !panel.isOpen(), throwsDone);
+}
 const haptics = createHaptics(() => cfg.controls.haptics);
 const loftPicker = createLoftPicker('half');
 app.append(loftPicker.element);
@@ -122,8 +122,7 @@ function startNewEnd(): void {
 
 function onThrow(intent: ThrowIntent): void {
   if (state.phase !== 'aiming' || panel.isOpen()) return;
-  hasThrown = true;
-  setHint(false);
+  throwsDone++;
   const r = beginThrow(state, intent, cfg);
   state = r.state;
   world = r.world;
@@ -137,17 +136,34 @@ function onThrow(intent: ThrowIntent): void {
   updateInputEnabled();
 }
 
+// Roll-out prediction (lone-boule simulation): cached on rounded (aim, power, loft, tuning) so it
+// only reruns when the preview meaningfully changes.
+let restKey = '';
+let restPoint: Vec3 | null = null;
+store.subscribe(() => {
+  restKey = ''; // any tuning change invalidates the cache
+});
+function restFor(p: AimPreview, loft: LoftPreset, params: ThrowParams): Vec3 | null {
+  if (cfg.controls.rollHintFrac <= 0) return null;
+  const key = `${Math.round(p.aim * 1000)}|${Math.round(p.power * 200)}|${loft}`;
+  if (key !== restKey) {
+    restKey = key;
+    restPoint = predictRestPoint(params, cfg);
+  }
+  return restPoint;
+}
+
 function onPreview(p: AimPreview | null): void {
-  setHint(!p);
   if (!p || state.phase !== 'aiming') {
     hud.setPower(null);
     scene.setAimPreview(null);
     return;
   }
   scene.setCameraMode('aim');
-  hud.setPower(p.power);
-  const { params, flight } = previewThrow({ aim: p.aim, power: p.power, loft: loftPicker.get() }, cfg);
-  scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, points: flight.points });
+  hud.setPower(cfg.controls.showPowerMeter ? p.power : null);
+  const loft = loftPicker.get();
+  const { params, flight } = previewThrow({ aim: p.aim, power: p.power, loft }, cfg);
+  scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, rest: restFor(p, loft, params), points: flight.points });
 }
 
 // ---- input ------------------------------------------------------------------
@@ -159,12 +175,25 @@ const controller = createThrowController(canvas, () => store.config, () => loftP
 
 function updateInputEnabled(): void {
   controller.setEnabled(state.phase === 'aiming' && !panel.isOpen());
+  refreshTouchHint();
 }
 
 // Any touch on the field while aiming brings the camera back behind the circle.
 canvas.addEventListener('pointerdown', () => {
   if (state.phase === 'aiming' && !panel.isOpen()) scene.setCameraMode('aim');
 });
+
+// The cue hides while a finger is down (pointer capture keeps up/cancel on the canvas).
+const fingers = new Set<number>();
+const trackFinger = (e: PointerEvent, isDown: boolean): void => {
+  if (isDown) fingers.add(e.pointerId);
+  else fingers.delete(e.pointerId);
+  dragging = fingers.size > 0;
+  refreshTouchHint();
+};
+canvas.addEventListener('pointerdown', (e) => trackFinger(e, true));
+canvas.addEventListener('pointerup', (e) => trackFinger(e, false));
+canvas.addEventListener('pointercancel', (e) => trackFinger(e, false));
 
 hud.onNewEnd(startNewEnd);
 hud.onNextEnd(startNewEnd);

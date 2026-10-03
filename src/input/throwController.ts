@@ -20,6 +20,8 @@ export interface ThrowController {
 interface Gesture {
   pointerId: number;
   scheme: ControlScheme;
+  /** Slingshot pull (px) that gives power 1, resolved from the viewport height at gesture start. */
+  fullPowerPx: number;
   start: { x: number; y: number };
   last: { x: number; y: number };
   samples: Sample[];
@@ -72,7 +74,7 @@ export function createThrowController(
     const loft = getLoft();
     handlers.onPreview(
       g.scheme === 'slingshot'
-        ? slingshotPreview(g.start, g.last, controls, loft)
+        ? slingshotPreview(g.start, g.last, controls, loft, g.fullPowerPx)
         : flickPreview(g.samples, controls, loft),
     );
   };
@@ -94,6 +96,7 @@ export function createThrowController(
     gesture = {
       pointerId: e.pointerId,
       scheme: getConfig().controls.scheme,
+      fullPowerPx: getConfig().controls.fullPowerDragFrac * (target.clientHeight || window.innerHeight),
       start: p,
       last: p,
       samples: [{ x: p.x, y: p.y, t: e.timeStamp }],
@@ -120,7 +123,7 @@ export function createThrowController(
     const loft = getLoft();
     const intent =
       g.scheme === 'slingshot'
-        ? slingshotIntent(g.start, g.last, controls, loft)
+        ? slingshotIntent(g.start, g.last, controls, loft, g.fullPowerPx)
         : flickIntent(g.samples, controls, loft);
     handlers.onPreview(null);
     if (intent) handlers.onThrow(intent);

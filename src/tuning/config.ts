@@ -36,8 +36,8 @@ export interface GameConfig {
   };
   controls: {
     scheme: ControlScheme;
-    /** Slingshot: drag distance (px) that gives power = 1. */
-    fullPowerDragPx: number;
+    /** Slingshot: drag distance that gives power = 1, as a fraction of the viewport height. */
+    fullPowerDragFrac: number;
     /** Max aim angle either side (degrees). */
     maxAimDeg: number;
     /** Multiplier from finger angle to aim angle (lower = finer aim). */
@@ -45,7 +45,10 @@ export interface GameConfig {
     /** Flick: finger speed (px/s) that gives power = 1. */
     flickFullPowerPxPerS: number;
     showLandingMarker: boolean;
-    showTrajectory: boolean;
+    /** Fraction (0..1) of the predicted roll-out (landing -> rest point) drawn as a fading ground line; 0 hides it. */
+    rollHintFrac: number;
+    /** Left-edge power bar while dragging. */
+    showPowerMeter: boolean;
     /** Vibrate on landings and ball hits (where the browser supports it). */
     haptics: boolean;
   };
@@ -117,23 +120,24 @@ export const defaultConfig: GameConfig = {
   },
   controls: {
     scheme: 'slingshot',
-    fullPowerDragPx: 260,
+    fullPowerDragFrac: 0.3,
     maxAimDeg: 20,
     aimSensitivity: 0.6,
     flickFullPowerPxPerS: 2500,
     showLandingMarker: true,
-    showTrajectory: false,
+    rollHintFrac: 0.5,
+    showPowerMeter: false,
     haptics: true,
   },
   camera: {
-    fovDeg: 52,
-    height: 1.6,
-    back: 2.4,
+    fovDeg: 58,
+    height: 2.3,
+    back: 2.0,
     follow: true,
     followLerp: 0.08,
     closeUpAfterRest: true,
     playbackSpeed: 1,
-    aimLookAhead: 4.5,
+    aimLookAhead: 3.4,
     followHeight: 0.9,
     followBack: 2.2,
     closeUpHeight: 1.5,
@@ -199,12 +203,13 @@ export const tuningSchema: TuningFolder[] = [
     title: 'Controls',
     fields: [
       { path: 'controls.scheme', label: 'scheme', options: ['slingshot', 'flick'] },
-      { path: 'controls.fullPowerDragPx', label: 'full power drag px', min: 100, max: 600, step: 5 },
+      { path: 'controls.fullPowerDragFrac', label: 'full power drag (screen)', min: 0.1, max: 0.6, step: 0.01 },
       { path: 'controls.flickFullPowerPxPerS', label: 'flick full power px/s', min: 500, max: 6000, step: 50 },
       { path: 'controls.maxAimDeg', label: 'max aim°', min: 5, max: 45, step: 1 },
       { path: 'controls.aimSensitivity', label: 'aim sensitivity', min: 0.1, max: 2, step: 0.05 },
       { path: 'controls.showLandingMarker', label: 'landing marker', toggle: true },
-      { path: 'controls.showTrajectory', label: 'trajectory line', toggle: true },
+      { path: 'controls.rollHintFrac', label: 'roll hint', min: 0, max: 1, step: 0.05 },
+      { path: 'controls.showPowerMeter', label: 'power meter', toggle: true },
       { path: 'controls.haptics', label: 'haptics', toggle: true },
     ],
   },

@@ -10,6 +10,7 @@ import {
   distancesToJack,
   JACK_ID,
   newEnd,
+  predictRestPoint,
   previewThrow,
   settleThrow,
   type PracticeState,
@@ -150,5 +151,40 @@ describe('practice', () => {
     expect(p.flight.points.length).toBeGreaterThan(2);
     expect(p.flight.landing.z).toBeLessThan(cfg.throw.originZ);
     expect(p.params.yaw).toBeCloseTo(0.02, 12);
+  });
+});
+
+describe('predictRestPoint', () => {
+  const rollOut = (loft: ThrowIntent['loft'], power = 0.6): { landing: number; rest: number } => {
+    const { params, flight } = previewThrow({ aim: 0, power, loft }, cfg);
+    const rest = predictRestPoint(params, cfg);
+    const d = (p: { x: number; z: number }): number => Math.hypot(p.x - params.origin.x, p.z - params.origin.z);
+    return { landing: d(flight.landing), rest: d(rest) };
+  };
+
+  it('is deterministic and ends past (or at) the landing point', () => {
+    const { params } = previewThrow({ aim: 0.05, power: 0.6, loft: 'half' }, cfg);
+    expect(predictRestPoint(params, cfg)).toEqual(predictRestPoint(params, cfg));
+    const r = rollOut('half');
+    expect(r.rest).toBeGreaterThanOrEqual(r.landing - 1e-6);
+  });
+
+  it('a lob rolls out less than a roll after landing', () => {
+    const roll = rollOut('roll');
+    const lob = rollOut('lob');
+    expect(lob.rest - lob.landing).toBeLessThan(roll.rest - roll.landing);
+  });
+
+  it('matches the real lone-boule throw (zero noise) by construction', () => {
+    const noNoise = { ...cfg, throw: { ...cfg.throw, aimNoiseDeg: 0, powerNoisePct: 0 } };
+    const intent: ThrowIntent = { aim: 0.03, power: 0.55, loft: 'lob' };
+    const { params } = previewThrow(intent, noNoise);
+    const predicted = predictRestPoint(params, noNoise);
+    const s = createPractice(1, noNoise);
+    const lone = { ...s, bodies: [] };
+    const r = beginThrow(lone, intent, noNoise);
+    const end = simulateToRest(r.world, noNoise.physics).world.bodies[0];
+    expect(end?.pos.x).toBeCloseTo(predicted.x, 6);
+    expect(end?.pos.z).toBeCloseTo(predicted.z, 6);
   });
 });

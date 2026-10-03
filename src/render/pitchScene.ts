@@ -7,14 +7,16 @@ import {
   BoxGeometry,
   BufferAttribute,
   BufferGeometry,
+  DynamicDrawUsage,
+  InstancedMesh,
+  Matrix4,
   CanvasTexture,
   Color,
   CylinderGeometry,
+  DoubleSide,
   DirectionalLight,
   Fog,
   HemisphereLight,
-  Line,
-  LineBasicMaterial,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -47,11 +49,20 @@ const STYLE = {
   jackMarkerRingInner: 0.11,
   jackMarkerRingOuter: 0.15,
   jackMarkerBeamHeight: 0.55,
-  aimLineWidth: 0.03,
   resultLineWidth: 0.006,
   landingRingInner: 0.17,
   landingRingOuter: 0.22,
-  maxArcPoints: 512,
+  /** Trajectory dots: spacing along the arc, radius, and the most dots drawn (m). */
+  arcDotSpacing: 0.3,
+  arcDotRadius: 0.04,
+  arcDotOutline: 0.015,
+  arcDotMax: 160,
+  arcDotColor: 0xffffff,
+  arcDotOutlineColor: 0x1d2b3a,
+  /** Roll hint: ground strip width (m) and number of segments (the fade is per vertex). */
+  rollHintWidth: 0.07,
+  rollHintSegments: 16,
+  rollHintColor: 0xff7a2f,
   /** The close-up also keeps the last thrown boule in view when it lies within this distance (m) of the jack. */
   frameCurrentWithin: 1.5,
 } as const;
@@ -61,6 +72,8 @@ export interface AimPreviewView {
   /** Aim angle (rad), 0 = toward -Z, positive = toward -X. */
   aim: number;
   landing: Vec3;
+  /** Where a lone boule would come to rest after landing (for the roll hint); null = unknown. */
+  rest: Vec3 | null;
   /** Flight arc, ball-centre positions. */
   points: readonly Vec3[];
 }
@@ -72,7 +85,7 @@ export interface PitchScene {
   /** One mesh per body id; `currentId` is highlighted and followed by the camera. */
   syncBodies(bodies: readonly Body[], currentId: string | null): void;
   setCameraMode(mode: CameraMode): void;
-  /** null hides the aim line / landing marker / arc. Marker and arc obey the live controls config. */
+  /** null hides the flight arc / landing marker / roll hint. Marker and roll hint obey the live controls config. */
   setAimPreview(p: AimPreviewView | null): void;
   /** Thin line on the ground between two points (jack -> closest boule); null hides it. */
   setResultLine(from: Vec3 | null, to: Vec3 | null): void;
@@ -284,7 +297,6 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     m.scale.set(w, 1, Math.max(len, 1e-4));
     m.visible = len > 1e-3;
   };
-  const aimRibbon = mkRibbon(0xffffff, 0.6);
   const resultRibbon = mkRibbon(0xff7a2f, 0.95);
 
   const landingMarker = new Mesh(
@@ -295,44 +307,117 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   landingMarker.visible = false;
   scene.add(landingMarker);
 
-  const arcPositions = new Float32Array(STYLE.maxArcPoints * 3);
-  const arcGeo = new BufferGeometry();
-  arcGeo.setAttribute('position', new BufferAttribute(arcPositions, 3));
-  arcGeo.setDrawRange(0, 0);
-  const arc = new Line(arcGeo, new LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 }));
-  arc.frustumCulled = false;
-  arc.visible = false;
-  scene.add(arc);
+  // Trajectory: a chain of dots (white with a dark outline), drawn on top so the arc reads against sky and sand.
+  const dotGeo = new SphereGeometry(1, 12, 8);
+  const mkDots = (color: number, radius: number, order: number): InstancedMesh => {
+    const mat = new MeshBasicMaterial({ color, depthTest: false, depthWrite: false });
+    const m = new InstancedMesh(dotGeo, mat, STYLE.arcDotMax);
+    m.instanceMatrix.setUsage(DynamicDrawUsage);
+    m.userData['radius'] = radius;
+    m.renderOrder = order;
+    m.frustumCulled = false;
+    m.count = 0;
+    m.visible = false;
+    scene.add(m);
+    return m;
+  };
+  const dotsOutline = mkDots(STYLE.arcDotOutlineColor, STYLE.arcDotRadius + STYLE.arcDotOutline, 10);
+  const dotsFill = mkDots(STYLE.arcDotColor, STYLE.arcDotRadius, 11);
+  const dotMatrix = new Matrix4();
+  function setArcDots(points: readonly Vec3[]): void {
+    let n = 0;
+    let carry = 0; // distance travelled since the last dot
+    const put = (x: number, y: number, z: number): void => {
+      for (const m of [dotsOutline, dotsFill]) {
+        const r = m.userData['radius'] as number;
+        dotMatrix.makeScale(r, r, r).setPosition(x, y, z);
+        m.setMatrixAt(n, dotMatrix);
+      }
+      n++;
+    };
+    const first = points[0];
+    if (first) put(first.x, first.y, first.z);
+    for (let i = 1; i < points.length && n < STYLE.arcDotMax; i++) {
+      const a = points[i - 1] as Vec3;
+      const b = points[i] as Vec3;
+      const segLen = Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+      let d = STYLE.arcDotSpacing - carry;
+      while (d <= segLen && n < STYLE.arcDotMax) {
+        const t = segLen > 0 ? d / segLen : 0;
+        put(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
+        d += STYLE.arcDotSpacing;
+      }
+      carry = segLen - (d - STYLE.arcDotSpacing);
+    }
+    for (const m of [dotsOutline, dotsFill]) {
+      m.count = n;
+      m.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  // Roll hint: a ground strip from the landing point toward the predicted rest point, fading out along its length.
+  const segs = STYLE.rollHintSegments;
+  const hintPos = new Float32Array((segs + 1) * 2 * 3);
+  const hintCol = new Float32Array((segs + 1) * 2 * 4);
+  const hintIdx: number[] = [];
+  const base = new Color(STYLE.rollHintColor);
+  for (let i = 0; i <= segs; i++) {
+    const alpha = 0.9 * (1 - i / segs);
+    for (let k = 0; k < 2; k++) hintCol.set([base.r, base.g, base.b, alpha], (i * 2 + k) * 4);
+    if (i < segs) hintIdx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  }
+  const hintGeo = new BufferGeometry();
+  hintGeo.setAttribute('position', new BufferAttribute(hintPos, 3));
+  hintGeo.setAttribute('color', new BufferAttribute(hintCol, 4));
+  hintGeo.setIndex(hintIdx);
+  const rollHint = new Mesh(
+    hintGeo,
+    new MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, side: DoubleSide }),
+  );
+  rollHint.frustumCulled = false;
+  rollHint.visible = false;
+  scene.add(rollHint);
+  function setRollHint(from: Vec3, to: Vec3 | null, frac: number): void {
+    const dx = to ? to.x - from.x : 0;
+    const dz = to ? to.z - from.z : 0;
+    const full = Math.hypot(dx, dz);
+    const len = full * Math.min(1, Math.max(0, frac));
+    if (!to || len < 0.05) {
+      rollHint.visible = false;
+      return;
+    }
+    const ux = dx / full;
+    const uz = dz / full;
+    const hw = STYLE.rollHintWidth / 2;
+    for (let i = 0; i <= segs; i++) {
+      const d = (len * i) / segs;
+      const cx0 = from.x + ux * d;
+      const cz0 = from.z + uz * d;
+      hintPos.set([cx0 - uz * hw, 0.007, cz0 + ux * hw], i * 6);
+      hintPos.set([cx0 + uz * hw, 0.007, cz0 - ux * hw], i * 6 + 3);
+    }
+    (hintGeo.getAttribute('position') as BufferAttribute).needsUpdate = true;
+    rollHint.visible = true;
+  }
 
   function setAimPreview(p: AimPreviewView | null): void {
     if (!p) {
-      aimRibbon.visible = false;
       landingMarker.visible = false;
-      arc.visible = false;
+      dotsOutline.visible = false;
+      dotsFill.visible = false;
+      rollHint.visible = false;
       return;
     }
     const { controls } = getConfig();
-    const dx = p.landing.x - p.origin.x;
-    const dz = p.landing.z - p.origin.z;
-    // Ground line from the circle toward the aim direction, as long as the predicted flight.
-    const len = Math.max(1, Math.hypot(dx, dz));
-    placeRibbon(aimRibbon, p.origin.x, p.origin.z, p.origin.x - Math.sin(p.aim) * len, p.origin.z - Math.cos(p.aim) * len, STYLE.aimLineWidth);
-
     landingMarker.visible = controls.showLandingMarker;
     landingMarker.position.set(p.landing.x, 0.008, p.landing.z);
 
-    arc.visible = controls.showTrajectory;
-    if (controls.showTrajectory) {
-      const n = Math.min(p.points.length, STYLE.maxArcPoints);
-      for (let i = 0; i < n; i++) {
-        const pt = p.points[i] as Vec3;
-        arcPositions[i * 3] = pt.x;
-        arcPositions[i * 3 + 1] = pt.y;
-        arcPositions[i * 3 + 2] = pt.z;
-      }
-      arcGeo.setDrawRange(0, n);
-      (arcGeo.getAttribute('position') as BufferAttribute).needsUpdate = true;
-    }
+    // The flight arc is the aim indicator (it replaces the old straight ground line).
+    dotsOutline.visible = true;
+    dotsFill.visible = true;
+    setArcDots(p.points);
+
+    setRollHint(p.landing, p.rest, controls.rollHintFrac);
   }
 
   function setResultLine(from: Vec3 | null, to: Vec3 | null): void {

@@ -10,6 +10,7 @@ export {
   createPractice,
   distancesToJack,
   newEnd,
+  predictRestPoint,
   previewThrow,
   settleThrow,
 } from './practice';

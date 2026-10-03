@@ -45,21 +45,37 @@ function clampAim(angle: number, cfg: ControlsConfig): number {
 
 // ---------------------------------------------------------------- slingshot
 
-export function slingshotIntent(start: Point, current: Point, cfg: ControlsConfig, loft: LoftPreset): ThrowIntent | null {
+/**
+ * `fullPowerPx` is the pull distance (px) that gives power 1; the caller
+ * resolves it from `cfg.fullPowerDragFrac` and the viewport height.
+ */
+export function slingshotIntent(
+  start: Point,
+  current: Point,
+  cfg: ControlsConfig,
+  loft: LoftPreset,
+  fullPowerPx: number,
+): ThrowIntent | null {
   const dx = current.x - start.x;
   const dy = current.y - start.y;
   // Only the downward ("pull back") component counts. Upward / sideways / tiny = cancel.
   if (dy < SLINGSHOT_DEAD_ZONE_PX) return null;
   return {
     aim: clampAim(Math.atan2(dx, dy), cfg),
-    power: clamp(dy / cfg.fullPowerDragPx, 0, 1),
+    power: clamp(dy / Math.max(1, fullPowerPx), 0, 1),
     loft,
   };
 }
 
 /** Live preview while dragging; null while in the cancel zone. */
-export function slingshotPreview(start: Point, current: Point, cfg: ControlsConfig, loft: LoftPreset): AimPreview | null {
-  const intent = slingshotIntent(start, current, cfg, loft);
+export function slingshotPreview(
+  start: Point,
+  current: Point,
+  cfg: ControlsConfig,
+  loft: LoftPreset,
+  fullPowerPx: number,
+): AimPreview | null {
+  const intent = slingshotIntent(start, current, cfg, loft, fullPowerPx);
   if (!intent) return null;
   return { aim: intent.aim, power: intent.power, start: { ...start }, current: { ...current } };
 }

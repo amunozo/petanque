@@ -59,10 +59,10 @@ describe('config store', () => {
     const store = createConfigStore(defaultConfig, { storage: null });
     expect(JSON.parse(store.exportJson())).toEqual({});
     store.set('physics.surface.rollingResistance', 0.2);
-    store.set('controls.showTrajectory', true);
+    store.set('controls.showLandingMarker', false);
     expect(JSON.parse(store.exportJson())).toEqual({
       physics: { surface: { rollingResistance: 0.2 } },
-      controls: { showTrajectory: true },
+      controls: { showLandingMarker: false },
     });
   });
 
@@ -93,6 +93,14 @@ describe('config store', () => {
     expect(s.config.camera.fovDeg).toBe(defaultConfig.camera.fovDeg);
     expect(s.config.throw.maxSpeed).toBe(14);
     expect('removed' in s.config).toBe(false);
+  });
+
+  it('drops the old controls.fullPowerDragPx key from saved data', () => {
+    const storage = fakeStorage({ [KEY]: JSON.stringify({ controls: { fullPowerDragPx: 400, haptics: false } }) });
+    const s = createConfigStore(defaultConfig, { storage, schema: tuningSchema });
+    expect('fullPowerDragPx' in s.config.controls).toBe(false);
+    expect(s.config.controls.fullPowerDragFrac).toBe(defaultConfig.controls.fullPowerDragFrac);
+    expect(s.config.controls.haptics).toBe(false);
   });
 
   it('survives corrupt saved JSON', () => {

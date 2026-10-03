@@ -9,11 +9,18 @@ export interface LoftPicker {
   onChange(fn: (loft: LoftPreset) => void): () => void;
 }
 
-const OPTIONS: readonly { value: LoftPreset; label: string }[] = [
-  { value: 'roll', label: 'Roll' },
-  { value: 'half', label: 'Half-lob' },
-  { value: 'lob', label: 'Lob' },
+/** `arc` = the quadratic control-point y of the little trajectory icon (baseline y = 14): lower = taller arc. */
+const OPTIONS: readonly { value: LoftPreset; label: string; arc: number }[] = [
+  { value: 'roll', label: 'Roll', arc: 10 },
+  { value: 'half', label: 'Half-lob', arc: 0 },
+  { value: 'lob', label: 'Lob', arc: -12 },
 ];
+
+const arcIcon = (controlY: number): string =>
+  '<svg class="lp-icon" viewBox="0 0 28 16" width="28" height="16" aria-hidden="true" focusable="false">' +
+  `<path d="M3 14 Q14 ${controlY} 25 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 4"/>` +
+  `<path d="M3 14 Q14 ${controlY} 25 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>` +
+  '</svg>';
 
 const SHIELDED = [
   'pointerdown', 'pointermove', 'pointerup', 'pointercancel',
@@ -34,7 +41,7 @@ export function createLoftPicker(initial: LoftPreset = 'half'): LoftPicker {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'lp-btn';
-    b.textContent = o.label;
+    b.innerHTML = `${arcIcon(o.arc)}<span class="lp-label">${o.label}</span>`;
     b.setAttribute('role', 'radio');
     b.addEventListener('click', () => set(o.value));
     el.append(b);
