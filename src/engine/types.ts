@@ -29,6 +29,11 @@ export interface Body {
   /** Accumulated rolling rotation (axis * angle, radians) — for rendering only. */
   rot: Vec3;
   state: BodyState;
+  /**
+   * Backspin (rad/s, >= 0). Set by `launch` from ThrowParams.backspin; spent
+   * as extra sliding friction once the ball rolls. Absent = 0.
+   */
+  spin?: number;
 }
 
 /** Ground material. Tunable live. */
