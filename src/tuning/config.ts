@@ -46,6 +46,8 @@ export interface GameConfig {
     flickFullPowerPxPerS: number;
     showLandingMarker: boolean;
     showTrajectory: boolean;
+    /** Vibrate on landings and ball hits (where the browser supports it). */
+    haptics: boolean;
   };
   camera: {
     fovDeg: number;
@@ -60,6 +62,16 @@ export interface GameConfig {
     closeUpAfterRest: boolean;
     /** Simulation speed multiplier for the visual playback (1 = real time). */
     playbackSpeed: number;
+    /** Aim view looks at the ground this far ahead of the throwing circle (m). */
+    aimLookAhead: number;
+    /** Follow view: height above / distance behind the ball (m). */
+    followHeight: number;
+    followBack: number;
+    /** Close-up view: height above / distance behind the jack (m). */
+    closeUpHeight: number;
+    closeUpBack: number;
+    /** The close-up backs off by up to this factor to keep the jack and the nearest boule in view. */
+    closeUpMaxZoomOut: number;
   };
   practice: {
     jackMinDist: number;
@@ -111,6 +123,7 @@ export const defaultConfig: GameConfig = {
     flickFullPowerPxPerS: 2500,
     showLandingMarker: true,
     showTrajectory: false,
+    haptics: true,
   },
   camera: {
     fovDeg: 52,
@@ -120,6 +133,12 @@ export const defaultConfig: GameConfig = {
     followLerp: 0.08,
     closeUpAfterRest: true,
     playbackSpeed: 1,
+    aimLookAhead: 4.5,
+    followHeight: 0.9,
+    followBack: 2.2,
+    closeUpHeight: 1.5,
+    closeUpBack: 1.2,
+    closeUpMaxZoomOut: 5,
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
 };
@@ -186,6 +205,7 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'controls.aimSensitivity', label: 'aim sensitivity', min: 0.1, max: 2, step: 0.05 },
       { path: 'controls.showLandingMarker', label: 'landing marker', toggle: true },
       { path: 'controls.showTrajectory', label: 'trajectory line', toggle: true },
+      { path: 'controls.haptics', label: 'haptics', toggle: true },
     ],
   },
   {
@@ -198,6 +218,12 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'camera.followLerp', label: 'follow speed', min: 0.01, max: 1, step: 0.01 },
       { path: 'camera.closeUpAfterRest', label: 'close-up after rest', toggle: true },
       { path: 'camera.playbackSpeed', label: 'playback speed', min: 0.25, max: 3, step: 0.05 },
+      { path: 'camera.aimLookAhead', label: 'aim look-ahead m', min: 2, max: 14, step: 0.5 },
+      { path: 'camera.followHeight', label: 'follow height', min: 0.3, max: 4, step: 0.05 },
+      { path: 'camera.followBack', label: 'follow back', min: 0.5, max: 8, step: 0.1 },
+      { path: 'camera.closeUpHeight', label: 'close-up height', min: 0.4, max: 4, step: 0.05 },
+      { path: 'camera.closeUpBack', label: 'close-up back', min: 0.3, max: 4, step: 0.05 },
+      { path: 'camera.closeUpMaxZoomOut', label: 'close-up max zoom-out', min: 1, max: 6, step: 0.1 },
     ],
   },
   {

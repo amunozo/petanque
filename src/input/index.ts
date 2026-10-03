@@ -16,5 +16,3 @@ export { createThrowController } from './throwController';
 export type { ThrowController, ThrowHandlers } from './throwController';
 export { createLoftPicker } from './loftPicker';
 export type { LoftPicker } from './loftPicker';
-export { createTouchTracker } from './touchTracker';
-export type { TouchTracker, TrackedPointer } from './touchTracker';
