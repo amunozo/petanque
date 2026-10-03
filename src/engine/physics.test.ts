@@ -29,7 +29,7 @@ const frictionless: PhysicsConfig = { ...flat, surface: { ...flat.surface, rolli
 
 const throwCfg = {
   originX: 0, originY: 0.5, originZ: 5, maxSpeed: 11, minSpeed: 1, powerCurve: 1.3,
-  loftRollDeg: 10, loftHalfDeg: 35, loftLobDeg: 60, backspinRoll: 0, backspinHalf: 0, backspinLob: 0,
+  loftRollDeg: 10, loftHalfDeg: 35, loftLobDeg: 60, backspinRoll: 0, backspinHalf: 0, backspinLob: 0, loftShootDeg: 20, backspinShoot: 0, shootSpeedMul: 1.35,
   aimNoiseDeg: 0.8, powerNoisePct: 1.5,
 };
 const noNoise = { aim: 0, power: 0 };

@@ -4,7 +4,8 @@
  */
 import type { ThrowParams } from './types';
 
-export type Loft = 'roll' | 'half' | 'lob';
+/** 'shoot' = le tir: fast, flat throw to knock boules away (speeds scaled by shootSpeedMul). */
+export type Loft = 'roll' | 'half' | 'lob' | 'shoot';
 
 /** Structurally identical to GameConfig['throw'] so callers can pass it directly. */
 export interface ThrowModelConfig {
@@ -22,10 +23,14 @@ export interface ThrowModelConfig {
   loftRollDeg: number;
   loftHalfDeg: number;
   loftLobDeg: number;
+  loftShootDeg: number;
   /** Backspin per loft preset (rad/s). */
   backspinRoll: number;
   backspinHalf: number;
   backspinLob: number;
+  backspinShoot: number;
+  /** Multiplies min/max launch speed for the 'shoot' loft. */
+  shootSpeedMul: number;
   /** Random error, 1 standard deviation. */
   aimNoiseDeg: number;
   powerNoisePct: number;
@@ -51,7 +56,8 @@ const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 export function intentToThrow(intent: ThrowIntent, cfg: ThrowModelConfig, noise: ThrowNoise): ThrowParams {
   const power = clamp01(Number.isFinite(intent.power) ? intent.power : 0);
-  const baseSpeed = cfg.minSpeed + (cfg.maxSpeed - cfg.minSpeed) * Math.pow(power, cfg.powerCurve);
+  const speedMul = intent.loft === 'shoot' ? cfg.shootSpeedMul : 1;
+  const baseSpeed = (cfg.minSpeed + (cfg.maxSpeed - cfg.minSpeed) * Math.pow(power, cfg.powerCurve)) * speedMul;
   const speed = Math.max(0, baseSpeed * (1 + (noise.power * cfg.powerNoisePct) / 100));
   const yaw = intent.aim + noise.aim * cfg.aimNoiseDeg * DEG_TO_RAD;
 
@@ -69,6 +75,10 @@ export function intentToThrow(intent: ThrowIntent, cfg: ThrowModelConfig, noise:
     case 'lob':
       pitchDeg = cfg.loftLobDeg;
       backspin = cfg.backspinLob;
+      break;
+    case 'shoot':
+      pitchDeg = cfg.loftShootDeg;
+      backspin = cfg.backspinShoot;
       break;
   }
 

@@ -11,9 +11,12 @@ const cfg: ThrowModelConfig = {
   loftRollDeg: 10,
   loftHalfDeg: 35,
   loftLobDeg: 60,
+  loftShootDeg: 18,
   backspinRoll: 0,
   backspinHalf: 5,
   backspinLob: 20,
+  backspinShoot: 3,
+  shootSpeedMul: 1.5,
   aimNoiseDeg: 1,
   powerNoisePct: 2,
 };
@@ -46,6 +49,19 @@ describe('intentToThrow', () => {
     expect(half.pitch).toBeCloseTo((35 * Math.PI) / 180, 12);
     expect(half.backspin).toBe(5);
     expect(intentToThrow({ aim: 0, power: 0.5, loft: 'roll' }, cfg, none).pitch).toBeCloseTo((10 * Math.PI) / 180, 12);
+  });
+
+  it('shoot loft: own angle and backspin, speeds scaled by shootSpeedMul', () => {
+    const lo = intentToThrow({ aim: 0, power: 0, loft: 'shoot' }, cfg, none);
+    const hi = intentToThrow({ aim: 0, power: 1, loft: 'shoot' }, cfg, none);
+    expect(lo.speed).toBeCloseTo(1.5, 12);
+    expect(hi.speed).toBeCloseTo(16.5, 12);
+    expect(hi.pitch).toBeCloseTo((18 * Math.PI) / 180, 12);
+    expect(hi.backspin).toBe(3);
+    // other lofts are unaffected by the multiplier
+    expect(intentToThrow({ aim: 0, power: 1, loft: 'half' }, cfg, none).speed).toBeCloseTo(11, 12);
+    // noise still applies on top
+    expect(intentToThrow({ aim: 0, power: 1, loft: 'shoot' }, cfg, { aim: 0, power: -1 }).speed).toBeCloseTo(16.5 * 0.98, 12);
   });
 
   it('never returns a negative speed', () => {

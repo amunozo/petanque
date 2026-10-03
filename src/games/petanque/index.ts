@@ -22,3 +22,28 @@ export type {
   PracticeState,
   PracticeThrow,
 } from './practice';
+
+// Full match rules (Phase 2)
+export { applyAction, beginThrow as beginMatchThrow, canThrow, createMatch, nextEnd, settle } from './match';
+export {
+  AUTO_JACK_HALF_WIDTH,
+  TIE_EPSILON,
+  distances,
+  holdingTeam,
+  isJackOut,
+  isValidJack,
+  nextThrower,
+  otherTeam,
+  placeJack,
+  scoreEnd,
+} from './matchMeasure';
+export type { Holding, MatchBouleDistance, MatchConfig, MatchSettleConfig } from './matchMeasure';
+export type {
+  EndResult,
+  MatchAction,
+  MatchPhase,
+  MatchRules,
+  MatchState,
+  TeamId,
+  ThrowRecord,
+} from './matchTypes';

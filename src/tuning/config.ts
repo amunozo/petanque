@@ -4,8 +4,9 @@
  * them (never cache them in module constants).
  */
 import type { BallSpec, PhysicsConfig } from '../engine/types';
+import type { MatchRules } from '../games/petanque/matchTypes';
 
-export type LoftPreset = 'roll' | 'half' | 'lob';
+export type LoftPreset = 'roll' | 'half' | 'lob' | 'shoot';
 export type ControlScheme = 'slingshot' | 'flick';
 
 export interface GameConfig {
@@ -26,10 +27,14 @@ export interface GameConfig {
     loftRollDeg: number;
     loftHalfDeg: number;
     loftLobDeg: number;
+    loftShootDeg: number;
     /** Backspin per loft preset (rad/s). */
     backspinRoll: number;
     backspinHalf: number;
     backspinLob: number;
+    backspinShoot: number;
+    /** Multiplies min/max launch speed for the 'shoot' loft (le tir). */
+    shootSpeedMul: number;
     /** Random error, 1 standard deviation. */
     aimNoiseDeg: number;
     powerNoisePct: number;
@@ -83,6 +88,8 @@ export interface GameConfig {
     jackMaxDist: number;
     boulesPerEnd: number;
   };
+  /** Rules of a full match (see games/petanque/match.ts). */
+  match: MatchRules;
 }
 
 export const defaultConfig: GameConfig = {
@@ -114,9 +121,12 @@ export const defaultConfig: GameConfig = {
     loftRollDeg: 10,
     loftHalfDeg: 32,
     loftLobDeg: 52,
+    loftShootDeg: 20,
     backspinRoll: 0,
     backspinHalf: 0,
     backspinLob: 0,
+    backspinShoot: 0,
+    shootSpeedMul: 1.35,
     aimNoiseDeg: 0.8,
     powerNoisePct: 1.5,
   },
@@ -135,7 +145,7 @@ export const defaultConfig: GameConfig = {
     fovDeg: 58,
     height: 2.3,
     back: 2.0,
-    aimSideOffset: 0.7,
+    aimSideOffset: 0,
     follow: true,
     followLerp: 0.08,
     closeUpAfterRest: true,
@@ -148,6 +158,7 @@ export const defaultConfig: GameConfig = {
     closeUpMaxZoomOut: 5,
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
+  match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
 };
 
 /** UI metadata for the tuning panel. `path` is a dot path into GameConfig. */
@@ -171,9 +182,12 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'throw.loftRollDeg', label: 'roll angle°', min: 0, max: 30, step: 1 },
       { path: 'throw.loftHalfDeg', label: 'half angle°', min: 15, max: 55, step: 1 },
       { path: 'throw.loftLobDeg', label: 'lob angle°', min: 35, max: 80, step: 1 },
+      { path: 'throw.loftShootDeg', label: 'shoot angle°', min: 0, max: 45, step: 1 },
+      { path: 'throw.shootSpeedMul', label: 'shoot speed ×', min: 1, max: 2, step: 0.01 },
       { path: 'throw.backspinRoll', label: 'roll backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.backspinHalf', label: 'half backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.backspinLob', label: 'lob backspin', min: 0, max: 100, step: 1 },
+      { path: 'throw.backspinShoot', label: 'shoot backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.aimNoiseDeg', label: 'aim error°', min: 0, max: 5, step: 0.1 },
       { path: 'throw.powerNoisePct', label: 'power error %', min: 0, max: 10, step: 0.1 },
       { path: 'throw.originY', label: 'release height', min: 0.1, max: 1.2, step: 0.05 },
@@ -241,6 +255,16 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'practice.jackMinDist', label: 'jack min m', min: 3, max: 12, step: 0.5 },
       { path: 'practice.jackMaxDist', label: 'jack max m', min: 4, max: 14, step: 0.5 },
       { path: 'practice.boulesPerEnd', label: 'boules', min: 1, max: 6, step: 1 },
+    ],
+  },
+  {
+    title: 'Match',
+    fields: [
+      { path: 'match.pointsToWin', label: 'points to win', min: 1, max: 13, step: 1 },
+      { path: 'match.boulesPerTeam', label: 'boules per team', min: 1, max: 6, step: 1 },
+      { path: 'match.jackMinDist', label: 'jack min m', min: 3, max: 12, step: 0.5 },
+      { path: 'match.jackMaxDist', label: 'jack max m', min: 4, max: 14, step: 0.5 },
+      { path: 'match.jackMinSideMargin', label: 'jack side margin m', min: 0, max: 1.5, step: 0.05 },
     ],
   },
 ];
