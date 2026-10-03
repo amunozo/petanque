@@ -25,6 +25,7 @@ import { createAiTurn } from './aiTurn';
 import type { AppContext, Mode } from './context';
 import type { TurnData } from './matchHud';
 import { endCardView, jackFault, matchOverTitle, scoreLine, settleMessage, TEAM_NAME, turnView, VOICE_2P, VOICE_VS } from './matchText';
+import { matchConfig, type MatchLength } from './matchLength';
 import { createPlayback } from './playback';
 
 export type Seat = 'human' | 'ai';
@@ -33,11 +34,13 @@ export interface MatchSetup {
   seats: Record<TeamId, Seat>;
   /** Used when a seat is 'ai'. */
   difficulty: AiDifficulty;
+  /** Match length chosen in the menu; sets the points to win of every match created (rematches included). */
+  length: MatchLength;
 }
 
-export const SETUP_2P: MatchSetup = { seats: { A: 'human', B: 'human' }, difficulty: 'medium' };
+export const setup2p = (length: MatchLength): MatchSetup => ({ seats: { A: 'human', B: 'human' }, difficulty: 'medium', length });
 /** Human = Blue (team A, throws the first jack), computer = Red (team B). */
-export const setupVsComputer = (difficulty: AiDifficulty): MatchSetup => ({ seats: { A: 'human', B: 'ai' }, difficulty });
+export const setupVsComputer = (difficulty: AiDifficulty, length: MatchLength): MatchSetup => ({ seats: { A: 'human', B: 'ai' }, difficulty, length });
 
 export interface MatchMode extends Mode {
   /** Who plays which team; call before entering (a rematch keeps it). */
@@ -55,13 +58,13 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
   const playback = createPlayback(ctx);
   const preview = createAimPreviewer(ctx);
 
-  let state: MatchState = createMatch(1, cfg);
+  let setup: MatchSetup = setup2p('standard');
+  let state: MatchState = createMatch(1, matchConfig(cfg, setup.length));
   let world: World | null = null;
   /** A rejected jack: the rules drop it from the state, but it stays on screen until the next throw. */
   let ghostJack: Body | null = null;
   let cardTimer: ReturnType<typeof setTimeout> | undefined;
   let lastTurn: TurnData | null = null;
-  let setup: MatchSetup = SETUP_2P;
   /** Throws made in this match (both seats): feeds the AI seed. */
   let throwCount = 0;
   const aiClient = createAiClient(() => cfg);
@@ -218,7 +221,9 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     matchHud.reset();
     matchHud.setNames(voice().name);
     throwCount = 0;
-    state = createMatch(ctx.newSeed(), cfg);
+    // Rules are snapshotted into the state; the live tuning config is not touched.
+    state = createMatch(ctx.newSeed(), matchConfig(cfg, setup.length));
+    matchHud.setTarget(state.rules.pointsToWin);
     start();
   }
 

@@ -35,6 +35,8 @@ export interface MatchHud {
   show(): void;
   hide(): void;
   setScore(score: Record<TeamId, number>, active: TeamId | null): void;
+  /** Points needed to win, shown small under the scoreboard pill ("to 7"). */
+  setTarget(points: number): void;
   /** Labels on the scoreboard pill (default "Blue" / "Red"). */
   setNames(names: Record<TeamId, string>): void;
   /** Big banner for ~1.2 s that shrinks into the persistent chip. */
@@ -77,6 +79,7 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   const sideA = side('A');
   const sideB = side('B');
   score.append(sideA.box, el('span', 'mh-dash', '–'), sideB.box);
+  const target = el('div', 'mh-target');
 
   // Turn banner + chip
   const banner = el('div', 'mh-banner');
@@ -112,7 +115,7 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   overRow.append(rematchBtn, menuBtn);
   overCard.append(overTitle, overDetail, overRow);
 
-  root.append(score, banner, chip, message, endCard, overCard);
+  root.append(score, target, banner, chip, message, endCard, overCard);
   parent.append(root);
   for (const c of [endCard, overCard]) shieldPointer(c);
 
@@ -144,6 +147,9 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
       sideB.pts.textContent = String(s.B);
       sideA.box.classList.toggle('is-active', active === 'A');
       sideB.box.classList.toggle('is-active', active === 'B');
+    },
+    setTarget(points) {
+      target.textContent = `to ${points}`;
     },
     setNames(names) {
       sideA.name.textContent = names.A;

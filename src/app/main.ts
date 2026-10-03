@@ -13,9 +13,10 @@ import type { AppContext, Mode } from './context';
 import { createHaptics } from './haptics';
 import { createHud } from './hud';
 import { createMatchHud } from './matchHud';
-import { createMatchMode, SETUP_2P, setupVsComputer } from './matchMode';
+import { pointsFor } from './matchLength';
+import { createMatchMode, setup2p, setupVsComputer } from './matchMode';
 import { confirmDialog, createMenu } from './menu';
-import { isDifficulty, loadDifficulty } from './prefs';
+import { isDifficulty, loadDifficulty, loadMatchLength } from './prefs';
 import { createPracticeMode } from './practiceMode';
 import { createTouchHint } from './touchHint';
 
@@ -38,7 +39,7 @@ const cfg = store.config;
 const scene = createPitchScene(canvas, () => store.config);
 const hud = createHud(hudRoot, __BUILD_ID__);
 const matchHud = createMatchHud(hudRoot);
-const menu = createMenu(app, __BUILD_ID__);
+const menu = createMenu(app, __BUILD_ID__, () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }));
 const touchHint = createTouchHint(app);
 const haptics = createHaptics(() => cfg.controls.haptics);
 const audio = createAudio();
@@ -141,14 +142,13 @@ async function requestMenu(): Promise<void> {
   goMenu();
 }
 
-menu.setMatchInfo(`First to ${cfg.match.pointsToWin}`);
 menu.onPractice(() => enterMode(practice));
-menu.onMatch(() => {
-  match.setSetup(SETUP_2P);
+menu.onMatch((length) => {
+  match.setSetup(setup2p(length));
   enterMode(match);
 });
-menu.onVsComputer((difficulty) => {
-  match.setSetup(setupVsComputer(difficulty));
+menu.onVsComputer((difficulty, length) => {
+  match.setSetup(setupVsComputer(difficulty, length));
   enterMode(match);
 });
 
@@ -222,10 +222,10 @@ const startMode = params.get('mode');
 const levelParam = params.get('level');
 if (startMode === 'practice') enterMode(practice);
 else if (startMode === 'match') {
-  match.setSetup(SETUP_2P);
+  match.setSetup(setup2p(loadMatchLength()));
   enterMode(match);
 } else if (startMode === 'ai') {
-  match.setSetup(setupVsComputer(isDifficulty(levelParam) ? levelParam : loadDifficulty()));
+  match.setSetup(setupVsComputer(isDifficulty(levelParam) ? levelParam : loadDifficulty(), loadMatchLength()));
   enterMode(match);
 } else goMenu();
 requestAnimationFrame(frame);

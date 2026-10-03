@@ -1,19 +1,19 @@
 /** Start menu + confirm dialog (plain DOM overlays; styles in the "Menu" section of src/style.css, classes mn-*). */
 import type { AiDifficulty } from '../games/petanque/aiTypes';
 import { button, el, shieldPointer } from './dom';
-import { DIFFICULTIES, loadDifficulty, saveDifficulty } from './prefs';
+import { MATCH_LENGTHS, matchInfoText, type MatchLength } from './matchLength';
+import { DIFFICULTIES, loadDifficulty, loadMatchLength, saveDifficulty, saveMatchLength } from './prefs';
 import { paintMuteButton } from './soundIcon';
 
 export interface Menu {
   show(): void;
   hide(): void;
   isOpen(): boolean;
-  /** Second line of the "2 players" button, e.g. "First to 13". */
-  setMatchInfo(text: string): void;
   onPractice(fn: () => void): void;
-  onMatch(fn: () => void): void;
-  /** "1 player vs computer" was chosen, with the difficulty selected in the menu. */
-  onVsComputer(fn: (difficulty: AiDifficulty) => void): void;
+  /** "2 players" was chosen, with the match length selected in the menu. */
+  onMatch(fn: (length: MatchLength) => void): void;
+  /** "1 player vs computer" was chosen, with the difficulty and match length selected in the menu. */
+  onVsComputer(fn: (difficulty: AiDifficulty, length: MatchLength) => void): void;
   /** Speaker button in the top-right corner. */
   setMuted(muted: boolean): void;
   onMute(fn: () => void): void;
@@ -45,6 +45,44 @@ function difficultyPicker(): { element: HTMLElement; get(): AiDifficulty } {
   return { element: row, get: () => value };
 }
 
+/** Points to win per length, read when the menu opens (Standard follows the tunable target). */
+export type LengthPoints = () => Record<MatchLength, number>;
+
+const LENGTH_NAME: Record<MatchLength, string> = { quick: 'Quick', standard: 'Standard' };
+
+/** "Quick · 7" / "Standard · 13" segmented control, shared by both match buttons; the choice is remembered. */
+function lengthPicker(points: LengthPoints, onChange: (l: MatchLength) => void): { element: HTMLElement; get(): MatchLength; refresh(): void } {
+  let value = loadMatchLength();
+  const row = el('div', 'mn-seg');
+  row.setAttribute('role', 'radiogroup');
+  row.setAttribute('aria-label', 'Match length');
+  const buttons = MATCH_LENGTHS.map((l) => {
+    const b = button('mn-seg-btn', '', () => {
+      value = l;
+      saveMatchLength(l);
+      refresh();
+      onChange(l);
+    });
+    b.setAttribute('role', 'radio');
+    b.dataset['length'] = l;
+    row.append(b);
+    return b;
+  });
+  function refresh(): void {
+    const p = points();
+    MATCH_LENGTHS.forEach((l, i) => {
+      const b = buttons[i];
+      if (!b) return;
+      b.textContent = `${LENGTH_NAME[l]} · ${p[l]}`;
+      b.setAttribute('aria-checked', String(l === value));
+    });
+  }
+  refresh();
+  const wrap = el('div', 'mn-length');
+  wrap.append(el('div', 'mn-length-label', 'Match length'), row);
+  return { element: wrap, get: () => value, refresh };
+}
+
 function choice(cls: string, title: string, sub: string): { btn: HTMLButtonElement; sub: HTMLElement } {
   const btn = button(`mn-btn ${cls}`, '');
   const subEl = el('span', 'mn-btn-sub', sub);
@@ -52,7 +90,7 @@ function choice(cls: string, title: string, sub: string): { btn: HTMLButtonEleme
   return { btn, sub: subEl };
 }
 
-export function createMenu(parent: HTMLElement, buildId: string): Menu {
+export function createMenu(parent: HTMLElement, buildId: string, points: LengthPoints): Menu {
   const root = el('div', 'mn-root');
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-label', 'Main menu');
@@ -64,13 +102,17 @@ export function createMenu(parent: HTMLElement, buildId: string): Menu {
   logo.append(el('i', 'mn-ball mn-ball-a'), el('i', 'mn-ball mn-jack'), el('i', 'mn-ball mn-ball-b'));
 
   const practice = choice('mn-practice', 'Practice', 'Throw at the jack, on your own');
-  const match = choice('mn-match', '2 players (same phone)', 'Pass and play');
+  const match = choice('mn-match', '2 players (same phone)', matchInfoText(points()[loadMatchLength()]));
   const vs = choice('mn-vs', '1 player vs computer', 'You are Blue');
   const level = difficultyPicker();
   const vsBox = el('div', 'mn-vs-box');
   vsBox.append(vs.btn, level.element);
+  const paintMatchInfo = (): void => {
+    match.sub.textContent = matchInfoText(points()[length.get()]);
+  };
+  const length = lengthPicker(points, paintMatchInfo);
   const buttons = el('div', 'mn-buttons');
-  buttons.append(practice.btn, vsBox, match.btn);
+  buttons.append(practice.btn, vsBox, match.btn, length.element);
 
   const muteBtn = el('button', 'mn-mute');
   muteBtn.type = 'button';
@@ -80,16 +122,18 @@ export function createMenu(parent: HTMLElement, buildId: string): Menu {
   parent.append(root);
 
   let practiceFn: () => void = () => undefined;
-  let matchFn: () => void = () => undefined;
-  let vsFn: (d: AiDifficulty) => void = () => undefined;
+  let matchFn: (l: MatchLength) => void = () => undefined;
+  let vsFn: (d: AiDifficulty, l: MatchLength) => void = () => undefined;
   let muteFn: () => void = () => undefined;
   practice.btn.addEventListener('click', () => practiceFn());
-  match.btn.addEventListener('click', () => matchFn());
-  vs.btn.addEventListener('click', () => vsFn(level.get()));
+  match.btn.addEventListener('click', () => matchFn(length.get()));
+  vs.btn.addEventListener('click', () => vsFn(level.get(), length.get()));
   muteBtn.addEventListener('click', () => muteFn());
 
   return {
     show() {
+      length.refresh();
+      paintMatchInfo();
       root.hidden = false;
       document.body.classList.add('is-menu');
     },
@@ -98,9 +142,6 @@ export function createMenu(parent: HTMLElement, buildId: string): Menu {
       document.body.classList.remove('is-menu');
     },
     isOpen: () => !root.hidden,
-    setMatchInfo(text) {
-      match.sub.textContent = text;
-    },
     onPractice(fn) {
       practiceFn = fn;
     },
