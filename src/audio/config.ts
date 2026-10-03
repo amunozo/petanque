@@ -75,13 +75,13 @@ export interface AudioConfig {
 }
 
 export const audioConfig: AudioConfig = {
-  masterVolume: 0.8,
+  masterVolume: 1,
   maxVoicesPerFrame: 3,
   maxActiveVoices: 28,
   hit: {
     minSpeed: 0.12,
     refSpeed: 6,
-    gain: 0.5,
+    gain: 0.75,
     partials: [
       { hz: 1580, gain: 1.0, decay: 0.3 },
       { hz: 2310, gain: 0.8, decay: 0.22 },
@@ -98,7 +98,7 @@ export const audioConfig: AudioConfig = {
   jackHit: {
     minSpeed: 0.1,
     refSpeed: 4,
-    gain: 0.3,
+    gain: 0.42,
     partials: [
       { hz: 1900, gain: 1.0, decay: 0.07 },
       { hz: 2900, gain: 0.6, decay: 0.05 },
@@ -113,7 +113,7 @@ export const audioConfig: AudioConfig = {
   land: {
     minSpeed: 0.3,
     refSpeed: 5,
-    gain: 0.55,
+    gain: 0.8,
     lowHz: 280,
     highHz: 1300,
     thumpHz: 95,
@@ -124,7 +124,7 @@ export const audioConfig: AudioConfig = {
   rumble: {
     minSpeed: 0.06,
     refSpeed: 4,
-    gain: 0.16,
+    gain: 0.24,
     minCutoffHz: 260,
     maxCutoffHz: 1500,
     smoothing: 0.08,
