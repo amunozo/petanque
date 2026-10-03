@@ -6,13 +6,18 @@
  */
 import type { ThrowParams, Vec3 } from '../engine';
 import { predictRestPoint, previewThrow } from '../games/petanque';
-import type { AimPreview } from '../input';
+import type { AimPreview, ThrowIntent } from '../input';
 import type { LoftPreset } from '../tuning';
 import type { AppContext } from './context';
 
 export interface AimPreviewer {
   /** `p` null (or `ball` null) clears the preview. `ball` = 'jack' previews with the jack's size and weight. */
   update(p: AimPreview | null, ball: 'boule' | 'jack' | null): void;
+  /**
+   * Shows what a throw intent would do (zero noise): the dots arc and landing ring only,
+   * no power meter or roll-out line. Used to show the computer's aim before it throws.
+   */
+  showIntent(intent: ThrowIntent, ball: 'boule' | 'jack'): void;
 }
 
 export function createAimPreviewer(ctx: AppContext): AimPreviewer {
@@ -35,6 +40,12 @@ export function createAimPreviewer(ctx: AppContext): AimPreviewer {
   const ballCfg = (ball: 'boule' | 'jack') => (ball === 'jack' ? { ...cfg, balls: { ...cfg.balls, boule: cfg.balls.jack } } : cfg);
 
   return {
+    showIntent(intent, ball) {
+      scene.setCameraMode('aim');
+      hud.setPower(null);
+      const { params, flight } = previewThrow(intent, ballCfg(ball));
+      scene.setAimPreview({ origin: params.origin, aim: intent.aim, landing: flight.landing, rest: null, points: flight.points });
+    },
     update(p, ball) {
       if (!p || !ball) {
         hud.setPower(null);

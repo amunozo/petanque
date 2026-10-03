@@ -35,6 +35,8 @@ export interface MatchHud {
   show(): void;
   hide(): void;
   setScore(score: Record<TeamId, number>, active: TeamId | null): void;
+  /** Labels on the scoreboard pill (default "Blue" / "Red"). */
+  setNames(names: Record<TeamId, string>): void;
   /** Big banner for ~1.2 s that shrinks into the persistent chip. */
   announceTurn(turn: TurnData): void;
   /** Updates the chip (and dots) without the banner, e.g. when a throw starts. */
@@ -65,11 +67,12 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
 
   // Scoreboard pill
   const score = el('div', 'mh-score');
-  const side = (t: TeamId): { box: HTMLElement; pts: HTMLElement } => {
+  const side = (t: TeamId): { box: HTMLElement; pts: HTMLElement; name: HTMLElement } => {
     const box = el('div', `mh-side ${teamClass(t)}`);
     const pts = el('span', 'mh-pts', '0');
-    box.append(el('span', 'mh-name', TEAM_NAME[t]), pts);
-    return { box, pts };
+    const name = el('span', 'mh-name', TEAM_NAME[t]);
+    box.append(name, pts);
+    return { box, pts, name };
   };
   const sideA = side('A');
   const sideB = side('B');
@@ -141,6 +144,10 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
       sideB.pts.textContent = String(s.B);
       sideA.box.classList.toggle('is-active', active === 'A');
       sideB.box.classList.toggle('is-active', active === 'B');
+    },
+    setNames(names) {
+      sideA.name.textContent = names.A;
+      sideB.name.textContent = names.B;
     },
     announceTurn(turn) {
       bannerTitle.textContent = turn.banner;

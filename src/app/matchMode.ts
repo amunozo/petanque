@@ -1,7 +1,9 @@
 /**
- * 2-player pass-and-play match: input -> games/petanque/match rules (reducer
- * style) -> engine playback -> view + match HUD. The active team throws with the
- * usual gestures; when the world settles its resting bodies go back to the rules.
+ * Match mode: input -> games/petanque/match rules (reducer style) -> engine
+ * playback -> view + match HUD. Each team is a seat controlled by a human (usual
+ * gestures) or the computer (aiTurn.ts: think -> show aim -> throw). Pass-and-play
+ * is two human seats; "vs computer" is Blue = human, Red = computer. When the
+ * world settles its resting bodies go back to the rules.
  */
 import type { Body, World } from '../engine';
 import {
@@ -14,13 +16,33 @@ import {
   type MatchState,
   type TeamId,
 } from '../games/petanque';
+import type { AiDecision, AiDifficulty, AiRequest } from '../games/petanque/aiTypes';
 import type { AimPreview, ThrowIntent } from '../input';
 import type { JackZoneView, TeamResolver } from '../render';
 import { createAimPreviewer } from './aimPreview';
+import { createAiClient } from './aiClient';
+import { createAiTurn } from './aiTurn';
 import type { AppContext, Mode } from './context';
 import type { TurnData } from './matchHud';
-import { endCardView, jackFault, matchOverTitle, scoreLine, settleMessage, turnView } from './matchText';
+import { endCardView, jackFault, matchOverTitle, scoreLine, settleMessage, TEAM_NAME, turnView, VOICE_2P, VOICE_VS } from './matchText';
 import { createPlayback } from './playback';
+
+export type Seat = 'human' | 'ai';
+
+export interface MatchSetup {
+  seats: Record<TeamId, Seat>;
+  /** Used when a seat is 'ai'. */
+  difficulty: AiDifficulty;
+}
+
+export const SETUP_2P: MatchSetup = { seats: { A: 'human', B: 'human' }, difficulty: 'medium' };
+/** Human = Blue (team A, throws the first jack), computer = Red (team B). */
+export const setupVsComputer = (difficulty: AiDifficulty): MatchSetup => ({ seats: { A: 'human', B: 'ai' }, difficulty });
+
+export interface MatchMode extends Mode {
+  /** Who plays which team; call before entering (a rematch keeps it). */
+  setSetup(setup: MatchSetup): void;
+}
 
 /** Pause between the last boule coming to rest and the end card (s): time to see the scoring rings. */
 const CARD_DELAY_MS = 900;
@@ -28,7 +50,7 @@ const CARD_DELAY_MS = 900;
 /** Boule bodies are named `${team}${n}` by the rules; the jack and practice balls stay neutral. */
 const teamOf: TeamResolver = (b) => (b.kind === 'boule' ? (b.id.startsWith('B') ? 'B' : 'A') : null);
 
-export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
+export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode {
   const { cfg, scene, matchHud, app } = ctx;
   const playback = createPlayback(ctx);
   const preview = createAimPreviewer(ctx);
@@ -39,6 +61,14 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
   let ghostJack: Body | null = null;
   let cardTimer: ReturnType<typeof setTimeout> | undefined;
   let lastTurn: TurnData | null = null;
+  let setup: MatchSetup = SETUP_2P;
+  /** Throws made in this match (both seats): feeds the AI seed. */
+  let throwCount = 0;
+  const aiClient = createAiClient(() => cfg);
+
+  const voice = () => (setup.seats.A !== setup.seats.B ? VOICE_VS : VOICE_2P);
+  const isAiTurn = (): boolean => canThrow(state, thrower()) && setup.seats[thrower()] === 'ai';
+  const isHumanTurn = (): boolean => canThrow(state, thrower()) && setup.seats[thrower()] === 'human';
 
   const lastThrow = () => state.throws[state.throws.length - 1];
   const thrower = (): TeamId => state.toThrow;
@@ -58,12 +88,44 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
   }
 
   function turnData(): TurnData {
-    return { ...turnView(state), left: state.boulesLeft, total: state.rules.boulesPerTeam };
+    return { ...turnView(state, voice()), left: state.boulesLeft, total: state.rules.boulesPerTeam };
   }
 
   function announceTurn(): void {
     lastTurn = turnData();
     matchHud.announceTurn(lastTurn);
+  }
+
+  // ---- the computer's turn -----------------------------------------------------
+  const ai = createAiTurn({
+    request: () => {
+      const req: AiRequest = { state, team: thrower(), difficulty: setup.difficulty, seed: state.seed * 1000 + throwCount };
+      return aiClient.requestAiThrow(req);
+    },
+    onAim(d: AiDecision) {
+      app.dataset['ai'] = 'aiming';
+      if (lastTurn) {
+        lastTurn = { ...lastTurn, chip: 'Computer plays' };
+        matchHud.setChip(lastTurn);
+      }
+      // Same dots arc + landing ring a human sees while aiming, from its intent without noise.
+      preview.showIntent(d.intent, state.phase === 'jack' ? 'jack' : 'boule');
+      if (d.plan === 'shoot') matchHud.setMessage(`${TEAM_NAME[thrower()]} shoots!`, thrower());
+    },
+    onFire(d: AiDecision) {
+      delete app.dataset['ai'];
+      const shoots = d.plan === 'shoot';
+      const team = thrower();
+      doThrow(team, d.intent);
+      if (shoots) matchHud.setMessage(`${TEAM_NAME[team]} shoots!`, team);
+    },
+  });
+
+  /** Starts the computer's turn if it is its move. */
+  function maybeStartAi(): void {
+    if (!isAiTurn()) return;
+    app.dataset['ai'] = 'thinking'; // also a hook for tests / styling
+    ai.start();
   }
 
   function clearCards(): void {
@@ -81,12 +143,14 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
     cardTimer = setTimeout(() => {
       app.classList.add('is-endover');
       ctx.refreshInput();
+      const v = voice();
+      if (over && state.winner) ctx.audio.chime(v === VOICE_VS && setup.seats[state.winner] === 'ai' ? 'lose' : 'win');
+      else if (end.winner) ctx.audio.chime('score');
       if (over && state.winner) {
         const ends = state.endNumber;
-        matchHud.showMatchOver({ title: matchOverTitle(state.winner, state.score), detail: `after ${ends} end${ends === 1 ? '' : 's'}`, team: state.winner });
+        matchHud.showMatchOver({ title: matchOverTitle(state.winner, state.score, v), detail: `after ${ends} end${ends === 1 ? '' : 's'}`, team: state.winner });
       } else {
-        const v = endCardView(end);
-        matchHud.showEndCard({ ...v, score: scoreLine(state.score) });
+        matchHud.showEndCard({ ...endCardView(end, v), score: scoreLine(state.score, v) });
       }
     }, CARD_DELAY_MS);
   }
@@ -104,7 +168,7 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
       showResultCards();
       return;
     }
-    const msg = settleMessage(state, fault);
+    const msg = settleMessage(state, fault, voice());
     matchHud.setMessage(msg ? msg.text : null, msg ? msg.team : null);
     // The point line (jack -> nearest boule) like in practice.
     const jack = state.bodies.find((b) => b.id === 'jack');
@@ -112,6 +176,7 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
     const nb = nearest ? state.bodies.find((b) => b.id === nearest.id) : undefined;
     scene.setResultLine(jack && nb ? jack.pos : null, jack && nb ? nb.pos : null);
     announceTurn();
+    maybeStartAi();
   }
 
   function onSettled(w: World): void {
@@ -131,6 +196,8 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
   }
 
   function start(): void {
+    ai.cancel();
+    delete app.dataset['ai'];
     clearCards();
     world = null;
     ghostJack = null;
@@ -144,12 +211,33 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
     matchHud.setScore(state.score, state.toThrow);
     announceTurn();
     ctx.refreshInput();
+    maybeStartAi();
   }
 
   function newMatch(): void {
     matchHud.reset();
+    matchHud.setNames(voice().name);
+    throwCount = 0;
     state = createMatch(ctx.newSeed(), cfg);
     start();
+  }
+
+  /** Applies a throw through the match rules, whoever decided it (gesture or computer). */
+  function doThrow(team: TeamId, intent: ThrowIntent): void {
+    if (!canThrow(state, team)) return;
+    throwCount++;
+    const r = beginMatchThrow(state, team, intent, cfg);
+    state = r.state;
+    world = r.world;
+    ghostJack = null;
+    playback.reset();
+    matchHud.setMessage(null, null);
+    if (lastTurn) matchHud.setChip({ ...lastTurn, left: state.boulesLeft });
+    ctx.hud.setPower(null);
+    scene.setAimPreview(null);
+    scene.setResultLine(null, null);
+    scene.setCameraMode('flight');
+    ctx.refreshInput();
   }
 
   matchHud.onNextEnd(() => {
@@ -161,6 +249,9 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
   matchHud.onMenu(goMenu);
 
   return {
+    setSetup(next) {
+      setup = next;
+    },
     enter() {
       ctx.hud.setMode('match');
       ctx.hud.showEndCard(null);
@@ -168,6 +259,9 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
       newMatch();
     },
     exit() {
+      ai.cancel();
+      delete app.dataset['ai'];
+      aiClient.dispose();
       clearCards();
       world = null;
       ghostJack = null;
@@ -179,29 +273,19 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): Mode {
       matchHud.reset();
       matchHud.hide();
     },
-    canAim: () => canThrow(state, thrower()),
+    canAim: isHumanTurn,
     inProgress: () => state.phase !== 'matchOver' && (state.endNumber > 1 || state.throws.length > 0 || state.score.A + state.score.B > 0),
     onPreview(p: AimPreview | null) {
-      const ball = canThrow(state, thrower()) ? (state.phase === 'jack' ? 'jack' : 'boule') : null;
+      const ball = isHumanTurn() ? (state.phase === 'jack' ? 'jack' : 'boule') : null;
       preview.update(p, ball);
     },
     onThrow(intent: ThrowIntent) {
-      if (!canThrow(state, thrower())) return;
+      if (!isHumanTurn()) return;
       ctx.noteThrow();
-      const r = beginMatchThrow(state, thrower(), intent, cfg);
-      state = r.state;
-      world = r.world;
-      ghostJack = null;
-      playback.reset();
-      matchHud.setMessage(null, null);
-      if (lastTurn) matchHud.setChip({ ...lastTurn, left: state.boulesLeft });
-      ctx.hud.setPower(null);
-      scene.setAimPreview(null);
-      scene.setResultLine(null, null);
-      scene.setCameraMode('flight');
-      ctx.refreshInput();
+      doThrow(thrower(), intent);
     },
     frame(dtReal) {
+      ai.tick(dtReal, ctx.uiBlocked());
       if (world && state.phase === 'inFlight' && playback.advance(world, dtReal)) onSettled(world);
       const bodies = world ? world.bodies : ghostJack ? [...state.bodies, ghostJack] : state.bodies;
       scene.syncBodies(bodies, lastThrow()?.id ?? null, teamOf);

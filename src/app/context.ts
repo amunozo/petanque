@@ -1,5 +1,6 @@
 /** What the app modes (practice, match) share: view, HUD, config and input plumbing. */
 import type { AimPreview, LoftPicker, ThrowIntent } from '../input';
+import type { Audio } from '../audio';
 import type { PitchScene } from '../render';
 import type { ConfigStore, GameConfig } from '../tuning';
 import type { Haptics } from './haptics';
@@ -15,9 +16,12 @@ export interface AppContext {
   hud: Hud;
   matchHud: MatchHud;
   haptics: Haptics;
+  audio: Audio;
   loftPicker: LoftPicker;
   /** Re-evaluates whether throw gestures / the touch cue are active (call after any state change). */
   refreshInput(): void;
+  /** True while the tuning panel, the menu or a dialog is up: nothing automatic (the computer's turn) may advance. */
+  uiBlocked(): boolean;
   /** Counts a throw for the "touch here" cue. */
   noteThrow(): void;
   /** Fresh seed for a new session (the `?seed=` URL param for the first one, for reproducible runs). */

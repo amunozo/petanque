@@ -1,5 +1,6 @@
 /** Game HUD (plain DOM, styles in the "Game HUD" section of src/style.css, classes hud-*). */
 import { el, shieldPointer } from './dom';
+import { paintMuteButton } from './soundIcon';
 
 export interface DistanceRow {
   label: string;
@@ -20,6 +21,9 @@ export type HudMode = 'practice' | 'match';
 
 export interface Hud {
   readonly fullscreenButton: HTMLButtonElement;
+  /** The speaker button in the right column. */
+  setMuted(muted: boolean): void;
+  onMute(fn: () => void): void;
   /** Practice shows the status/distance list and "new end"; match hides them (its own HUD takes over). */
   setMode(mode: HudMode): void;
   /** The ☰ button in the right column. */
@@ -63,6 +67,9 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   );
   fullscreenButton.hidden = true; // main.ts reveals it where supported
   const menuButton = iconButton('hud-menu', 'Menu', '<path d="M4 7h16M4 12h16M4 17h16"/>');
+  const muteButton = el('button', 'hud-btn hud-mute');
+  muteButton.type = 'button';
+  paintMuteButton(muteButton, false);
   const newEndButton = iconButton('hud-new', 'New end', '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/>');
 
   const power = el('div', 'hud-power');
@@ -82,22 +89,30 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   nextButton.type = 'button';
   card.append(cardTitle, cardBest, cardSession, nextButton);
 
-  root.append(info, fullscreenButton, newEndButton, menuButton, power, card);
+  root.append(info, fullscreenButton, newEndButton, menuButton, muteButton, power, card);
 
   let newEndFn: () => void = () => undefined;
   let nextFn: () => void = () => undefined;
   let menuFn: () => void = () => undefined;
+  let muteFn: () => void = () => undefined;
+  muteButton.addEventListener('click', () => muteFn());
   newEndButton.addEventListener('click', () => newEndFn());
   menuButton.addEventListener('click', () => menuFn());
   nextButton.addEventListener('click', () => nextFn());
 
   // Buttons must not leak touches into the game canvas underneath.
-  for (const target of [newEndButton, menuButton, fullscreenButton, card]) {
+  for (const target of [newEndButton, menuButton, muteButton, fullscreenButton, card]) {
     shieldPointer(target);
   }
 
   return {
     fullscreenButton,
+    setMuted(muted) {
+      paintMuteButton(muteButton, muted);
+    },
+    onMute(fn) {
+      muteFn = fn;
+    },
     setMode(mode) {
       root.classList.toggle('hud-mode-match', mode === 'match');
     },

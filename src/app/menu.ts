@@ -1,5 +1,8 @@
 /** Start menu + confirm dialog (plain DOM overlays; styles in the "Menu" section of src/style.css, classes mn-*). */
+import type { AiDifficulty } from '../games/petanque/aiTypes';
 import { button, el, shieldPointer } from './dom';
+import { DIFFICULTIES, loadDifficulty, saveDifficulty } from './prefs';
+import { paintMuteButton } from './soundIcon';
 
 export interface Menu {
   show(): void;
@@ -9,6 +12,37 @@ export interface Menu {
   setMatchInfo(text: string): void;
   onPractice(fn: () => void): void;
   onMatch(fn: () => void): void;
+  /** "1 player vs computer" was chosen, with the difficulty selected in the menu. */
+  onVsComputer(fn: (difficulty: AiDifficulty) => void): void;
+  /** Speaker button in the top-right corner. */
+  setMuted(muted: boolean): void;
+  onMute(fn: () => void): void;
+}
+
+const DIFFICULTY_LABEL: Record<AiDifficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+
+/** Inline Easy / Medium / Hard segmented control; the choice is remembered (localStorage). */
+function difficultyPicker(): { element: HTMLElement; get(): AiDifficulty } {
+  let value = loadDifficulty();
+  const row = el('div', 'mn-seg');
+  row.setAttribute('role', 'radiogroup');
+  row.setAttribute('aria-label', 'Computer difficulty');
+  const buttons = DIFFICULTIES.map((d) => {
+    const b = button('mn-seg-btn', DIFFICULTY_LABEL[d], () => {
+      value = d;
+      saveDifficulty(d);
+      render();
+    });
+    b.setAttribute('role', 'radio');
+    b.dataset['level'] = d;
+    row.append(b);
+    return b;
+  });
+  function render(): void {
+    DIFFICULTIES.forEach((d, i) => buttons[i]?.setAttribute('aria-checked', String(d === value)));
+  }
+  render();
+  return { element: row, get: () => value };
 }
 
 function choice(cls: string, title: string, sub: string): { btn: HTMLButtonElement; sub: HTMLElement } {
@@ -31,16 +65,28 @@ export function createMenu(parent: HTMLElement, buildId: string): Menu {
 
   const practice = choice('mn-practice', 'Practice', 'Throw at the jack, on your own');
   const match = choice('mn-match', '2 players (same phone)', 'Pass and play');
+  const vs = choice('mn-vs', '1 player vs computer', 'You are Blue');
+  const level = difficultyPicker();
+  const vsBox = el('div', 'mn-vs-box');
+  vsBox.append(vs.btn, level.element);
   const buttons = el('div', 'mn-buttons');
-  buttons.append(practice.btn, match.btn);
+  buttons.append(practice.btn, vsBox, match.btn);
 
-  root.append(logo, el('h1', 'mn-title', 'Pétanque'), buttons, el('div', 'mn-build', buildId));
+  const muteBtn = el('button', 'mn-mute');
+  muteBtn.type = 'button';
+  paintMuteButton(muteBtn, false);
+
+  root.append(muteBtn, logo, el('h1', 'mn-title', 'Pétanque'), buttons, el('div', 'mn-build', buildId));
   parent.append(root);
 
   let practiceFn: () => void = () => undefined;
   let matchFn: () => void = () => undefined;
+  let vsFn: (d: AiDifficulty) => void = () => undefined;
+  let muteFn: () => void = () => undefined;
   practice.btn.addEventListener('click', () => practiceFn());
   match.btn.addEventListener('click', () => matchFn());
+  vs.btn.addEventListener('click', () => vsFn(level.get()));
+  muteBtn.addEventListener('click', () => muteFn());
 
   return {
     show() {
@@ -60,6 +106,15 @@ export function createMenu(parent: HTMLElement, buildId: string): Menu {
     },
     onMatch(fn) {
       matchFn = fn;
+    },
+    onVsComputer(fn) {
+      vsFn = fn;
+    },
+    setMuted(muted) {
+      paintMuteButton(muteBtn, muted);
+    },
+    onMute(fn) {
+      muteFn = fn;
     },
   };
 }

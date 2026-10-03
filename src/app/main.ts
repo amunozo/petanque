@@ -1,10 +1,11 @@
 /**
  * App wiring: config store + tuning panel + input + start menu. The menu picks a
- * mode (practice / 2-player match, each in its own file); main owns what they
+ * mode (practice / match vs a friend or the computer; practice and match each in their own file); main owns what they
  * share: the three.js view, the HUD, gesture routing and the frame loop.
  * Config is read live (store.config is mutated in place).
  */
 import '../style.css';
+import { createAudio } from '../audio';
 import { createLoftPicker, createThrowController, type AimPreview, type ThrowIntent } from '../input';
 import { createPitchScene } from '../render';
 import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema } from '../tuning';
@@ -12,8 +13,9 @@ import type { AppContext, Mode } from './context';
 import { createHaptics } from './haptics';
 import { createHud } from './hud';
 import { createMatchHud } from './matchHud';
-import { createMatchMode } from './matchMode';
+import { createMatchMode, SETUP_2P, setupVsComputer } from './matchMode';
 import { confirmDialog, createMenu } from './menu';
+import { isDifficulty, loadDifficulty } from './prefs';
 import { createPracticeMode } from './practiceMode';
 import { createTouchHint } from './touchHint';
 
@@ -39,6 +41,7 @@ const matchHud = createMatchHud(hudRoot);
 const menu = createMenu(app, __BUILD_ID__);
 const touchHint = createTouchHint(app);
 const haptics = createHaptics(() => cfg.controls.haptics);
+const audio = createAudio();
 const loftPicker = createLoftPicker('half');
 app.append(loftPicker.element);
 
@@ -60,8 +63,10 @@ const ctx: AppContext = {
   hud,
   matchHud,
   haptics,
+  audio,
   loftPicker,
   refreshInput: () => refreshInput(),
+  uiBlocked: () => panel.isOpen() || menu.isOpen() || dialogOpen,
   noteThrow: () => {
     throwsDone++;
   },
@@ -108,6 +113,7 @@ function enterMode(next: Mode): void {
 
 function goMenu(): void {
   mode?.exit();
+  audio.setRolling(0);
   mode = null;
   scene.setAimPreview(null);
   scene.setCameraMode('aim');
@@ -137,7 +143,29 @@ async function requestMenu(): Promise<void> {
 
 menu.setMatchInfo(`First to ${cfg.match.pointsToWin}`);
 menu.onPractice(() => enterMode(practice));
-menu.onMatch(() => enterMode(match));
+menu.onMatch(() => {
+  match.setSetup(SETUP_2P);
+  enterMode(match);
+});
+menu.onVsComputer((difficulty) => {
+  match.setSetup(setupVsComputer(difficulty));
+  enterMode(match);
+});
+
+// ---- sound: mute buttons (HUD + menu) and loft tick ---------------------------------
+const paintMute = (muted: boolean): void => {
+  hud.setMuted(muted);
+  menu.setMuted(muted);
+};
+paintMute(audio.isMuted());
+audio.onMuteChange(paintMute);
+const toggleMute = (): void => {
+  audio.toggleMute();
+  if (!audio.isMuted()) audio.tick(); // audible confirmation
+};
+hud.onMute(toggleMute);
+menu.onMute(toggleMute);
+loftPicker.onChange(() => audio.tick());
 hud.onMenu(() => void requestMenu());
 
 // Any touch on the field while aiming brings the camera back behind the circle.
@@ -189,9 +217,15 @@ function frame(now: number): void {
 }
 
 resize();
-// `?mode=practice|match` skips the menu (handy for dev and screenshots).
+// `?mode=practice|match|ai` skips the menu (handy for dev and screenshots); `&level=easy|medium|hard` for ai.
 const startMode = params.get('mode');
+const levelParam = params.get('level');
 if (startMode === 'practice') enterMode(practice);
-else if (startMode === 'match') enterMode(match);
-else goMenu();
+else if (startMode === 'match') {
+  match.setSetup(SETUP_2P);
+  enterMode(match);
+} else if (startMode === 'ai') {
+  match.setSetup(setupVsComputer(isDifficulty(levelParam) ? levelParam : loadDifficulty()));
+  enterMode(match);
+} else goMenu();
 requestAnimationFrame(frame);

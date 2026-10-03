@@ -4,6 +4,7 @@
  * them (never cache them in module constants).
  */
 import type { BallSpec, PhysicsConfig } from '../engine/types';
+import type { AiDifficulty, AiLevel } from '../games/petanque/aiTypes';
 import type { MatchRules } from '../games/petanque/matchTypes';
 
 export type LoftPreset = 'roll' | 'half' | 'lob' | 'shoot';
@@ -90,6 +91,8 @@ export interface GameConfig {
   };
   /** Rules of a full match (see games/petanque/match.ts). */
   match: MatchRules;
+  /** Computer opponent per difficulty (see games/petanque/ai.ts). */
+  ai: Record<AiDifficulty, AiLevel>;
 }
 
 export const defaultConfig: GameConfig = {
@@ -159,6 +162,11 @@ export const defaultConfig: GameConfig = {
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
   match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
+  ai: {
+    easy: { aimErrorDeg: 3, powerErrorPct: 8, canShoot: false, maxSimulations: 30 },
+    medium: { aimErrorDeg: 1.5, powerErrorPct: 4, canShoot: true, maxSimulations: 80 },
+    hard: { aimErrorDeg: 0.6, powerErrorPct: 1.5, canShoot: true, maxSimulations: 160 },
+  },
 };
 
 /** UI metadata for the tuning panel. `path` is a dot path into GameConfig. */
@@ -265,6 +273,23 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'match.jackMinDist', label: 'jack min m', min: 3, max: 12, step: 0.5 },
       { path: 'match.jackMaxDist', label: 'jack max m', min: 4, max: 14, step: 0.5 },
       { path: 'match.jackMinSideMargin', label: 'jack side margin m', min: 0, max: 1.5, step: 0.05 },
+    ],
+  },
+  {
+    title: 'Computer',
+    fields: [
+      { path: 'ai.easy.aimErrorDeg', label: 'easy aim error°', min: 0, max: 10, step: 0.1 },
+      { path: 'ai.easy.powerErrorPct', label: 'easy power error %', min: 0, max: 25, step: 0.5 },
+      { path: 'ai.easy.canShoot', label: 'easy shoots', toggle: true },
+      { path: 'ai.easy.maxSimulations', label: 'easy max sims', min: 5, max: 400, step: 5 },
+      { path: 'ai.medium.aimErrorDeg', label: 'medium aim error°', min: 0, max: 10, step: 0.1 },
+      { path: 'ai.medium.powerErrorPct', label: 'medium power error %', min: 0, max: 25, step: 0.5 },
+      { path: 'ai.medium.canShoot', label: 'medium shoots', toggle: true },
+      { path: 'ai.medium.maxSimulations', label: 'medium max sims', min: 5, max: 400, step: 5 },
+      { path: 'ai.hard.aimErrorDeg', label: 'hard aim error°', min: 0, max: 10, step: 0.1 },
+      { path: 'ai.hard.powerErrorPct', label: 'hard power error %', min: 0, max: 25, step: 0.5 },
+      { path: 'ai.hard.canShoot', label: 'hard shoots', toggle: true },
+      { path: 'ai.hard.maxSimulations', label: 'hard max sims', min: 5, max: 400, step: 5 },
     ],
   },
 ];

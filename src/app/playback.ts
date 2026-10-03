@@ -13,11 +13,19 @@ export interface Playback {
   advance(world: World, dtReal: number): boolean;
 }
 
+/** Horizontal speed of the fastest rolling ball (m/s); 0 when none rolls. */
+export function fastestRolling(w: World): number {
+  let fastest = 0;
+  for (const b of w.bodies) if (b.state === 'rolling') fastest = Math.max(fastest, Math.hypot(b.vel.x, b.vel.z));
+  return fastest;
+}
+
 export function createPlayback(ctx: AppContext): Playback {
   let accumulator = 0;
   return {
     reset() {
       accumulator = 0;
+      ctx.audio.setRolling(0);
     },
     advance(w, dtReal) {
       const { cfg } = ctx;
@@ -33,7 +41,10 @@ export function createPlayback(ctx: AppContext): Playback {
       }
       if (steps >= MAX_STEPS_PER_FRAME) accumulator = 0; // drop the backlog instead of spiralling
       ctx.haptics.handle(events);
-      return isSettled(w) || w.time > MAX_THROW_SECONDS;
+      ctx.audio.handle(events, w.bodies);
+      const done = isSettled(w) || w.time > MAX_THROW_SECONDS;
+      ctx.audio.setRolling(done ? 0 : fastestRolling(w));
+      return done;
     },
   };
 }

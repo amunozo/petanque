@@ -3,7 +3,7 @@ import { createBody } from '../engine';
 import { createMatch } from '../games/petanque';
 import type { MatchState } from '../games/petanque';
 import { defaultConfig } from '../tuning';
-import { endCardView, formatLead, jackFault, matchOverTitle, scoreLine, settleMessage, turnView } from './matchText';
+import { endCardView, formatLead, jackFault, matchOverTitle, scoreLine, settleMessage, turnView, VOICE_VS } from './matchText';
 
 const cfg = defaultConfig;
 const base = (): MatchState => createMatch(1, cfg);
@@ -78,5 +78,25 @@ describe('cards', () => {
   it('formatLead', () => {
     expect(formatLead(0.123)).toBe('12\u00a0cm');
     expect(formatLead(0.004)).toBe('4\u00a0mm');
+  });
+});
+
+describe('vs computer voice', () => {
+  it('speaks to the human and describes the computer', () => {
+    expect(matchOverTitle('A', { A: 13, B: 8 }, VOICE_VS)).toBe('You win 13 – 8');
+    expect(matchOverTitle('B', { A: 8, B: 13 }, VOICE_VS)).toBe('Computer wins 13 – 8');
+    expect(endCardView({ winner: 'A', points: 2, scoringIds: [], reason: 'normal' }, VOICE_VS).title).toBe('You score 2');
+    expect(endCardView({ winner: 'B', points: 2, scoringIds: [], reason: 'normal' }, VOICE_VS).title).toBe('Computer scores 2');
+    expect(scoreLine({ A: 5, B: 3 }, VOICE_VS)).toBe('You 5 – 3 Computer');
+  });
+  it('turn banners', () => {
+    expect(turnView(base(), VOICE_VS).banner).toBe('Your turn — throw the jack');
+    expect(turnView({ ...base(), phase: 'boule', toThrow: 'B' }, VOICE_VS).banner).toBe('Computer is thinking…');
+    expect(turnView({ ...base(), phase: 'jack', toThrow: 'B' }, VOICE_VS).banner).toBe('Computer is thinking…');
+    expect(turnView({ ...base(), phase: 'boule', toThrow: 'A' }, VOICE_VS).chip).toBe('Your turn');
+  });
+  it('settle messages use the right verbs', () => {
+    const s: MatchState = { ...base(), toThrow: 'A', jackAttempts: 1 };
+    expect(settleMessage(s, 'too far', VOICE_VS)?.text).toBe('Jack too far — You throw it');
   });
 });

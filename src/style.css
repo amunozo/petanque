@@ -46,7 +46,7 @@ body {
 /* ==========================================================================
    Game HUD (src/app/hud.ts)
    Right column: fullscreen (top 8), tuning gear (top 52, see --tn-gear-top),
-   new end (top 96, practice only), menu (top 140; 96 in a match). Left: status +
+   new end (top 96, practice only), menu (top 140; 96 in a match), sound (below the menu: 184; 140 in a match). Left: status +
    distances, power meter mid-left.
    Bottom: loft picker, or the end card (picker hidden while it shows).
    ========================================================================== */
@@ -137,6 +137,9 @@ body {
 .hud-menu {
   top: calc(var(--safe-top) + 140px);
 }
+.hud-mute {
+  top: calc(var(--safe-top) + 184px);
+}
 /* Match mode: the match HUD (mh-*) replaces the practice status / new-end button. */
 #hud.hud-mode-match .hud-info,
 #hud.hud-mode-match .hud-new {
@@ -144,6 +147,9 @@ body {
 }
 #hud.hud-mode-match .hud-menu {
   top: calc(var(--safe-top) + 96px);
+}
+#hud.hud-mode-match .hud-mute {
+  top: calc(var(--safe-top) + 140px);
 }
 
 .hud-power {
@@ -1136,6 +1142,57 @@ body {
 .mn-match {
   background: linear-gradient(90deg, var(--team-a-dark), var(--team-b-dark));
 }
+.mn-vs-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mn-vs {
+  background: linear-gradient(90deg, var(--team-a-dark), #2b2b2b 55%, #3a3a3a);
+}
+.mn-seg {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.mn-seg-btn {
+  flex: 1;
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.mn-seg-btn[aria-checked='true'] {
+  background: #8fd16a;
+  color: #10200a;
+}
+.mn-mute {
+  position: absolute;
+  top: calc(var(--safe-top) + 8px);
+  right: calc(var(--safe-right) + 8px);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.mn-mute:active {
+  background: rgba(60, 90, 40, 0.8);
+}
 .mn-btn-title {
   font-size: 21px;
   font-weight: 800;
@@ -1202,4 +1259,21 @@ body.is-dialog .tn-root {
 /* A card at the bottom replaces the turn chip. */
 .mh-root.has-card .mh-chip {
   display: none;
+}
+
+/* Short phones: tighten the menu so all three choices fit. */
+@media (max-height: 620px) {
+  .mn-root {
+    gap: 10px;
+  }
+  .mn-btn {
+    min-height: 62px;
+  }
+  .mn-title {
+    margin-bottom: 6px;
+    font-size: 42px;
+  }
+  .mn-seg-btn {
+    min-height: 34px;
+  }
 }
