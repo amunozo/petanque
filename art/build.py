@@ -22,7 +22,7 @@ from lib.export import export_glb  # noqa: E402
 from lib.modifiers import triangle_count  # noqa: E402
 from lib.preview import render_views  # noqa: E402
 
-ASSETS = ["court", "plane_tree"]
+ASSETS = ["court", "plane_tree", "houses", "cafe", "props", "cypress", "hills"]
 MODELS_DIR = os.path.join(ROOT, "public", "models")
 BLEND_DIR = os.path.join(HERE, "blend")
 PREVIEW_DIR = os.path.join(HERE, "previews")

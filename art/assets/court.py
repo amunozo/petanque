@@ -1,10 +1,11 @@
 """
-court.glb: the playing surface + boards + the ground around it.
+court.glb: the playing surface + boards + the ground of the village square around it.
 
 The court rectangle matches the physics arena in src/tuning/config.ts (x -2..2, z -9.5..5.5)
 and its top is exactly y = 0 (balls roll on it). Keep ARENA in sync with that config.
-Objects: court_gravel (y=0), court_boards (+ stakes), court_surround (packed earth, worn
-grass, a strip of limestone paving behind the throwing end). All flat per-face colours.
+Objects: court_gravel (y=0), court_boards (+ stakes), court_surround (packed earth of the square,
+limestone pavements in front of the houses of art/assets/houses.py, fields beyond the village).
+All flat per-face colours.
 """
 from __future__ import annotations
 
@@ -28,7 +29,7 @@ SURROUND_EDGE_Y = -0.012  # surround just below the court top at the boards
 
 PREVIEW = {
     "views": [
-        ("overview", (7.5, 5.0, 13.0), (0.0, 0.0, -2.5), 32),
+        ("overview", (9.0, 8.0, 16.0), (0.0, 0.0, -5.0), 32),
         ("aim", (0.0, 2.3, 7.0), (0.0, 0.0, 3.6), 40),
         ("far", (-4.5, 3.0, -2.0), (0.5, 0.0, -9.0), 34),
     ],
@@ -48,7 +49,11 @@ def _jitter_color(c, rng: Rng, amount: float):
 # --- gravel -------------------------------------------------------------------------------
 
 def build_gravel(rng: Rng) -> MeshData:
-    cols, rows = 40, 50
+    """
+    Calm raked gravel: small, nearly square facets with low colour variation (so the jack and the
+    boules pop), broad soft patches and faint rake lines; slightly darker along the boards.
+    """
+    cols, rows = 36, 120
     x0, x1 = ARENA["min_x"], ARENA["max_x"]
     z0, z1 = ARENA["min_z"], ARENA["max_z"]
     m = MeshData()
@@ -56,29 +61,29 @@ def build_gravel(rng: Rng) -> MeshData:
     for j in range(rows + 1):
         z = z0 + (z1 - z0) * j / rows
         if 0 < j < rows:
-            z += rng.jitter(0.06)  # wobbly rows; edges stay exact
+            z += rng.jitter(0.025)  # wobbly rows; edges stay exact
         zs.append(z)
     grid = [[m.add_vert((x0 + (x1 - x0) * i / cols, 0.0, zs[j])) for i in range(cols + 1)] for j in range(rows + 1)]
 
-    base = mix(P["dust"], P["limestone"], 0.4)
-    warm = P["ochre_light"]
-    cool = mix(P["dust_dark"], P["bark_grey"], 0.25)
+    base = P["dust"]
+    warm = mix(P["dust"], P["ochre_light"], 0.5)
+    cool = mix(P["dust_dark"], P["bark_grey"], 0.3)
     for j in range(rows):
         for i in range(cols):
             cx = x0 + (x1 - x0) * (i + 0.5) / cols
             cz = (zs[j] + zs[j + 1]) / 2
-            patch = fbm(cx * 0.55, cz * 0.55, 0.0, SEED, 3)
-            c = mix(base, warm, _smoothstep(0.45, 0.8, patch) * 0.4)
-            c = mix(c, cool, _smoothstep(0.55, 0.15, patch) * 0.45)
-            # Rake lines: alternate columns, broken up here and there.
-            rake = 1.0 + (0.045 if (i // 2) % 2 == 0 else -0.045) * (1.0 if value_noise(i * 0.25, j * 0.35, 0, SEED + 3) > 0.25 else 0.0)
+            patch = fbm(cx * 0.45, cz * 0.45, 0.0, SEED, 3)
+            c = mix(base, warm, _smoothstep(0.5, 0.8, patch) * 0.35)
+            c = mix(c, cool, _smoothstep(0.5, 0.2, patch) * 0.3)
+            # Faint, broken rake lines (kept subtle: strong continuous stripes read as floorboards).
+            rake = 1.0 + (0.008 if (i // 2) % 2 == 0 else -0.008) * (1.0 if value_noise(i * 0.3, j * 0.5, 0, SEED + 3) > 0.45 else 0.0)
             # Worn, slightly darker band along the boards.
-            edge = 1.0 - 0.06 * _smoothstep(0.5, 0.0, min(i, cols - 1 - i) / 6.0)
+            edge = 1.0 - 0.06 * _smoothstep(0.5, 0.0, min(i, cols - 1 - i) / 5.0)
             c = scale(c, rake * edge)
             a, b, d, e = grid[j][i], grid[j][i + 1], grid[j + 1][i + 1], grid[j + 1][i]
             # Winding must face +Y (up): (a, e, d) and (a, d, b) in x/z-plane with z increasing.
-            m.add_face((a, e, d), _jitter_color(c, rng, 0.025 if rng.random() > 0.07 else 0.10))
-            m.add_face((a, d, b), _jitter_color(c, rng, 0.025 if rng.random() > 0.07 else 0.10))
+            m.add_face((a, e, d), _jitter_color(c, rng, 0.012))
+            m.add_face((a, d, b), _jitter_color(c, rng, 0.012))
     return m
 
 
@@ -123,10 +128,10 @@ def build_boards(rng: Rng) -> MeshData:
 
 # --- surround -----------------------------------------------------------------------------
 
-def _axis(breaks: list[float], max_cell: float) -> list[float]:
+def _axis(breaks: list[float], cell_for) -> list[float]:
     out = [breaks[0]]
     for a, b in zip(breaks, breaks[1:]):
-        n = max(1, math.ceil((b - a) / max_cell))
+        n = max(1, math.ceil((b - a) / cell_for(a, b)))
         out += [a + (b - a) * k / n for k in range(1, n + 1)]
     return out
 
@@ -137,12 +142,38 @@ def _dist_to_court(x: float, z: float) -> float:
     return math.hypot(dx, dz)
 
 
+# The village around the square (keep in sync with art/assets/houses.py).
+FAR_FACADE_Z = -16.0
+SIDE_FACADE_X = 10.5
+SIDE_ROW_Z0 = -10.0
+VILLAGE_HALF_W = 17.6   # far row spans x -17.1 .. 17.1
+PAVEMENT = 1.4          # limestone pavement in front of the facades
+GAP_HALF = 3.4          # belvedere gap in the far row (parapet at z = PARAPET_Z)
+PARAPET_Z = -16.9
+
+
+def _valley_drop(x: float, z: float) -> float:
+    """Beyond the belvedere the ground falls away into a valley (widening with distance)."""
+    widen = max(0.0, -z - 33.0) * 0.5
+    return 4.0 * _smoothstep(-17.6, -24.0, z) * _smoothstep(5.5, 3.6, abs(x) - widen)
+
+
 def build_surround(rng: Rng) -> MeshData:
     x0, x1 = ARENA["min_x"], ARENA["max_x"]
     z0, z1 = ARENA["min_z"], ARENA["max_z"]
-    xs = _axis([-44, -26, -14, -8, -5, -3.4, -2.6, x0], 2.6)[:-1] + _axis([x1, 2.6, 3.4, 5, 8, 14, 26, 44], 2.6)
-    zs = _axis([-64, -40, -24, -16, -12.5, -11, z0], 2.6)[:-1] + _axis([z1, 6.6, 8.5, 12, 18, 28], 2.6)
-    # Make sure the hole edges are exactly the court edges.
+    W, F, S = VILLAGE_HALF_W, FAR_FACADE_Z, SIDE_FACADE_X
+
+    def cell_x(a, b):
+        return 1.6 if max(abs(a), abs(b)) <= W + 0.1 else 14.0
+
+    def cell_z(a, b):
+        return 1.6 if min(a, b) >= -23.1 else 14.0
+
+    right = [x1, 2.6, 3.4, 6.0, S - PAVEMENT, S, W, 24.0, 44.0, 72.0]
+    xs = [-v for v in reversed(right)]
+    xs = _axis(xs, cell_x) + _axis(right, cell_x)
+    zs = _axis([-78.0, -50.0, -30.0, -23.0, -17.6, F, F + PAVEMENT, -12.5, -11.0, z0], cell_z) + \
+        _axis([z1, 6.6, 8.5, 12.0, 20.0], cell_z)
     m = MeshData()
     idx: dict[tuple[int, int], int] = {}
 
@@ -152,12 +183,16 @@ def build_surround(rng: Rng) -> MeshData:
             return idx[key]
         x, z = xs[i], zs[j]
         on_court_line = x in (x0, x1) or z in (z0, z1)
-        if not on_court_line and 0 < i < len(xs) - 1 and 0 < j < len(zs) - 1:
-            x += rng.jitter(0.22 * min(xs[i] - xs[i - 1], xs[i + 1] - xs[i]))
-            z += rng.jitter(0.22 * min(zs[j] - zs[j - 1], zs[j + 1] - zs[j]))
+        far = abs(x) > W + 0.1 or z < -23.1
+        if far and 0 < i < len(xs) - 1 and 0 < j < len(zs) - 1:
+            x += rng.jitter(0.2 * min(xs[i] - xs[i - 1], xs[i + 1] - xs[i]))
+            z += rng.jitter(0.2 * min(zs[j] - zs[j - 1], zs[j + 1] - zs[j]))
         d = _dist_to_court(x, z)
         ramp = _smoothstep(1.0, 6.0, d)
-        y = SURROUND_EDGE_Y + ramp * (fbm(x * 0.35, z * 0.35, 0, SEED + 11, 3) - 0.45) * 0.14
+        y = SURROUND_EDGE_Y + ramp * (fbm(x * 0.35, z * 0.35, 0, SEED + 11, 3) - 0.5) * 0.08
+        if far:
+            y += (fbm(x * 0.05, z * 0.05, 0, SEED + 13, 2) - 0.4) * 2.5 * _smoothstep(30.0, 50.0, math.hypot(x, z + 8))
+        y -= _valley_drop(x, z)
         if on_court_line and d == 0.0:
             y = SURROUND_EDGE_Y
         idx[key] = m.add_vert((x, y, z))
@@ -169,31 +204,35 @@ def build_surround(rng: Rng) -> MeshData:
                 continue  # the court itself
             cx, cz = (xs[i] + xs[i + 1]) / 2, (zs[j] + zs[j + 1]) / 2
             a, b, d_, e = vert(i, j), vert(i + 1, j), vert(i + 1, j + 1), vert(i, j + 1)
-            for tri in ((a, e, d_), (a, d_, b)):
-                m.add_face(tri, _surround_color(cx + rng.jitter(0.6), cz + rng.jitter(0.6), rng))
+            for k, tri in enumerate(((a, e, d_), (a, d_, b))):
+                m.add_face(tri, _surround_color(cx, cz, k, rng))
     return m
 
 
-def _surround_color(x: float, z: float, rng: Rng):
+def _surround_color(x: float, z: float, k: int, rng: Rng):
+    W, F, S = VILLAGE_HALF_W, FAR_FACADE_Z, SIDE_FACADE_X
     d = _dist_to_court(x, z)
-    n = fbm(x * 0.28, z * 0.28, 0, SEED + 21, 3)
-    # Packed earth near the court, worn grass further out, with ragged edges.
-    grass = _smoothstep(2.0, 6.5, d + (n - 0.5) * 5.0)
-    earth = mix(P["dust"], P["ochre_light"], _smoothstep(0.35, 0.8, n) * 0.6)
-    earth = mix(earth, P["terracotta"], _smoothstep(0.7, 0.95, fbm(x * 0.5, z * 0.5, 3, SEED + 31, 2)) * 0.35)
-    earth = mix(earth, P["dust_dark"], _smoothstep(0.5, 0.1, n) * 0.5)
-    g = fbm(x * 0.4, z * 0.4, 9, SEED + 41, 2)
-    green = mix(mix(P["straw"], P["sage"], 0.45), P["sage"], _smoothstep(0.3, 0.65, g))
-    green = mix(green, P["olive"], _smoothstep(0.65, 0.95, g) * 0.8)
-    c = mix(earth, green, grass)
-    # Limestone paving strip behind the throwing end.
-    if z > ARENA["max_z"] and abs(x) < 6.0:
-        pave = _smoothstep(1.4, 0.3, d) * _smoothstep(6.5, 4.5, abs(x))
-        c = mix(c, mix(P["limestone"], P["limestone_dark"], n), pave * 0.9)
-    # A few lavender tufts in the grass.
-    if grass > 0.7 and rng.random() < 0.012:
-        c = mix(c, P["lavender"], 0.55)
-    return scale(c, 1.0 + rng.jitter(0.05))
+    n = fbm(x * 0.3, z * 0.3, 0, SEED + 21, 3)
+    # Packed earth of the square: warm, a bit darker and redder than the court; worn ring round the boards.
+    earth = mix(P["earth"], P["ochre_light"], _smoothstep(0.55, 0.85, n) * 0.4)
+    earth = mix(earth, P["earth_dark"], _smoothstep(0.45, 0.15, n) * 0.5)
+    earth = mix(earth, P["dust_dark"], _smoothstep(1.2, 0.2, d) * 0.35)
+    c = earth
+    in_far_pavement = (F <= z <= F + PAVEMENT and abs(x) <= W) or (PARAPET_Z - 0.7 <= z <= F and abs(x) <= GAP_HALF)
+    in_side_pavement = S - PAVEMENT <= abs(x) <= S and SIDE_ROW_Z0 <= z <= 12.0
+    in_street = abs(x) >= S and F <= z <= SIDE_ROW_Z0 and abs(x) <= W
+    if in_far_pavement or in_side_pavement or in_street:
+        flag = rng.random()
+        c = mix(P["limestone"], P["limestone_dark"], flag * 0.6)
+        c = mix(c, P["render_sand"], 0.25 if k == 1 else 0.0)
+    elif abs(x) > W + 0.1 or z < -23.1 or (abs(x) > S and z > SIDE_ROW_Z0) or z < PARAPET_Z - 0.7:
+        # countryside beyond the village (seen through the streets and around the hills)
+        g = fbm(x * 0.06, z * 0.06, 9, SEED + 41, 3)
+        c = mix(P["straw"], P["sage"], _smoothstep(0.35, 0.6, g))
+        c = mix(c, P["olive"], _smoothstep(0.6, 0.8, g) * 0.9)
+        if _smoothstep(0.62, 0.7, fbm(x * 0.1 + 4, z * 0.1, 2, SEED + 43, 2)) > 0.5:
+            c = mix(c, P["lavender"], 0.7)  # a lavender field
+    return scale(c, 1.0 + rng.jitter(0.03))
 
 
 def build():

@@ -51,43 +51,75 @@ def to_hex(c: Color) -> str:
 
 
 # --- the palette (sRGB hex) -------------------------------------------------------------
+# Art pass 2: richer and more saturated than the first look test (which read as washed-out beige).
+# Families: warm earth (ochre, terracotta), limestone render, greens (sage, olive, leaf), the
+# painted-shutter accents (lavender, sage, Provence blue) and the far landscape (haze lavender).
 HEX = {
     # Warm earth
-    "ochre": "#d4a259",
-    "ochre_light": "#e3bd7c",
-    "ochre_dark": "#b4823f",
-    "terracotta": "#c4673f",
-    "terracotta_dark": "#9a4a2e",
-    "dust": "#cdb48c",          # packed earth / court gravel base
-    "dust_dark": "#a98c63",
-    # Limestone / cream
-    "cream": "#efe2c2",
-    "limestone": "#dccfb0",
-    "limestone_dark": "#b9aa88",
+    "ochre": "#d89a45",
+    "ochre_light": "#e8b866",
+    "ochre_dark": "#b0742f",
+    "terracotta": "#c55a32",
+    "terracotta_dark": "#913a22",
+    "terracotta_light": "#dc7a4a",
+    "dust": "#bf9b70",          # court gravel base: mid value, so the yellow jack and steel boules pop
+    "dust_dark": "#9c7a52",
+    "earth": "#c08f5c",          # packed earth of the square around the court (warmer than the court)
+    "earth_dark": "#9c6d43",
+    # Limestone / render
+    "cream": "#f0dcb0",
+    "limestone": "#dcc9a2",
+    "limestone_dark": "#b49f7a",
+    "render_ochre": "#e2a957",   # facade render colours
+    "render_cream": "#ecd2a0",
+    "render_pink": "#e3a27f",
+    "render_rose": "#d9896a",
+    "render_sand": "#d8b98a",
+    "stone_grey": "#a99c86",
     # Greens
-    "sage": "#8da16b",
-    "sage_light": "#a9b983",
-    "olive": "#6b7a3b",
-    "olive_dark": "#4a5a2b",
-    "leaf_light": "#a6b650",
-    "leaf_mid": "#78994a",
-    "leaf_dark": "#4d7440",
-    "straw": "#c9b765",         # dry late-summer grass
+    "sage": "#8ea866",
+    "sage_light": "#adc17f",
+    "olive": "#6b7f35",
+    "olive_dark": "#4a5d26",
+    "leaf_light": "#a9c24a",
+    "leaf_mid": "#6f9a3c",
+    "leaf_dark": "#3f6b35",
+    "leaf_deep": "#2c5030",
+    "straw": "#cdb35a",         # dry late-summer grass
+    "cypress": "#2a4a2c",
+    "cypress_light": "#4a6b37",
     # Plane-tree bark
-    "bark_khaki": "#8f8765",
-    "bark_grey": "#827f74",
-    "bark_cream": "#cbc19f",
-    "bark_dark": "#5e5646",
-    "bark_olive": "#7d7a55",
-    # Wood (boards, stakes)
-    "timber": "#7c5a38",
-    "timber_light": "#9b7649",
-    "timber_dark": "#5d4128",
-    # Accent + sky
-    "lavender": "#8a78b8",
-    "lavender_light": "#a897d0",
-    "sky_blue": "#7fb1dc",
-    "sky_horizon": "#f6dcae",
+    "bark_khaki": "#8e8459",
+    "bark_grey": "#86837a",
+    "bark_cream": "#d6cba1",
+    "bark_green": "#a3a86f",
+    "bark_dark": "#5a5040",
+    "bark_olive": "#77723f",
+    # Wood (boards, stakes, doors)
+    "timber": "#7c5531",
+    "timber_light": "#a17344",
+    "timber_dark": "#573a20",
+    # Painted woodwork + accents
+    "lavender": "#8f74c4",
+    "lavender_light": "#ab97d8",
+    "shutter_sage": "#7fa585",
+    "shutter_blue": "#4f86b5",
+    "shutter_teal": "#3f8a8c",
+    "shutter_lavender": "#9a86c8",
+    "glass": "#2f3846",
+    "geranium": "#d63c32",
+    "iron": "#2f3030",
+    "canvas_white": "#f3ead6",
+    "canvas_red": "#c83a2e",
+    "canvas_blue": "#3c6fae",
+    "canvas_green": "#4f8a55",
+    # Far landscape (atmospheric)
+    "hill_near": "#77885a",
+    "hill_mid": "#6f7fa8",
+    "hill_far": "#9187c2",
+    # Sky (reference only: the game's sky colours live in src/render/sky.ts)
+    "sky_blue": "#3a7bd5",
+    "sky_horizon": "#f7c27e",
 }
 
 # Linear versions, `P["ochre"]` etc.

@@ -4,15 +4,18 @@
  */
 import { BackSide, BufferAttribute, Color, Mesh, MeshBasicMaterial, SphereGeometry, Vector3, type PerspectiveCamera } from 'three';
 
-/** sRGB colours (three converts to linear). The horizon colour is also the fog colour. */
+/**
+ * sRGB display colours (the sky is not tone-mapped, so these are what you see; keep the horizon in
+ * sync with art/lib/palette.py "sky_horizon"). The horizon colour is also the fog colour.
+ */
 export const SKY_STYLE = {
-  zenith: 0x5f95cf,
-  mid: 0x8fbbe3,
-  horizon: 0xf0d3a6,
-  glow: 0xffc27a,
-  /** Elevation (rad) over which the horizon haze blends into the mid blue / the zenith. */
-  hazeBand: 0.28,
-  midBand: 0.9,
+  zenith: 0x2f6fd0,
+  mid: 0x86b8ec,
+  horizon: 0xf7c27e,
+  glow: 0xffc874,
+  /** Elevation (rad) over which the golden horizon blends into the mid blue / the zenith. */
+  hazeBand: 0.16,
+  midBand: 0.7,
 } as const;
 
 export interface Sky {
@@ -23,10 +26,10 @@ export interface Sky {
 }
 
 export function createSky(radius: number): Sky {
-  const geo = new SphereGeometry(1, 28, 16);
+  const geo = new SphereGeometry(1, 32, 48); // fine rows so the narrow horizon gradient is resolved
   const count = geo.getAttribute('position').count;
   geo.setAttribute('color', new BufferAttribute(new Float32Array(count * 3), 3));
-  const mat = new MeshBasicMaterial({ vertexColors: true, side: BackSide, fog: false, depthWrite: false });
+  const mat = new MeshBasicMaterial({ vertexColors: true, side: BackSide, fog: false, depthWrite: false, toneMapped: false });
   const mesh = new Mesh(geo, mat);
   mesh.scale.setScalar(radius);
   mesh.renderOrder = -10;
@@ -53,7 +56,7 @@ export function createSky(radius: number): Sky {
         v.fromBufferAttribute(pos, i).normalize();
         const elev = Math.asin(Math.max(-1, Math.min(1, v.y)));
         c.copy(horizon);
-        c.lerp(mid, smooth(SKY_STYLE.hazeBand * 0.2, SKY_STYLE.hazeBand + 0.25, elev));
+        c.lerp(mid, smooth(SKY_STYLE.hazeBand * 0.1, SKY_STYLE.hazeBand + 0.2, elev));
         c.lerp(zenith, smooth(SKY_STYLE.hazeBand, SKY_STYLE.midBand + 0.5, elev) * 0.9);
         const toSun = Math.max(0, v.dot(dir));
         c.lerp(glow, Math.min(1, Math.pow(toSun, 6) * 0.55 + Math.pow(toSun, 40) * 0.5));

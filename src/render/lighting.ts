@@ -1,7 +1,8 @@
 /**
- * Warm late-afternoon light: low golden sun with shadows fitted tightly to the court,
- * hemisphere fill, sky dome and matching haze. Sun direction / intensity, exposure and fog
- * density are read live from config.look (cheap: nothing is recomputed unless they change).
+ * Warm late-afternoon light: low golden sun with shadows fitted tightly to the court, a cool
+ * sky-blue / warm-bounce hemisphere fill (so shade stays light and readable), sky dome and a
+ * light golden haze. Sun direction / intensity, fill, shadow darkness, exposure and fog density
+ * are read live from config.look (cheap: nothing is recomputed unless they change).
  */
 import {
   ACESFilmicToneMapping,
@@ -19,10 +20,10 @@ import type { GameConfig } from '../tuning/config';
 import { createSky, SKY_STYLE } from './sky';
 
 const STYLE = {
-  sunColor: 0xffd49a,
-  hemiSky: 0xdacfe8,
-  hemiGround: 0xd0a36e,
-  hemiIntensity: 2.25,
+  sunColor: 0xffcf8f,
+  /** Fill from the sky (cool, so shade reads blue-ish against the golden sun) and bounce from the warm ground. */
+  hemiSky: 0xa9c8f2,
+  hemiGround: 0xd29a62,
   shadowMapSize: 2048,
   /** Distance of the sun from the court centre and the depth range of its shadow camera (m). */
   sunDistance: 40,
@@ -33,7 +34,7 @@ const STYLE = {
   shadowBias: -0.0004,
   shadowNormalBias: 0.03,
   /** PCF blur radius in shadow-map texels (softer edges). */
-  shadowRadius: 3,
+  shadowRadius: 6,
   skyRadius: 70,
 } as const;
 
@@ -59,7 +60,8 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
   const fog = new FogExp2(horizon, 0.02);
   scene.fog = fog;
 
-  scene.add(new HemisphereLight(STYLE.hemiSky, STYLE.hemiGround, STYLE.hemiIntensity));
+  const hemi = new HemisphereLight(STYLE.hemiSky, STYLE.hemiGround, 2);
+  scene.add(hemi);
 
   const cx = (court.minX + court.maxX) / 2;
   const cz = (court.minZ + court.maxZ) / 2;
@@ -129,6 +131,8 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
         aimSun(lastEl, lastAz);
       }
       sun.intensity = look.sunIntensity;
+      sun.shadow.intensity = look.shadowStrength;
+      hemi.intensity = look.fillIntensity;
       renderer.toneMappingExposure = look.exposure;
       fog.density = look.fogDensity;
       sky.follow(camera);

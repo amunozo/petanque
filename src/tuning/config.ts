@@ -101,6 +101,10 @@ export interface GameConfig {
     exposure: number;
     /** Exponential fog density (1/m): higher = hazier distance. */
     fogDensity: number;
+    /** Sky/ground fill light (hemisphere) intensity: higher = lighter shade. */
+    fillIntensity: number;
+    /** How dark cast shadows are (0 = none, 1 = full). */
+    shadowStrength: number;
   };
   /** Rules of a full match (see games/petanque/match.ts). */
   match: MatchRules;
@@ -174,7 +178,15 @@ export const defaultConfig: GameConfig = {
     closeUpMaxZoomOut: 5,
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
-  look: { sunElevationDeg: 34, sunAzimuthDeg: 62, sunIntensity: 3.0, exposure: 1, fogDensity: 0.022 },
+  look: {
+    sunElevationDeg: 32,
+    sunAzimuthDeg: 62,
+    sunIntensity: 3.4,
+    exposure: 1,
+    fogDensity: 0.008,
+    fillIntensity: 1.9,
+    shadowStrength: 0.62,
+  },
   match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
   ai: {
     easy: { aimErrorDeg: 3, powerErrorPct: 8, canShoot: false, maxSimulations: 30 },
@@ -279,6 +291,8 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'look.sunIntensity', label: 'sun intensity', min: 0, max: 8, step: 0.1 },
       { path: 'look.exposure', label: 'exposure', min: 0.3, max: 2.5, step: 0.05 },
       { path: 'look.fogDensity', label: 'haze', min: 0, max: 0.08, step: 0.002 },
+      { path: 'look.fillIntensity', label: 'shade fill', min: 0, max: 5, step: 0.05 },
+      { path: 'look.shadowStrength', label: 'shadow darkness', min: 0, max: 1, step: 0.05 },
     ],
   },
   {
