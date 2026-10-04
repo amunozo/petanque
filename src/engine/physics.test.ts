@@ -21,9 +21,13 @@ const cfg: PhysicsConfig = {
   fixedDt: 1 / 240,
   restSpeed: 0.03,
   surface: { impactRestitution: 0.15, impactFriction: 0.5, rollingResistance: 0.12, roughness: 0.01, roughnessScale: 0.4 },
-  arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardRestitution: 0.3, endBoardRestitution: 0.3, endBoards: true },
+  arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardContact: 'dead', boardRestitution: 0.3, endBoardRestitution: 0.3, endBoards: true },
 };
-const flat: PhysicsConfig = { ...cfg, surface: { ...cfg.surface, roughness: 0, rollingResistance: 0.1 } };
+/** Flat ground, boards bounce (the legacy mode; most rolling/collision fixtures want it). */
+const flat: PhysicsConfig = { ...cfg, surface: { ...cfg.surface, roughness: 0, rollingResistance: 0.1 }, arena: { ...cfg.arena, boardContact: 'bounce' } };
+/** Flat ground, default rules: touching a board kills the ball. */
+const deadFlat: PhysicsConfig = { ...flat, arena: { ...flat.arena, boardContact: 'dead' } };
+const deadFrictionless: PhysicsConfig = { ...deadFlat, surface: { ...deadFlat.surface, rollingResistance: 0 }, airDrag: 0 };
 /** No friction at all: pure collision tests. */
 const frictionless: PhysicsConfig = { ...flat, surface: { ...flat.surface, rollingResistance: 0 }, airDrag: 0 };
 
@@ -304,7 +308,7 @@ describe('collisions', () => {
   });
 });
 
-describe('arena', () => {
+describe('arena (boardContact: bounce)', () => {
   it('rolling ball bounces off a side board with boardRestitution and emits board', () => {
     const w = emptyWorld();
     w.bodies.push(rolling('r', boule, 1.5, 0, 3, 0));
@@ -458,6 +462,182 @@ describe('arena', () => {
     const ev = runUntil(w, frictionless, 0.3);
     expect(w.bodies[0]!.pos.z).toBeLessThan(frictionless.arena.minZ);
     expect(ev.some((e) => e.type === 'board')).toBe(false);
+  });
+});
+
+describe('arena (boardContact: dead, the default)', () => {
+  const eventsOf = (ev: SimEvent[], type: SimEvent['type']) => ev.filter((e) => e.type === type);
+
+  it('a rolling ball touching a side board is out at the contact point, with board then out events', () => {
+    for (const sx of [1, -1]) {
+      const w = emptyWorld();
+      w.bodies.push(rolling('r', boule, 1.5 * sx, 0, 3 * sx, 0.5));
+      const ev = runUntil(w, deadFrictionless, 0.5);
+      const b = w.bodies[0]!;
+      expect(b.state).toBe('out');
+      expect(b.vel).toEqual({ x: 0, y: 0, z: 0 });
+      expect(Math.abs(b.pos.x)).toBeCloseTo(deadFlat.arena.maxX - boule.radius, 9); // parked at the contact point
+      const types = ev.map((e) => e.type);
+      expect(types.filter((t) => t === 'out')).toHaveLength(1);
+      expect(types.filter((t) => t === 'board')).toHaveLength(1);
+      expect(types.indexOf('board')).toBeLessThan(types.indexOf('out'));
+      const board = eventsOf(ev, 'board')[0]!;
+      expect(board.type === 'board' && board.speed).toBeCloseTo(3, 6);
+      // Stays put afterwards and counts as settled.
+      const p = { ...b.pos };
+      runUntil(w, deadFrictionless, 0.3);
+      expect(w.bodies[0]!.pos).toEqual(p);
+      expect(isSettled(w)).toBe(true);
+    }
+  });
+
+  it('a rolling ball touching the far or near end board is out; nothing bounces', () => {
+    for (const vz of [-6, 6]) {
+      const w = emptyWorld();
+      w.bodies.push(rolling('r', boule, 0, vz < 0 ? -9 : 5, 0, vz));
+      const ev = runUntil(w, deadFrictionless, 0.5);
+      const b = w.bodies[0]!;
+      expect(b.state).toBe('out');
+      expect(b.vel).toEqual({ x: 0, y: 0, z: 0 });
+      const edge = vz < 0 ? deadFlat.arena.minZ + boule.radius : deadFlat.arena.maxZ - boule.radius;
+      expect(b.pos.z).toBeCloseTo(edge, 9);
+      expect(eventsOf(ev, 'out')).toHaveLength(1);
+      const board = eventsOf(ev, 'board');
+      expect(board).toHaveLength(1);
+      expect(board[0]!.type === 'board' && board[0]!.speed).toBeCloseTo(6, 6);
+    }
+  });
+
+  it('a corner contact gives one board event (faster axis) and one out', () => {
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 1.9, -9.4, 4, -6));
+    const ev = runUntil(w, deadFrictionless, 0.2);
+    expect(w.bodies[0]!.state).toBe('out');
+    expect(eventsOf(ev, 'out')).toHaveLength(1);
+    const board = eventsOf(ev, 'board');
+    expect(board).toHaveLength(1);
+    expect(board[0]!.type === 'board' && board[0]!.speed).toBeCloseTo(6, 6);
+  });
+
+  it('a slow roll that merely reaches the board is dead, one that stops short is not', () => {
+    const short = emptyWorld();
+    short.bodies.push(rolling('r', boule, 0, -6, 0, -2)); // 2 m/s with mu 0.1 stops after ~2 m (at z ~ -8)
+    runUntil(short, deadFlat, 6);
+    expect(short.bodies[0]!.state).toBe('resting');
+    const long = emptyWorld();
+    long.bodies.push(rolling('r', boule, 0, -6, 0, -4)); // would need ~8 m
+    runUntil(long, deadFlat, 6);
+    expect(long.bodies[0]!.state).toBe('out');
+  });
+
+  it('a ball that lands inside and then rolls into the end board is dead (not bounced)', () => {
+    const w = emptyWorld();
+    const b = createBody('b', 'boule', boule, { x: 0, y: 0, z: -8 });
+    b.state = 'flying';
+    b.pos.y = 0.2;
+    b.vel = { x: 0, y: -1, z: -7 };
+    w.bodies.push(b);
+    const ev = runUntil(w, deadFlat, 6);
+    expect(eventsOf(ev, 'land').length).toBeGreaterThanOrEqual(1);
+    expect(eventsOf(ev, 'board')).toHaveLength(1);
+    expect(eventsOf(ev, 'out')).toHaveLength(1);
+    expect(b.state).toBe('out');
+    expect(b.pos.z).toBeCloseTo(deadFlat.arena.minZ + boule.radius, 9);
+  });
+
+  it('a boule knocked into a board by a hit is dead; the shooter that stays inside is not', () => {
+    const w = emptyWorld();
+    w.bodies.push(createBody('target', 'boule', boule, { x: 0, y: 0, z: -9 }));
+    w.bodies.push(rolling('shooter', boule, 0, 0, 0, -6));
+    const ev = runUntil(w, deadFlat, 3);
+    const [target, shooter] = w.bodies as [Body, Body];
+    expect(eventsOf(ev, 'hit').length).toBeGreaterThanOrEqual(1);
+    expect(target.state).toBe('out');
+    expect(shooter.state).not.toBe('out');
+    expect(eventsOf(ev, 'out')).toHaveLength(1);
+    expect(ev.find((e) => e.type === 'out')).toEqual({ type: 'out', id: 'target' });
+  });
+
+  it('a resting ball pushed into a side board by a neighbour is dead', () => {
+    const w = emptyWorld();
+    w.bodies.push(createBody('t', 'boule', boule, { x: 1.9, y: 0, z: -3 }));
+    w.bodies.push(rolling('s', boule, 0.2, -3, 4, 0));
+    runUntil(w, deadFlat, 1);
+    expect(w.bodies[0]!.state).toBe('out');
+  });
+
+  it('the jack touching a board is out', () => {
+    const side = emptyWorld();
+    side.bodies.push(rolling('jack', jack, 1.9, -3, 2, 0));
+    const ev = runUntil(side, deadFlat, 1);
+    expect(side.bodies[0]!.state).toBe('out');
+    expect(eventsOf(ev, 'out')).toEqual([{ type: 'out', id: 'jack' }]);
+    expect(side.bodies[0]!.pos.x).toBeCloseTo(deadFlat.arena.maxX - jack.radius, 9);
+    const end = emptyWorld();
+    end.bodies.push(rolling('jack', jack, 0, -9.3, 0, -2));
+    runUntil(end, deadFlat, 1);
+    expect(end.bodies[0]!.state).toBe('out');
+    expect(end.bodies[0]!.pos.z).toBeCloseTo(deadFlat.arena.minZ + jack.radius, 9);
+  });
+
+  it('ball radius matters: the surface, not the centre, triggers the contact', () => {
+    // Centre 1.97 m: inside for a jack (0.015) but touching for a boule (0.0375).
+    const w = emptyWorld();
+    w.bodies.push(createBody('j', 'jack', jack, { x: 1.97, y: 0, z: 0 }));
+    w.bodies.push(createBody('b', 'boule', boule, { x: -1.97, y: 0, z: 0 }));
+    w.bodies.push(createBody('b2', 'boule', boule, { x: 1.9, y: 0, z: -2 }));
+    runUntil(w, deadFlat, 0.1);
+    expect(w.bodies.map((b) => b.state)).toEqual(['resting', 'out', 'resting']);
+  });
+
+  it('endBoards:false: ends stay open (centre crossing is out, no board event), side boards are still dead', () => {
+    const open: PhysicsConfig = { ...deadFrictionless, arena: { ...deadFrictionless.arena, endBoards: false } };
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 0, -9, 0, -6));
+    const ev = runUntil(w, open, 1);
+    expect(w.bodies[0]!.state).toBe('out');
+    expect(eventsOf(ev, 'board')).toHaveLength(0);
+    const side = emptyWorld();
+    side.bodies.push(rolling('r', boule, 1.5, 0, 3, 0));
+    const ev2 = runUntil(side, open, 1);
+    expect(side.bodies[0]!.state).toBe('out');
+    expect(eventsOf(ev2, 'board')).toHaveLength(1);
+  });
+
+  it('a ball airborne over a board is not killed by it (judged on landing)', () => {
+    const w = emptyWorld();
+    const b = createBody('b', 'boule', boule, { x: 0, y: 0, z: -9.4 });
+    b.state = 'flying';
+    b.pos.y = 2;
+    b.vel = { x: 0, y: 0, z: -5 };
+    w.bodies.push(b);
+    const ev = runUntil(w, deadFrictionless, 0.3);
+    expect(w.bodies[0]!.state).toBe('flying');
+    expect(eventsOf(ev, 'board')).toHaveLength(0);
+    expect(eventsOf(ev, 'out')).toHaveLength(0);
+  });
+
+  it('bounce mode is unchanged by the option: same setup bounces and survives', () => {
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 1.5, 0, 3, 0));
+    const ev = runUntil(w, { ...frictionless, arena: { ...frictionless.arena, boardContact: 'bounce' } }, 0.5);
+    expect(w.bodies[0]!.state).toBe('rolling');
+    expect(w.bodies[0]!.vel.x).toBeCloseTo(-0.9, 6);
+    expect(eventsOf(ev, 'out')).toHaveLength(0);
+  });
+
+  it('is deterministic and JSON round-trip safe', () => {
+    const run = (round: boolean) => {
+      let w = emptyWorld();
+      w.bodies.push(createBody('jack', 'jack', jack, { x: 1.9, y: 0, z: -4 }));
+      w.bodies.push(createBody('b0', 'boule', boule, { x: -1.9, y: 0, z: -3 }));
+      const t = intentToThrow({ aim: -0.08, power: 0.8, loft: 'roll' }, throwCfg, { aim: 0.4, power: 0.2 });
+      w = launch(w, createBody('b1', 'boule', boule, { x: 0, y: 0, z: 0 }), t);
+      if (round) w = JSON.parse(JSON.stringify(w)) as World;
+      return JSON.stringify(simulateToRest(w, cfg));
+    };
+    expect(run(false)).toBe(run(false));
+    expect(run(true)).toBe(run(false));
   });
 });
 

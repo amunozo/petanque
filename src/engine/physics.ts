@@ -17,7 +17,7 @@
  *      sphere) until it is used up. Spin never reverses the ball (no "retro").
  *      A ball slower than restSpeed whose slope pull does not exceed rolling
  *      friction comes to rest.
- *  - collisions: see collisions.ts. Boards: see `applyBounds`.
+ *  - collisions: see collisions.ts. Boards (dead or bounce): see `applyBounds`.
  */
 import { BOUNCE_REST_STEPS, resolveCollisions, substepCount } from './collisions';
 import { groundSlope } from './ground';
@@ -159,12 +159,53 @@ function boardAxis(
   return { pos, vel, hit: 0 };
 }
 
+function putOut(b: Body, events: SimEvent[]): void {
+  b.vel.x = 0;
+  b.vel.y = 0;
+  b.vel.z = 0;
+  if (b.spin !== undefined) b.spin = 0;
+  b.state = 'out';
+  events.push({ type: 'out', id: b.id });
+}
+
 /**
- * Arena limits for balls on the ground. Side boards (x) and, when
- * `arena.endBoards`, end boards (z): rolling balls bounce (one 'board' event
- * per impact, the faster axis speed in a corner), flying balls pass over (they
- * are judged when they land). Without end boards, a ground ball whose centre
- * crosses minZ/maxZ turns 'out'.
+ * boardContact 'dead' (FIPJP art. 18 on enclosed courts): a ground ball whose
+ * surface touches a board is dead. It is parked at the contact point (clamped
+ * to the playing side of the board), a 'board' event carries the approach speed
+ * (for sound) and then it turns 'out'. Corner: one 'board' event, faster axis.
+ */
+function deadBounds(b: Body, cfg: PhysicsConfig, events: SimEvent[]): void {
+  const { arena } = cfg;
+  const r = b.spec.radius;
+  let hit = -1;
+  if (b.pos.x - r < arena.minX) {
+    hit = Math.max(hit, -b.vel.x);
+    b.pos.x = arena.minX + r;
+  } else if (b.pos.x + r > arena.maxX) {
+    hit = Math.max(hit, b.vel.x);
+    b.pos.x = arena.maxX - r;
+  }
+  if (arena.endBoards) {
+    if (b.pos.z - r < arena.minZ) {
+      hit = Math.max(hit, -b.vel.z);
+      b.pos.z = arena.minZ + r;
+    } else if (b.pos.z + r > arena.maxZ) {
+      hit = Math.max(hit, b.vel.z);
+      b.pos.z = arena.maxZ - r;
+    }
+  }
+  if (hit < 0) return;
+  events.push({ type: 'board', id: b.id, speed: Math.max(0, hit) });
+  putOut(b, events);
+}
+
+/**
+ * Arena limits for balls on the ground. With `arena.boardContact === 'dead'`
+ * any board contact kills the ball (see `deadBounds`). With 'bounce' side
+ * boards (x) and, when `arena.endBoards`, end boards (z) reflect rolling balls
+ * (one 'board' event per impact, the faster axis speed in a corner). Flying
+ * balls pass over the boards in both modes (they are judged when they land).
+ * Without end boards, a ground ball whose centre crosses minZ/maxZ turns 'out'.
  */
 function applyBounds(b: Body, cfg: PhysicsConfig, events: SimEvent[]): void {
   if (b.state === 'out' || b.state === 'flying') return;
@@ -172,11 +213,11 @@ function applyBounds(b: Body, cfg: PhysicsConfig, events: SimEvent[]): void {
   const r = b.spec.radius;
   const isRolling = b.state === 'rolling';
   if (!arena.endBoards && (b.pos.z < arena.minZ || b.pos.z > arena.maxZ)) {
-    b.vel.x = 0;
-    b.vel.y = 0;
-    b.vel.z = 0;
-    b.state = 'out';
-    events.push({ type: 'out', id: b.id });
+    putOut(b, events);
+    return;
+  }
+  if (arena.boardContact === 'dead') {
+    deadBounds(b, cfg, events);
     return;
   }
   const x = boardAxis(b.pos.x, b.vel.x, arena.minX, arena.maxX, r, arena.boardRestitution, isRolling);

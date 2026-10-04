@@ -50,21 +50,31 @@ export interface SurfaceConfig {
   roughnessScale: number;
 }
 
+export type BoardContact = 'bounce' | 'dead';
+
 /** Axis-aligned playing area on the XZ plane. */
 export interface ArenaConfig {
   minX: number;
   maxX: number;
   minZ: number;
   maxZ: number;
-  /** Side boards (x = minX/maxX): restitution of a ball bouncing off them. */
+  /**
+   * What a ground ball does when its surface touches a board.
+   * 'dead'   = it is out (FIPJP art. 18: a boule that leaves the authorised
+   *            area is dead, and on enclosed courts the boards are the limit).
+   *            Parked at the contact point; emits 'board' then 'out'.
+   * 'bounce' = it reflects using the restitution fields below.
+   */
+  boardContact: BoardContact;
+  /** Side boards (x = minX/maxX), 'bounce' mode: restitution of a ball bouncing off them. */
   boardRestitution: number;
   /**
    * End boards (z = minZ/maxZ): restitution of a rolling ball bouncing off them.
-   * Only used when `endBoards` is true.
+   * 'bounce' mode only; board contact needs `endBoards` to be true.
    */
   endBoardRestitution: number;
   /**
-   * true  = boards run all around: rolling balls bounce off the end boards too.
+   * true  = boards run all around: rolling balls touch/bounce off the end boards too.
    * false = open ends (bocce, open courts): a ground ball whose centre crosses
    *         minZ/maxZ becomes 'out'.
    * Either way a ball that FIRST touches the ground outside the rectangle (by
