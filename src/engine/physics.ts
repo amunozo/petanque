@@ -133,15 +133,45 @@ function stepRolling(b: Body, cfg: PhysicsConfig, h: number, events: SimEvent[])
 }
 
 /**
- * Arena limits for balls on the ground. Side boards (x): rolling balls bounce,
- * flying balls pass (they are judged when they land). Crossing minZ/maxZ turns
- * a ground ball 'out'.
+ * Reflects one axis of a ground ball against a board pair. `pos`/`vel` are the
+ * axis components; returns the new [pos, vel] and the impact speed (0 = none).
+ * The position is always clamped to the playing side of the board (so even a
+ * very fast ball cannot pass through within one sub-step); the velocity only
+ * reflects while the ball is rolling and moving into the board.
+ */
+function boardAxis(
+  pos: number,
+  vel: number,
+  lo: number,
+  hi: number,
+  r: number,
+  restitution: number,
+  rolling: boolean,
+): { pos: number; vel: number; hit: number } {
+  if (pos - r < lo) {
+    if (rolling && vel < 0) return { pos: lo + r, vel: -vel * restitution, hit: -vel };
+    return { pos: lo + r, vel, hit: 0 };
+  }
+  if (pos + r > hi) {
+    if (rolling && vel > 0) return { pos: hi - r, vel: -vel * restitution, hit: vel };
+    return { pos: hi - r, vel, hit: 0 };
+  }
+  return { pos, vel, hit: 0 };
+}
+
+/**
+ * Arena limits for balls on the ground. Side boards (x) and, when
+ * `arena.endBoards`, end boards (z): rolling balls bounce (one 'board' event
+ * per impact, the faster axis speed in a corner), flying balls pass over (they
+ * are judged when they land). Without end boards, a ground ball whose centre
+ * crosses minZ/maxZ turns 'out'.
  */
 function applyBounds(b: Body, cfg: PhysicsConfig, events: SimEvent[]): void {
   if (b.state === 'out' || b.state === 'flying') return;
   const { arena } = cfg;
   const r = b.spec.radius;
-  if (b.pos.z < arena.minZ || b.pos.z > arena.maxZ) {
+  const isRolling = b.state === 'rolling';
+  if (!arena.endBoards && (b.pos.z < arena.minZ || b.pos.z > arena.maxZ)) {
     b.vel.x = 0;
     b.vel.y = 0;
     b.vel.z = 0;
@@ -149,19 +179,17 @@ function applyBounds(b: Body, cfg: PhysicsConfig, events: SimEvent[]): void {
     events.push({ type: 'out', id: b.id });
     return;
   }
-  if (b.pos.x - r < arena.minX) {
-    b.pos.x = arena.minX + r;
-    if (b.state === 'rolling' && b.vel.x < 0) {
-      events.push({ type: 'board', id: b.id, speed: -b.vel.x });
-      b.vel.x = -b.vel.x * arena.boardRestitution;
-    }
-  } else if (b.pos.x + r > arena.maxX) {
-    b.pos.x = arena.maxX - r;
-    if (b.state === 'rolling' && b.vel.x > 0) {
-      events.push({ type: 'board', id: b.id, speed: b.vel.x });
-      b.vel.x = -b.vel.x * arena.boardRestitution;
-    }
+  const x = boardAxis(b.pos.x, b.vel.x, arena.minX, arena.maxX, r, arena.boardRestitution, isRolling);
+  b.pos.x = x.pos;
+  b.vel.x = x.vel;
+  let hit = x.hit;
+  if (arena.endBoards) {
+    const z = boardAxis(b.pos.z, b.vel.z, arena.minZ, arena.maxZ, r, arena.endBoardRestitution, isRolling);
+    b.pos.z = z.pos;
+    b.vel.z = z.vel;
+    if (z.hit > hit) hit = z.hit;
   }
+  if (hit > 0) events.push({ type: 'board', id: b.id, speed: hit });
 }
 
 /**

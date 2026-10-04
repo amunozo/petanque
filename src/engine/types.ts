@@ -58,7 +58,19 @@ export interface ArenaConfig {
   maxZ: number;
   /** Side boards (x = minX/maxX): restitution of a ball bouncing off them. */
   boardRestitution: number;
-  /** Balls crossing minZ/maxZ, or touching the ground outside x bounds, become 'out'. */
+  /**
+   * End boards (z = minZ/maxZ): restitution of a rolling ball bouncing off them.
+   * Only used when `endBoards` is true.
+   */
+  endBoardRestitution: number;
+  /**
+   * true  = boards run all around: rolling balls bounce off the end boards too.
+   * false = open ends (bocce, open courts): a ground ball whose centre crosses
+   *         minZ/maxZ becomes 'out'.
+   * Either way a ball that FIRST touches the ground outside the rectangle (by
+   * centre) is 'out', and a ball still airborne is never blocked by a board.
+   */
+  endBoards: boolean;
 }
 
 export interface PhysicsConfig {

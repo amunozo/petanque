@@ -21,7 +21,7 @@ const cfg: PhysicsConfig = {
   fixedDt: 1 / 240,
   restSpeed: 0.03,
   surface: { impactRestitution: 0.15, impactFriction: 0.5, rollingResistance: 0.12, roughness: 0.01, roughnessScale: 0.4 },
-  arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardRestitution: 0.3 },
+  arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardRestitution: 0.3, endBoardRestitution: 0.3, endBoards: true },
 };
 const flat: PhysicsConfig = { ...cfg, surface: { ...cfg.surface, roughness: 0, rollingResistance: 0.1 } };
 /** No friction at all: pure collision tests. */
@@ -316,29 +316,148 @@ describe('arena', () => {
     expect(b.pos.x).toBeLessThanOrEqual(flat.arena.maxX - boule.radius + 1e-9);
   });
 
-  it('a ball crossing minZ / maxZ goes out and stays put', () => {
+  it('rolling ball bounces off the far and near end boards with endBoardRestitution and emits board', () => {
+    for (const vz of [-6, 6]) {
+      const c: PhysicsConfig = { ...frictionless, arena: { ...frictionless.arena, endBoardRestitution: 0.5 } };
+      const w = emptyWorld();
+      w.bodies.push(rolling('r', boule, 0, vz < 0 ? -9 : 5, 0, vz));
+      const ev = runUntil(w, c, 0.5);
+      const b = w.bodies[0]!;
+      const boards = ev.filter((e) => e.type === 'board');
+      expect(boards).toHaveLength(1);
+      const hit = boards[0]!;
+      expect(hit.type === 'board' && hit.speed).toBeCloseTo(6, 6);
+      expect(b.state).toBe('rolling');
+      expect(b.vel.z).toBeCloseTo(-vz * 0.5, 6); // reversed, scaled by endBoardRestitution
+      expect(ev.some((e) => e.type === 'out')).toBe(false);
+      expect(b.pos.z).toBeGreaterThanOrEqual(c.arena.minZ + boule.radius - 1e-9);
+      expect(b.pos.z).toBeLessThanOrEqual(c.arena.maxZ - boule.radius + 1e-9);
+    }
+  });
+
+  it('end board restitution is independent of the side board restitution', () => {
+    const c: PhysicsConfig = { ...frictionless, arena: { ...frictionless.arena, boardRestitution: 0.9, endBoardRestitution: 0.1 } };
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 0, -9, 0, -5));
+    runUntil(w, c, 0.3);
+    expect(w.bodies[0]!.vel.z).toBeCloseTo(0.5, 6);
+  });
+
+  it('a ball with friction bounces back from the end board and finally rests inside', () => {
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 0, -8, 0, -6));
+    const ev = runUntil(w, flat, 5);
+    expect(ev.some((e) => e.type === 'board')).toBe(true);
+    expect(ev.some((e) => e.type === 'out')).toBe(false);
+    expect(w.bodies[0]!.state).toBe('resting');
+    expect(w.bodies[0]!.pos.z).toBeGreaterThan(flat.arena.minZ + boule.radius - 1e-9);
+  });
+
+  it('no tunnelling: a 15 m/s roll cannot pass an end board (from every approach), even with a ball next to it', () => {
+    for (const [z0, vz] of [[-9.4, -15], [5.4, 15], [-9.499, -40], [-9.3, -15]] as const) {
+      const w = emptyWorld();
+      w.bodies.push(rolling('r', boule, 0.5, z0, 0, vz));
+      w.bodies.push(rolling('s', jack, -0.5, z0 + (vz < 0 ? 0.3 : -0.3), 0, vz));
+      const ev = runUntil(w, frictionless, 1);
+      for (const b of w.bodies) {
+        expect(b.state).not.toBe('out');
+        expect(b.pos.z).toBeGreaterThanOrEqual(frictionless.arena.minZ + b.spec.radius - 1e-9);
+        expect(b.pos.z).toBeLessThanOrEqual(frictionless.arena.maxZ - b.spec.radius + 1e-9);
+      }
+      expect(ev.some((e) => e.type === 'out')).toBe(false);
+      expect(ev.some((e) => e.type === 'board')).toBe(true);
+    }
+  });
+
+  it('corner: a rolling ball reflects both axes', () => {
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 1.9, -9.4, 4, -6));
+    const ev = runUntil(w, frictionless, 0.2);
+    const b = w.bodies[0]!;
+    expect(b.vel.x).toBeCloseTo(-4 * 0.3, 6);
+    expect(b.vel.z).toBeCloseTo(6 * 0.3, 6);
+    expect(b.state).toBe('rolling');
+    expect(ev.filter((e) => e.type === 'board').length).toBeGreaterThanOrEqual(1);
+    // Near-end corner, opposite signs.
+    const w2 = emptyWorld();
+    w2.bodies.push(rolling('r', boule, -1.9, 5.4, -4, 6));
+    runUntil(w2, frictionless, 0.2);
+    expect(w2.bodies[0]!.vel.x).toBeCloseTo(4 * 0.3, 6);
+    expect(w2.bodies[0]!.vel.z).toBeCloseTo(-6 * 0.3, 6);
+  });
+
+  it('endBoards:false keeps the open-end behaviour: a rolling ball crossing minZ / maxZ goes out and stays put', () => {
+    const open: PhysicsConfig = { ...flat, arena: { ...flat.arena, endBoards: false } };
     for (const vz of [-6, 6]) {
       const w = emptyWorld();
       w.bodies.push(rolling('r', boule, 0, vz < 0 ? -9 : 5, 0, vz));
-      const ev = runUntil(w, flat, 1);
+      const ev = runUntil(w, open, 1);
       const b = w.bodies[0]!;
       expect(b.state).toBe('out');
       expect(ev.filter((e) => e.type === 'out')).toHaveLength(1);
+      expect(ev.some((e) => e.type === 'board')).toBe(false);
       const p = { ...b.pos };
-      runUntil(w, flat, 0.2);
+      runUntil(w, open, 0.2);
       expect(w.bodies[0]!.pos).toEqual(p);
       expect(isSettled(w)).toBe(true);
     }
   });
 
-  it('a flying ball landing past the end is out; one landing outside the side boards is out', () => {
-    const { world } = throwBoule(1, 'half');
-    const res = simulateToRest(world, cfg);
-    expect(res.world.bodies[0]!.state).toBe('out');
+  it('side boards still work with endBoards:false', () => {
+    const open: PhysicsConfig = { ...frictionless, arena: { ...frictionless.arena, endBoards: false } };
+    const w = emptyWorld();
+    w.bodies.push(rolling('r', boule, 1.5, 0, 3, 0));
+    const ev = runUntil(w, open, 0.5);
+    expect(ev.some((e) => e.type === 'board')).toBe(true);
+    expect(w.bodies[0]!.vel.x).toBeCloseTo(-0.9, 6);
+  });
+
+  it('a lob landing beyond the end board is out (flying balls pass over the boards)', () => {
+    const t = { yaw: 0, pitch: Math.PI / 4, speed: 16, origin: { x: 0, y: 1, z: 5 } };
+    const w = launch(emptyWorld(), createBody('b', 'boule', boule, { x: 0, y: 0, z: 0 }), t);
+    const ev: SimEvent[] = [];
+    while (!isSettled(w) && w.time < 10) ev.push(...step(w, cfg));
+    expect(w.bodies[0]!.state).toBe('out');
+    expect(w.bodies[0]!.pos.z).toBeLessThan(cfg.arena.minZ);
+    expect(ev.filter((e) => e.type === 'out')).toHaveLength(1);
+    expect(ev.some((e) => e.type === 'board')).toBe(false);
+    // Same with end boards off.
+    const open: PhysicsConfig = { ...cfg, arena: { ...cfg.arena, endBoards: false } };
+    expect(simulateToRest(launch(emptyWorld(), createBody('b', 'boule', boule, { x: 0, y: 0, z: 0 }), t), open).world.bodies[0]!.state).toBe('out');
+  });
+
+  it('a ball that lands inside and then rolls into the end board bounces instead of going out', () => {
+    const w = emptyWorld();
+    const b = createBody('b', 'boule', boule, { x: 0, y: 0, z: -8 });
+    b.state = 'flying';
+    b.pos.y = 0.2;
+    b.vel = { x: 0, y: -1, z: -7 };
+    w.bodies.push(b);
+    const ev = runUntil(w, flat, 6);
+    expect(ev.some((e) => e.type === 'land')).toBe(true);
+    expect(ev.some((e) => e.type === 'board')).toBe(true);
+    expect(ev.some((e) => e.type === 'out')).toBe(false);
+    expect(b.state).toBe('resting');
+    expect(b.pos.z).toBeGreaterThanOrEqual(flat.arena.minZ + boule.radius - 1e-9);
+  });
+
+  it('a flying ball landing outside the side boards is out', () => {
     const side = throwBoule(0.5, 'half', 0).world;
     side.bodies[0]!.vel.x = -8;
     const r2 = simulateToRest(side, cfg);
     expect(r2.world.bodies[0]!.state).toBe('out');
+  });
+
+  it('a ball airborne over the end board is not blocked', () => {
+    const w = emptyWorld();
+    const b = createBody('b', 'boule', boule, { x: 0, y: 0, z: -9.4 });
+    b.state = 'flying';
+    b.pos.y = 2;
+    b.vel = { x: 0, y: 0, z: -5 };
+    w.bodies.push(b);
+    const ev = runUntil(w, frictionless, 0.3);
+    expect(w.bodies[0]!.pos.z).toBeLessThan(frictionless.arena.minZ);
+    expect(ev.some((e) => e.type === 'board')).toBe(false);
   });
 });
 

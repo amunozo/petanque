@@ -125,7 +125,7 @@ export const defaultConfig: GameConfig = {
       roughness: 0.01,
       roughnessScale: 0.4,
     },
-    arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardRestitution: 0.3 },
+    arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardRestitution: 0.3, endBoardRestitution: 0.3, endBoards: true },
   },
   balls: {
     boule: { radius: 0.0375, mass: 0.7, restitution: 0.6 },
@@ -236,6 +236,8 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'physics.surface.roughness', label: 'bumpiness', min: 0, max: 0.08, step: 0.001 },
       { path: 'physics.surface.roughnessScale', label: 'bump size m', min: 0.05, max: 2, step: 0.05 },
       { path: 'physics.arena.boardRestitution', label: 'board bounce', min: 0, max: 1, step: 0.01 },
+      { path: 'physics.arena.endBoardRestitution', label: 'end board bounce', min: 0, max: 1, step: 0.01 },
+      { path: 'physics.arena.endBoards', label: 'end boards', toggle: true },
     ],
   },
   {
