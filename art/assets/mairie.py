@@ -3,9 +3,8 @@ mairie.glb: the town hall that closes the far end of the square, centred on the 
 far row of houses (facade at z = -16, between the houses at |x| = 3.4, see houses.py).
 
 A small, symmetrical Provencal mairie: pale limestone, a rusticated (grooved) ground floor with a
-wide arched door up a few steps, "MAIRIE" in dark block letters on the band course above it, a
-balcony with an iron railing and two flags in a V (tricolour + EU) on the first floor, tall windows
-in stone surrounds, a full-width pediment with a clock, a bell gable (clocher-mur) with its bell on
+wide arched door up a few steps, a moulded band course (dentils) above it, a balcony with an iron
+railing on the first floor, tall windows in stone surrounds, a full-width pediment with a clock, a bell gable (clocher-mur) with its bell on
 the ridge, and two clipped bay trees in boxes by the steps.
 
 It is the backdrop behind the jack in the aim view, so the parts low and on the axis stay mid-dark
@@ -48,7 +47,6 @@ GROOVE = scale(mix(P["stone_grey"], P["limestone_dark"], 0.5), 0.62)
 STEP = mix(P["stone_grey"], P["limestone_dark"], 0.4)
 DOOR = scale(mix(P["olive_dark"], P["shutter_teal"], 0.35), 0.8)    # deep green double door
 JOINERY = mix(P["shutter_blue"], P["stone_grey"], 0.55)              # grey-blue window frames
-LETTER = mix(P["iron"], P["timber_dark"], 0.3)
 
 PREVIEW = {
     "views": [
@@ -190,8 +188,17 @@ def _pilasters(m: MeshData, rng: Rng) -> None:
 
 
 def _band_and_cornice(m: MeshData, rng: Rng) -> None:
-    # band course between the floors: a flat frieze (carries the lettering) with a moulded top
-    m.append(box(0, G - 0.15, 0.06, 2 * HALF_W + 0.1, 0.44, 0.12, jit(STONE_TRIM, rng, 0.02)))
+    # band course between the floors: a plain frieze with a bead below, a sunk fillet line and a row
+    # of dentils under the moulded top
+    W = 2 * HALF_W + 0.1
+    m.append(box(0, G - 0.15, 0.06, W, 0.44, 0.12, jit(STONE_TRIM, rng, 0.02)))
+    m.append(box(0, G - 0.34, 0.09, W + 0.06, 0.08, 0.18, jit(scale(STONE_TRIM, 1.03), rng, 0.02), bottom=True))
+    quad(m, (-W / 2, G - 0.2, 0.121), (W / 2, G - 0.2, 0.121), (W / 2, G - 0.17, 0.121), (-W / 2, G - 0.17, 0.121),
+         scale(STONE_TRIM, 0.72))
+    n = round(W / 0.24)
+    for k in range(n):
+        x = -W / 2 + W * (k + 0.5) / n
+        m.append(box(x, G - 0.03, 0.15, 0.11, 0.1, 0.06, jit(STONE_TRIM, rng, 0.03), bottom=True))
     m.append(box(0, G + 0.1, 0.1, 2 * HALF_W + 0.2, 0.12, 0.2, jit(scale(STONE_TRIM, 1.04), rng, 0.02), bottom=True))
     # entablature: frieze is the wall; architrave fillet + projecting cornice with a dark soffit
     top = G + F1 + ENT
@@ -313,48 +320,13 @@ def _steps(m: MeshData, rng: Rng) -> None:
                      top_color=jit(mix(STEP, P["limestone"], 0.45), rng, 0.03)))
 
 
-# --- lettering -----------------------------------------------------------------------------------
-
-FONT = {
-    "M": ["X...X", "XX.XX", "X.X.X", "X...X", "X...X"],
-    "A": [".XX.", "X..X", "XXXX", "X..X", "X..X"],
-    "I": ["XXX", ".X.", ".X.", ".X.", "XXX"],
-    "R": ["XXX.", "X..X", "XXX.", "X.X.", "X..X"],
-    "E": ["XXXX", "X...", "XXX.", "X...", "XXXX"],
-}
-
-
-def _lettering(m: MeshData, text: str, cy: float, z: float, px: float, color) -> None:
-    """Block letters on a 5-row grid, one quad per horizontal run of pixels, centred on x = 0."""
-    gap = 1
-    cols = sum(len(FONT[ch][0]) for ch in text) + gap * (len(text) - 1)
-    x = -cols * px / 2
-    y_top = cy + 2.5 * px
-    for ch in text:
-        rows = FONT[ch]
-        for r, row in enumerate(rows):
-            c = 0
-            while c < len(row):
-                if row[c] != "X":
-                    c += 1
-                    continue
-                e = c
-                while e < len(row) and row[e] == "X":
-                    e += 1
-                xa, xb = x + c * px, x + e * px
-                ya, yb = y_top - (r + 1) * px, y_top - r * px
-                quad(m, (xa, ya, z), (xb, ya, z), (xb, yb, z), (xa, yb, z), color)
-                c = e
-        x += (len(rows[0]) + gap) * px
-
-
-# --- balcony + flags -----------------------------------------------------------------------------
+# --- balcony ---------------------------------------------------------------------------------------
 
 def _balcony(m: MeshData, rng: Rng) -> None:
     w, out, y = 3.0, 0.75, G + 0.16
     iron = P["iron"]
     m.append(box(0, y - 0.08, out / 2, w, 0.16, out, jit(STONE_TRIM, rng, 0.02), bottom=True))
-    # consoles at the ends (clear of the lettering)
+    # consoles at the ends
     for sx in (-1, 1):
         m.append(box(sx * 1.32, y - 0.32, 0.25, 0.18, 0.32, 0.5, jit(STONE_TRIM, rng, 0.03)))
     # railing: top rail, bottom rail, bars, and a simple lozenge pattern in the middle
@@ -370,88 +342,6 @@ def _balcony(m: MeshData, rng: Rng) -> None:
         m.append(box(x, y + 0.53, out - 0.04, 0.025, 0.82, 0.025, iron))
     for sx in (-1, 1):
         m.append(box(sx * w / 4, y + 0.53, out - 0.03, 0.7, 0.03, 0.03, iron))
-    # two flagpoles in a V from a bracket in the middle of the railing
-    base = (0.0, y + 0.75, out + 0.02)
-    m.append(box(0, base[1], base[2], 0.16, 0.22, 0.06, iron))
-    for sx, kind in ((-1, "fr"), (1, "eu")):   # the tricolour on the left: less hidden by the plane trees
-        tip = (sx * 1.35, base[1] + 2.1, base[2] + 0.9)
-        _pole(m, base, tip)
-        _flag(m, base, tip, kind, sx, rng)
-
-
-def rod(m: MeshData, a, b, r: float, color, sides: int = 4) -> None:
-    """Thin prism from point a to point b (any direction), open ends."""
-    d = [b[i] - a[i] for i in range(3)]
-    ln = math.sqrt(sum(c * c for c in d)) or 1.0
-    d = [c / ln for c in d]
-    ref = (0.0, 0.0, 1.0) if abs(d[2]) < 0.9 else (1.0, 0.0, 0.0)
-    u = [d[1] * ref[2] - d[2] * ref[1], d[2] * ref[0] - d[0] * ref[2], d[0] * ref[1] - d[1] * ref[0]]
-    lu = math.sqrt(sum(c * c for c in u))
-    u = [c / lu for c in u]
-    w = [d[1] * u[2] - d[2] * u[1], d[2] * u[0] - d[0] * u[2], d[0] * u[1] - d[1] * u[0]]
-    ring_ = lambda p, k: tuple(p[i] + r * (math.cos(math.tau * k / sides) * u[i] + math.sin(math.tau * k / sides) * w[i])  # noqa: E731
-                               for i in range(3))
-    for k in range(sides):
-        quad(m, ring_(a, k), ring_(a, k + 1), ring_(b, k + 1), ring_(b, k), color)
-
-
-def _pole(m: MeshData, a, b) -> None:
-    rod(m, a, b, 0.025, mix(P["cream"], P["stone_grey"], 0.3), 5)
-    m.append(box(b[0], b[1] + 0.03, b[2], 0.08, 0.1, 0.08, mix(P["ochre_dark"], P["stone_grey"], 0.4)))  # finial
-
-
-def _flag(m: MeshData, base, tip, kind: str, sx: int, rng: Rng) -> None:
-    """
-    Flag hanging from the upper part of a slanted pole: hoist edge along the pole, the cloth falls
-    (with a slight fold, the breeze lifting it outward), so the stripes run parallel to the pole.
-    """
-    t0, t1 = 0.42, 0.95
-    hoist = lambda t: tuple(base[i] + (tip[i] - base[i]) * t for i in range(3))  # noqa: E731
-    fly = 1.15  # how far the cloth hangs below the pole
-    cols = 4    # along the pole
-    rows = 3    # down the cloth (one per tricolour band)
-    grid = []
-    for r in range(rows + 1):
-        f = r / rows
-        line = []
-        for c in range(cols + 1):
-            t = t0 + (t1 - t0) * c / cols
-            px, py, pz = hoist(t)
-            wave = 0.07 * math.sin(c * 2.2 + r * 1.3)
-            line.append((px + sx * f * 0.3, py - f * fly, pz + wave + f * 0.12))
-        grid.append(line)
-    if kind == "fr":
-        bands = [P["canvas_blue"], P["canvas_white"], P["canvas_red"]]
-    else:
-        bands = [P["canvas_blue"]] * 3
-    for r in range(rows):
-        for c in range(cols):
-            a, b, cc, d = grid[r][c], grid[r][c + 1], grid[r + 1][c + 1], grid[r + 1][c]
-            col = jit(bands[r], rng, 0.04)
-            shade = 0.9 if c % 2 else 1.0
-            u = [cc[i] - d[i] for i in range(3)]
-            v = [b[i] - cc[i] for i in range(3)]
-            front_z = u[0] * v[1] - u[1] * v[0] > 0      # does d-cc-b-a face +Z (the square)?
-            quad(m, d, cc, b, a, scale(col, shade * (1.0 if front_z else 0.75)))
-            quad(m, a, b, cc, d, scale(col, shade * (0.75 if front_z else 1.0)))
-    if kind == "eu":
-        # a small ring of stars (tiny pale-gold diamonds), drawn just in front of the cloth
-        mid_c, mid_r = cols / 2, rows / 2
-
-        def at(u, v):  # u along the pole (0..cols), v down the cloth (0..rows), bilinear
-            c0, r0 = min(int(u), cols - 1), min(int(v), rows - 1)
-            fu, fv = u - c0, v - r0
-            p00, p01, p10, p11 = grid[r0][c0], grid[r0][c0 + 1], grid[r0 + 1][c0], grid[r0 + 1][c0 + 1]
-            return tuple(p00[i] * (1 - fu) * (1 - fv) + p01[i] * fu * (1 - fv) + p10[i] * (1 - fu) * fv + p11[i] * fu * fv
-                         for i in range(3))
-        star = mix(P["ochre_light"], P["cream"], 0.4)
-        for k in range(12):
-            a = math.tau * k / 12
-            u, v = mid_c + 1.05 * math.cos(a), mid_r + 0.95 * math.sin(a)
-            p = at(u, v)
-            s = 0.045
-            quad(m, (p[0], p[1] - s, p[2] + 0.02), (p[0] + s, p[1], p[2] + 0.02), (p[0], p[1] + s, p[2] + 0.02),
-                 (p[0] - s, p[1], p[2] + 0.02), star)
 
 
 # --- pediment, clock, roof, bell gable ---------------------------------------------------------
@@ -619,7 +509,6 @@ def build():
     _upper_wall(m, rng)
     _pilasters(m, rng)
     _band_and_cornice(m, rng)
-    _lettering(m, "MAIRIE", G - 0.15, 0.125, 0.07, LETTER)
     _door(m, rng)
     _steps(m, rng)
     for sx in (-1, 1):

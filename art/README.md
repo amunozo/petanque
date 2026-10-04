@@ -68,7 +68,7 @@ Color: Material) to `public/models/<name>.glb`. Note that `npm run art` overwrit
   canopies hanging into the top corners of the aim view.
 - **Village** (`houses`, `mairie`, `cafe`, `props`, `hills`) is modelled directly in game coordinates
   and loaded as is. Layout: far row of houses with facades at z = -16, closed in line with the
-  court (|x| < 3.4) by the town hall (`mairie.py`: pediment with clock, bell gable, flags, steps;
+  court (|x| < 3.4) by the town hall (`mairie.py`: pediment with clock, bell gable, balcony, steps;
   the backdrop behind the jack, so it stays mid-dark and free of bright yellow low on the axis);
   side rows at |x| = 10.5 from z = -10 forward; café terrace right of the mairie, bench / lavender
   wall / lamp left of it; taller roofs, bell tower and cypresses behind. The surround in `court.py`
