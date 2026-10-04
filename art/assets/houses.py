@@ -1,7 +1,7 @@
 """
 houses.glb: the village edge around the square: rows of 2-3 storey Provencal houses beyond the far
-end of the court (facades at z = -16, with a belvedere gap in line with the court and the café
-on the ground floor right of it),
+end of the court (facades at z = -16, with a gap in line with the court that the mairie fills,
+mairie.py, and the café on the ground floor right of it),
 shorter rows along both sides at |x| = 10.5, a few taller roofs and a bell tower with an iron
 campanile behind the far row (for the skyline seen during a throw).
 
@@ -23,7 +23,7 @@ FAR_Z = -16.0       # facade line of the far row
 SIDE_X = 10.5       # facade line of the side rows
 
 # (width, setback, spec kwargs) left to right. The far row has a gap in the middle, in line with the
-# court: a belvedere (low parapet, see props.py) that opens the aim view onto the sky and the hills.
+# court, for the town hall (mairie.py, its own file) that closes the square behind the jack.
 GAP_HALF = 3.4
 FAR_LEFT = [
     (5.4, 0.0, dict(floors=3, render="render_pink", shutter="shutter_blue", door_slot=1, quoins=True, seed=101)),
@@ -53,8 +53,8 @@ LEFT_ROW = [
 ]
 SIDE_Z0 = -10.0      # side rows start here (between them and the far row: streets leading out)
 
-# Taller roofs behind the far row (only their upper floors and roofs show), kept out of the view
-# through the belvedere gap.
+# Taller roofs behind the far row (only their upper floors and roofs show), clear of the mairie
+# (|x| < GAP_HALF, down to z = -26).
 BACK_ROW = [
     (-19.5, -25.0, 6.0, dict(floors=3, render="render_sand", shutter="shutter_sage", seed=401, slots=3)),
     (-10.5, -24.0, 5.0, dict(floors=4, render="render_cream", shutter="shutter_blue", seed=402, slots=2)),
@@ -71,6 +71,7 @@ PREVIEW = {
     ],
     "ground_size": 40.0,
     "ground_color": (0.50, 0.36, 0.22),
+    "context": ["mairie"],  # rendered with the town hall that fills the gap (not exported with the houses)
 }
 
 

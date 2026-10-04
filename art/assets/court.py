@@ -147,15 +147,7 @@ FAR_FACADE_Z = -16.0
 SIDE_FACADE_X = 10.5
 SIDE_ROW_Z0 = -10.0
 VILLAGE_HALF_W = 17.6   # far row spans x -17.1 .. 17.1
-PAVEMENT = 1.4          # limestone pavement in front of the facades
-GAP_HALF = 3.4          # belvedere gap in the far row (parapet at z = PARAPET_Z)
-PARAPET_Z = -16.9
-
-
-def _valley_drop(x: float, z: float) -> float:
-    """Beyond the belvedere the ground falls away into a valley (widening with distance)."""
-    widen = max(0.0, -z - 33.0) * 0.5
-    return 4.0 * _smoothstep(-17.6, -24.0, z) * _smoothstep(5.5, 3.6, abs(x) - widen)
+PAVEMENT = 1.4          # limestone pavement in front of the facades (and the mairie in the middle)
 
 
 def build_surround(rng: Rng) -> MeshData:
@@ -172,7 +164,7 @@ def build_surround(rng: Rng) -> MeshData:
     right = [x1, 2.6, 3.4, 6.0, S - PAVEMENT, S, W, 24.0, 44.0, 72.0]
     xs = [-v for v in reversed(right)]
     xs = _axis(xs, cell_x) + _axis(right, cell_x)
-    zs = _axis([-78.0, -50.0, -30.0, -23.0, -17.6, F, F + PAVEMENT, -12.5, -11.0, z0], cell_z) + \
+    zs = _axis([-78.0, -50.0, -30.0, -23.0, F, F + PAVEMENT, -12.5, -11.0, z0], cell_z) + \
         _axis([z1, 6.6, 8.5, 12.0, 20.0], cell_z)
     m = MeshData()
     idx: dict[tuple[int, int], int] = {}
@@ -192,7 +184,6 @@ def build_surround(rng: Rng) -> MeshData:
         y = SURROUND_EDGE_Y + ramp * (fbm(x * 0.35, z * 0.35, 0, SEED + 11, 3) - 0.5) * 0.08
         if far:
             y += (fbm(x * 0.05, z * 0.05, 0, SEED + 13, 2) - 0.4) * 2.5 * _smoothstep(30.0, 50.0, math.hypot(x, z + 8))
-        y -= _valley_drop(x, z)
         if on_court_line and d == 0.0:
             y = SURROUND_EDGE_Y
         idx[key] = m.add_vert((x, y, z))
@@ -218,14 +209,14 @@ def _surround_color(x: float, z: float, k: int, rng: Rng):
     earth = mix(earth, P["earth_dark"], _smoothstep(0.45, 0.15, n) * 0.5)
     earth = mix(earth, P["dust_dark"], _smoothstep(1.2, 0.2, d) * 0.35)
     c = earth
-    in_far_pavement = (F <= z <= F + PAVEMENT and abs(x) <= W) or (PARAPET_Z - 0.7 <= z <= F and abs(x) <= GAP_HALF)
+    in_far_pavement = F <= z <= F + PAVEMENT and abs(x) <= W
     in_side_pavement = S - PAVEMENT <= abs(x) <= S and SIDE_ROW_Z0 <= z <= 12.0
     in_street = abs(x) >= S and F <= z <= SIDE_ROW_Z0 and abs(x) <= W
     if in_far_pavement or in_side_pavement or in_street:
         flag = rng.random()
         c = mix(P["limestone"], P["limestone_dark"], flag * 0.6)
         c = mix(c, P["render_sand"], 0.25 if k == 1 else 0.0)
-    elif abs(x) > W + 0.1 or z < -23.1 or (abs(x) > S and z > SIDE_ROW_Z0) or z < PARAPET_Z - 0.7:
+    elif abs(x) > W + 0.1 or z < -23.1 or (abs(x) > S and z > SIDE_ROW_Z0) or z < F:
         # countryside beyond the village (seen through the streets and around the hills)
         g = fbm(x * 0.06, z * 0.06, 9, SEED + 41, 3)
         c = mix(P["straw"], P["sage"], _smoothstep(0.35, 0.6, g))

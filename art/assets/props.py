@@ -1,9 +1,8 @@
 """
-props.glb: the square's furniture beyond the far end of the court, left of the belvedere (the
-café terrace is on the right, cafe.py): a low dry-stone wall holding a raised lavender bed, a
-wooden bench with cast-iron ends in front of it, two old cast-iron lamp posts with lanterns, a few
-lavender planters, and the belvedere parapet (dressed limestone, ball-topped end posts) closing
-the gap in the far row of houses. Game coordinates, all outside the court.
+props.glb: the square's furniture beyond the far end of the court, left of the mairie (the café
+terrace is on the right, cafe.py): a low dry-stone wall holding a raised lavender bed, a wooden
+bench with cast-iron ends in front of it, two old cast-iron lamp posts with lanterns and a few
+lavender planters. Game coordinates, all outside the court.
 """
 from __future__ import annotations
 
@@ -22,13 +21,12 @@ NAME = "props"
 WALL = {"x": -3.1, "z": -13.4, "length": 4.6, "height": 0.62, "thick": 0.5, "bed_depth": 1.0}
 BENCH = {"x": -5.0, "z": -12.75, "yaw": 0.0}            # faces +Z (the court)
 LAMPS = [(-2.75, -13.5), (6.3, 1.2)]
-PARAPET = {"x0": -3.4, "x1": 3.4, "z": -16.9, "height": 0.95, "thick": 0.45}
 PLANTERS = [(-8.3, -12.9, 0.9), (-2.3, -12.7, 0.75)]
 
 PREVIEW = {
     "views": [
         ("bench", (-2.0, 1.8, -8.0), (-5.0, 0.6, -13.2), 34),
-        ("belvedere", (0.5, 2.2, -9.0), (-1.5, 1.4, -15.5), 34),
+        ("lamp", (0.5, 2.2, -9.0), (-2.5, 1.4, -14.5), 34),
     ],
     "ground_size": 24.0,
     "ground_color": (0.50, 0.36, 0.22),
@@ -80,34 +78,6 @@ def build_wall(rng: Rng) -> MeshData:
         z = -length * (k + 0.5) / n + rng.jitter(0.08)
         lavender_bush(m, w["thick"] / 2 + d / 2 + rng.jitter(0.12), w["height"] - 0.12, z, 0.36 + rng.jitter(0.05), rng)
     return _place(m, w["x"], w["z"], 90.0)
-
-
-def build_parapet(rng: Rng) -> MeshData:
-    """Belvedere parapet: dressed limestone blocks, a moulded coping and two ball-topped posts."""
-    w = PARAPET
-    m = MeshData()
-    length = w["x1"] - w["x0"]
-    n = max(4, round(length / 0.9))
-    for row, (y0, hh) in enumerate(((-0.1, 0.45), (0.35, 0.42))):
-        off = 0.45 if row % 2 else 0.0
-        xs = [w["x0"]] + [w["x0"] + off + length * k / n for k in range(1, n + 1) if w["x0"] + off + length * k / n < w["x1"] - 0.2] + [w["x1"]]
-        for a, b in zip(xs, xs[1:]):
-            c = scale(mix(P["limestone"], P["render_sand"], rng.uniform(0.0, 0.5)), 1.0 + rng.jitter(0.05))
-            m.append(box((a + b) / 2, y0 + hh / 2, w["z"], b - a - 0.02, hh - 0.02, w["thick"], c))
-    cap = mix(P["limestone"], P["cream"], 0.5)
-    m.append(box((w["x0"] + w["x1"]) / 2, w["height"] - 0.1, w["z"], length, 0.1, w["thick"] + 0.12, scale(cap, 0.95),
-                 bottom=True, top_color=cap))
-    for x in (w["x0"] - 0.2, w["x1"] + 0.2):
-        m.append(box(x, 0.6, w["z"], 0.5, 1.3, 0.55, scale(cap, 0.97), top_color=cap))
-        m.append(box(x, 1.3, w["z"], 0.6, 0.1, 0.62, scale(cap, 0.9), bottom=True, top_color=cap))
-        cylinder(m, x, w["z"], 1.35, 1.45, 0.12, 0.12, 6, scale(cap, 0.9))
-        verts, faces = icosphere(1)
-        base = len(m.verts)
-        for v in verts:
-            m.verts.append((x + v[0] * 0.2, 1.62 + v[1] * 0.2, w["z"] + v[2] * 0.2))
-        for f in faces:
-            m.add_face(tuple(base + i for i in f), scale(cap, 1.0 + rng.jitter(0.04)))
-    return m
 
 
 def _place(local: MeshData, x, z, yaw_deg) -> MeshData:
@@ -162,7 +132,6 @@ def build():
     mat = palette_material()
     m = MeshData()
     m.append(build_wall(rng))
-    m.append(build_parapet(rng))
     m.append(build_bench(rng))
     for x, z in LAMPS:
         m.append(build_lamp(x, z))

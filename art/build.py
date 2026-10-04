@@ -22,7 +22,7 @@ from lib.export import export_glb  # noqa: E402
 from lib.modifiers import triangle_count  # noqa: E402
 from lib.preview import render_views  # noqa: E402
 
-ASSETS = ["court", "plane_tree", "houses", "cafe", "props", "cypress", "hills"]
+ASSETS = ["court", "plane_tree", "houses", "mairie", "cafe", "props", "cypress", "hills"]
 MODELS_DIR = os.path.join(ROOT, "public", "models")
 BLEND_DIR = os.path.join(HERE, "blend")
 PREVIEW_DIR = os.path.join(HERE, "previews")
@@ -40,6 +40,8 @@ def build_asset(name: str, preview: bool) -> None:
     print(f"[art] {mod.NAME}: {len(objs)} objects, {tris} triangles, {size / 1024:.0f} KB glb ({time.time() - t0:.1f}s)")
     if preview:
         p = mod.PREVIEW
+        for other in p.get("context", []):  # neighbouring assets, only to judge this one in place
+            importlib.import_module(f"assets.{other}").build()
         render_views(PREVIEW_DIR, mod.NAME, p["views"], ground_size=p.get("ground_size", 0.0),
                      ground_color=p.get("ground_color"))
         print(f"[art] {mod.NAME}: previews rendered ({time.time() - t0:.1f}s)")

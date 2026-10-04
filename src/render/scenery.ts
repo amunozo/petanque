@@ -1,7 +1,7 @@
 /**
  * Static scenery loaded from the Blender-made glTF files in public/models/ (see art/): the court
- * + boards + the ground of the square, the village (houses, café terrace, wall/bench/lamps), the
- * distant hills, and the instanced plane trees and cypresses.
+ * + boards + the ground of the square, the village (houses, the mairie closing the far end, café
+ * terrace, wall/bench/lamps), the distant hills, and the instanced plane trees and cypresses.
  * Until the court arrives (or if it fails to load) a plain placeholder court is shown, so the game
  * is playable either way. Everything lit shares one vertex-colour Lambert material; the hills use
  * one unlit material without fog or tone mapping (their colours are pre-lit and pre-hazed in Blender).
@@ -58,6 +58,7 @@ const CYPRESSES: readonly Placement[] = [
 /** Static models, in game coordinates. `shadows`: cast + receive (only what is near the court). */
 const STATIC_MODELS: readonly { file: string; shadows: boolean; unlit?: boolean }[] = [
   { file: 'houses.glb', shadows: false },
+  { file: 'mairie.glb', shadows: false },
   { file: 'cafe.glb', shadows: false },
   { file: 'props.glb', shadows: false },
   { file: 'hills.glb', shadows: false, unlit: true },

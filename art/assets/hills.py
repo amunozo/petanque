@@ -67,8 +67,8 @@ def build_layer(L: dict, rng: Rng) -> MeshData:
         n = fbm(i * 0.11 + L["seed"], 0.0, 0.0, L["seed"], 3)
         p = fbm(i * 0.35, 3.0, 0.0, L["seed"] + 9, 2)
         h = L["base"] + L["amp"] * (0.25 + 0.75 * n) * (0.45 + 0.9 * p)
-        # a low valley straight ahead (seen through the belvedere gap, so a band of sky stays
-        # visible above it), higher ridges to the sides
+        # lower straight ahead (behind the mairie, so its bell gable has sky around it), higher
+        # ridges to the sides
         h *= L["valley"] + (1 - L["valley"]) * _ss(0.08, 0.5, abs(a)) * (0.7 + 0.3 * math.cos(a * 0.75))
         col = []
         for k, f in enumerate(rows):
