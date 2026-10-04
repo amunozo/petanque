@@ -9,6 +9,8 @@ import type { MatchRules } from '../games/petanque/matchTypes';
 
 export type LoftPreset = 'roll' | 'half' | 'lob' | 'shoot';
 export type ControlScheme = 'slingshot' | 'flick';
+/** Renderer tone mapping (src/render/lighting.ts). 'neutral' keeps colours the most saturated. */
+export type ToneMappingChoice = 'neutral' | 'agx' | 'aces' | 'none';
 
 export interface GameConfig {
   physics: PhysicsConfig;
@@ -89,8 +91,14 @@ export interface GameConfig {
     jackMaxDist: number;
     boulesPerEnd: number;
   };
-  /** Scene look: low late-afternoon sun, exposure, haze. Read live by src/render/lighting.ts. */
+  /** Scene look: low late-afternoon sun, colour grade, exposure, haze. Read live by src/render/lighting.ts. */
   look: {
+    /** Tone-mapping curve. */
+    toneMapping: ToneMappingChoice;
+    /** Saturation of the scenery (1 = as modelled, >1 more vivid, 0 = grey). Balls and markers are not affected. */
+    saturation: number;
+    /** Sun colour temperature (K): ~3500 golden, ~5000 warm white, 6500 neutral white. */
+    sunTempK: number;
     /** Sun height above the horizon (degrees). */
     sunElevationDeg: number;
     /** Sun direction around the court: 0 = behind the player (+Z), 90 = from the right (+X), -90 = from the left. */
@@ -179,13 +187,16 @@ export const defaultConfig: GameConfig = {
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
   look: {
-    sunElevationDeg: 32,
-    sunAzimuthDeg: 62,
-    sunIntensity: 3.4,
+    toneMapping: 'neutral',
+    saturation: 1.1,
+    sunTempK: 5600,
+    sunElevationDeg: 34,
+    sunAzimuthDeg: 18,
+    sunIntensity: 4.6,
     exposure: 1,
-    fogDensity: 0.008,
-    fillIntensity: 1.9,
-    shadowStrength: 0.62,
+    fogDensity: 0.004,
+    fillIntensity: 2.4,
+    shadowStrength: 0.85,
   },
   match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
   ai: {
@@ -288,6 +299,9 @@ export const tuningSchema: TuningFolder[] = [
   {
     title: 'Look',
     fields: [
+      { path: 'look.toneMapping', label: 'tone mapping', options: ['neutral', 'agx', 'aces', 'none'] },
+      { path: 'look.saturation', label: 'saturation', min: 0, max: 2, step: 0.05 },
+      { path: 'look.sunTempK', label: 'sun colour K', min: 2500, max: 8000, step: 100 },
       { path: 'look.sunElevationDeg', label: 'sun height°', min: 8, max: 80, step: 1 },
       { path: 'look.sunAzimuthDeg', label: 'sun direction°', min: -180, max: 180, step: 1 },
       { path: 'look.sunIntensity', label: 'sun intensity', min: 0, max: 8, step: 0.1 },

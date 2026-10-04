@@ -64,8 +64,9 @@ Color: Material) to `public/models/<name>.glb`. Note that `npm run art` overwrit
 - **Trees** (`plane_tree.glb`: `plane_tree_a/_b/_c`; `cypress.glb`: `cypress_a/_b`) are modelled
   with the trunk base at the object origin; plane trees lean and reach toward +X. The game uses
   only their geometry and instances them with its own position / rotation / scale (`TREES` and
-  `CYPRESSES` in `src/render/scenery.ts`): plane trees in rows along both sides of the court,
-  canopies hanging into the top corners of the aim view.
+  `CYPRESSES` in `src/render/scenery.ts`): plane trees in two rows along the whole court (z +6 to
+  -13, ~4.7 m apart, |x| 5.2..5.9), canopies hanging into the top corners of the aim view. Only the
+  row on the sun's side renders into the shadow map (the other row's shadows fall away from the court).
 - **Village** (`houses`, `mairie`, `cafe`, `props`, `hills`) is modelled directly in game coordinates
   and loaded as is. Layout: far row of houses with facades at z = -16, closed in line with the
   court (|x| < 3.4) by the town hall (`mairie.py`: pediment with clock, bell gable, balcony, steps;
@@ -75,9 +76,12 @@ Color: Material) to `public/models/<name>.glb`. Note that `npm run art` overwrit
   mirrors this (pavements) - keep the constants in sync.
   Everything stays outside the court (x -2..2, z -9.5..5.5) and within ~85 m of the cameras
   (far plane 90 m). The hills are drawn unlit, without fog or tone mapping: their colours are
-  pre-lit and pre-hazed in `hills.py`.
+  pre-lit and pre-hazed in `hills.py` (toward `sky_horizon`, keep it in sync with `src/render/sky.ts`).
+- **Look**: vivid, clear late afternoon (art pass 3). The palette is saturated on purpose; the game
+  renders it with Neutral tone mapping, a warm-white sun (~5600 K), a cool blue shade fill and a
+  scenery-only saturation grade (`src/render/grade.ts`), all tunable in the `look` config.
 - **Budget** (whole scene incl. shadow pass): < 120k triangles, < 60 draw calls. Currently about
-  79k triangles / 26 draw calls in the aim view. Only the court boards and the plane trees cast
+  88k triangles / 29 draw calls in the aim view. Only the court boards and the plane trees cast
   shadows (the sun's shadow map covers the court only).
 
 ## Adding an asset

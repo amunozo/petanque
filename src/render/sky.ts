@@ -1,19 +1,20 @@
 /**
- * Cheap sky: one big inverted sphere with per-vertex colours (zenith blue -> warm horizon haze,
- * plus a soft glow toward the sun). Follows the camera so it is always "infinitely" far.
+ * Cheap sky: one big inverted sphere with per-vertex colours (deep zenith blue -> clear pale-blue
+ * horizon, plus a soft warm glow toward the sun). Follows the camera so it is always "infinitely" far.
  */
 import { BackSide, BufferAttribute, Color, Mesh, MeshBasicMaterial, SphereGeometry, Vector3, type PerspectiveCamera } from 'three';
+import { gradeMaterial } from './grade';
 
 /**
  * sRGB display colours (the sky is not tone-mapped, so these are what you see; keep the horizon in
  * sync with art/lib/palette.py "sky_horizon"). The horizon colour is also the fog colour.
  */
 export const SKY_STYLE = {
-  zenith: 0x2f6fd0,
-  mid: 0x86b8ec,
-  horizon: 0xf7c27e,
-  glow: 0xffc874,
-  /** Elevation (rad) over which the golden horizon blends into the mid blue / the zenith. */
+  zenith: 0x1f5fd6,
+  mid: 0x5c9cf0,
+  horizon: 0xbcd9f4,
+  glow: 0xffe2a8,
+  /** Elevation (rad) over which the pale horizon blends into the mid blue / the zenith. */
   hazeBand: 0.16,
   midBand: 0.7,
 } as const;
@@ -29,7 +30,9 @@ export function createSky(radius: number): Sky {
   const geo = new SphereGeometry(1, 32, 48); // fine rows so the narrow horizon gradient is resolved
   const count = geo.getAttribute('position').count;
   geo.setAttribute('color', new BufferAttribute(new Float32Array(count * 3), 3));
-  const mat = new MeshBasicMaterial({ vertexColors: true, side: BackSide, fog: false, depthWrite: false, toneMapped: false });
+  const mat = gradeMaterial(
+    new MeshBasicMaterial({ vertexColors: true, side: BackSide, fog: false, depthWrite: false, toneMapped: false }),
+  );
   const mesh = new Mesh(geo, mat);
   mesh.scale.setScalar(radius);
   mesh.renderOrder = -10;

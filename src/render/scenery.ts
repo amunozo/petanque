@@ -5,6 +5,7 @@
  * Until the court arrives (or if it fails to load) a plain placeholder court is shown, so the game
  * is playable either way. Everything lit shares one vertex-colour Lambert material; the hills use
  * one unlit material without fog or tone mapping (their colours are pre-lit and pre-hazed in Blender).
+ * Both get the scenery colour grade (src/render/grade.ts).
  */
 import {
   BufferGeometry,
@@ -21,6 +22,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Object3D } from 'three';
+import { gradeMaterial } from './grade';
 
 interface Placement {
   variant: string;
@@ -32,16 +34,25 @@ interface Placement {
 }
 
 /**
- * Plane trees in rows along both sides of the court, off the playing area. The models lean and
- * reach toward +X: ~180° on the right side and ~0° on the left hang the canopy over the court
- * edge, so the foliage frames the top corners of the portrait aim view.
+ * Plane trees in two rows along the whole court, from the throwing end (z ~ +6) to the far end
+ * (z ~ -13), ~4.7 m apart, well off the playing area (|x| 5..5.6; the two sides are staggered a
+ * little so they don't read as a grid). The models lean and reach toward +X: ~180° on the right
+ * side and ~0° on the left hang the canopy toward the court, so the foliage frames the top
+ * corners of the portrait aim view. The trees nearest the camera are turned to reach along the
+ * row more than over the court, so they never cover the court or the centre of the screen.
  */
 const TREES: readonly Placement[] = [
-  { variant: 'b', x: 4.95, z: -1.2, rotDeg: 166, scale: 1.0 },
-  { variant: 'a', x: 5.0, z: -7.2, rotDeg: 170, scale: 1.0 },
+  // right side (+X), from the throwing end to the far end
+  { variant: 'c', x: 5.9, z: 6.0, rotDeg: 150, scale: 0.95 },
+  { variant: 'a', x: 5.7, z: 1.4, rotDeg: 160, scale: 1.0 },
+  { variant: 'b', x: 5.4, z: -3.3, rotDeg: 168, scale: 1.0 },
+  { variant: 'a', x: 5.2, z: -8.0, rotDeg: 172, scale: 1.0 },
   { variant: 'c', x: 5.4, z: -12.8, rotDeg: 186, scale: 1.05 },
-  { variant: 'a', x: -4.85, z: -0.5, rotDeg: 14, scale: 1.0 },
-  { variant: 'c', x: -5.0, z: -6.6, rotDeg: 8, scale: 1.0 },
+  // left side (-X)
+  { variant: 'b', x: -5.9, z: 5.6, rotDeg: 30, scale: 0.95 },
+  { variant: 'c', x: -5.7, z: 1.0, rotDeg: 20, scale: 1.0 },
+  { variant: 'a', x: -5.3, z: -3.6, rotDeg: 12, scale: 1.0 },
+  { variant: 'c', x: -5.2, z: -7.9, rotDeg: 6, scale: 1.0 },
   { variant: 'b', x: -5.4, z: -12.3, rotDeg: -4, scale: 1.05 },
 ];
 
@@ -88,17 +99,17 @@ const meshesOf = (root: Object3D): Mesh[] => {
 };
 
 export function loadScenery(scene: Scene, court: CourtRect): Scenery {
-  const material = new MeshLambertMaterial({ vertexColors: true });
-  const unlit = new MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: false });
+  const material = gradeMaterial(new MeshLambertMaterial({ vertexColors: true }));
+  const unlit = gradeMaterial(new MeshBasicMaterial({ vertexColors: true, fog: false, toneMapped: false }));
 
   // Placeholder until the court model is in.
   const fallback = new Group();
-  const plain = new MeshLambertMaterial({ color: 0xc4a27a });
+  const plain = new MeshLambertMaterial({ color: 0xcc9e62 });
   const ground = new Mesh(new PlaneGeometry(court.maxX - court.minX, court.maxZ - court.minZ), plain);
   ground.rotation.x = -Math.PI / 2;
   ground.position.set((court.minX + court.maxX) / 2, 0, (court.minZ + court.maxZ) / 2);
   ground.receiveShadow = true;
-  const around = new Mesh(new PlaneGeometry(120, 120), new MeshLambertMaterial({ color: 0xc08f5c }));
+  const around = new Mesh(new PlaneGeometry(120, 120), new MeshLambertMaterial({ color: 0xbf8550 }));
   around.rotation.x = -Math.PI / 2;
   around.position.set(0, -0.02, -15);
   around.receiveShadow = true;
@@ -144,8 +155,17 @@ export function loadScenery(scene: Scene, court: CourtRect): Scenery {
 }
 
 /**
- * One InstancedMesh per variant (`<prefix><variant>` in the file). The geometry is modelled around
- * the trunk base, so node offsets in the file are ignored.
+ * A tree's shadow can only reach the court when the sun is on its side of the court (or roughly
+ * behind the player): with the sun more than this far over on the other side (horizontal component
+ * of the unit vector toward the sun), its shadow falls away from the court.
+ */
+const SHADOW_SIDE_CUT = 0.2;
+
+/**
+ * One InstancedMesh per variant (`<prefix><variant>` in the file) and, for shadow casters, per side
+ * of the court, so the side whose shadows fall away from the court skips the shadow pass (keeps the
+ * triangle budget). The geometry is modelled around the trunk base, so node offsets in the file are
+ * ignored.
  */
 function loadInstanced(
   loader: GLTFLoader,
@@ -168,19 +188,32 @@ function loadInstanced(
       const pos = new Vector3();
       const scl = new Vector3();
       const yAxis = new Vector3(0, 1, 0);
+      const lightDir = new Vector3();
+      const sides = shadows ? [-1, 1] : [0];
       for (const [variant, geo] of geos) {
-        const list = placements.filter((t) => t.variant === variant);
-        if (list.length === 0) continue;
-        const inst = new InstancedMesh(geo, material, list.length);
-        list.forEach((t, i) => {
-          q.setFromAxisAngle(yAxis, (t.rotDeg * Math.PI) / 180);
-          m.compose(pos.set(t.x, 0, t.z), q, scl.setScalar(t.scale));
-          inst.setMatrixAt(i, m);
-        });
-        inst.castShadow = shadows;
-        inst.receiveShadow = shadows;
-        inst.computeBoundingSphere(); // covers all instances, so frustum culling stays correct
-        scene.add(inst);
+        for (const side of sides) {
+          const list = placements.filter((t) => t.variant === variant && (side === 0 || Math.sign(t.x) === side));
+          if (list.length === 0) continue;
+          const inst = new InstancedMesh(geo, material, list.length);
+          list.forEach((t, i) => {
+            q.setFromAxisAngle(yAxis, (t.rotDeg * Math.PI) / 180);
+            m.compose(pos.set(t.x, 0, t.z), q, scl.setScalar(t.scale));
+            inst.setMatrixAt(i, m);
+          });
+          inst.castShadow = shadows;
+          inst.receiveShadow = shadows;
+          if (shadows) {
+            inst.onBeforeShadow = (_renderer, _object, _camera, shadowCamera) => {
+              shadowCamera.getWorldDirection(lightDir); // from the sun toward the court
+              if (-lightDir.x * side < -SHADOW_SIDE_CUT) inst.count = 0;
+            };
+            inst.onAfterShadow = () => {
+              inst.count = list.length;
+            };
+          }
+          inst.computeBoundingSphere(); // covers all instances, so frustum culling stays correct
+          scene.add(inst);
+        }
       }
     })
     .catch((err: unknown) => console.warn(`${file} failed to load`, err));
