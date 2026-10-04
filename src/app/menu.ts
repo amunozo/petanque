@@ -83,10 +83,20 @@ function lengthPicker(points: LengthPoints, onChange: (l: MatchLength) => void):
   return { element: wrap, get: () => value, refresh };
 }
 
-function choice(cls: string, title: string, sub: string): { btn: HTMLButtonElement; sub: HTMLElement } {
+/** Mini boules drawn in CSS: 'a' / 'b' = team boule, 'j' = jack. */
+function balls(kinds: readonly ('a' | 'b' | 'j')[]): HTMLElement {
+  const art = el('span', 'mn-btn-art');
+  art.setAttribute('aria-hidden', 'true');
+  for (const k of kinds) art.append(el('i', `mn-ball ${k === 'j' ? 'mn-jack' : `mn-ball-${k}`}`));
+  return art;
+}
+
+function choice(cls: string, title: string, sub: string, art: readonly ('a' | 'b' | 'j')[]): { btn: HTMLButtonElement; sub: HTMLElement } {
   const btn = button(`mn-btn ${cls}`, '');
   const subEl = el('span', 'mn-btn-sub', sub);
-  btn.append(el('span', 'mn-btn-title', title), subEl);
+  const text = el('span', 'mn-btn-text');
+  text.append(el('span', 'mn-btn-title', title), subEl);
+  btn.append(balls(art), text);
   return { btn, sub: subEl };
 }
 
@@ -96,14 +106,16 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   root.setAttribute('aria-label', 'Main menu');
   shieldPointer(root);
 
-  // Placeholder logo: a jack and one boule per team, drawn in CSS.
+  // Emblem: a jack between one boule per team, drawn in CSS, over a little ground shadow.
   const logo = el('div', 'mn-logo');
   logo.setAttribute('aria-hidden', 'true');
   logo.append(el('i', 'mn-ball mn-ball-a'), el('i', 'mn-ball mn-jack'), el('i', 'mn-ball mn-ball-b'));
+  const head = el('div', 'mn-head');
+  head.append(logo, el('h1', 'mn-title', 'Pétanque'), el('div', 'mn-tagline', 'Boules in the village square'));
 
-  const practice = choice('mn-practice', 'Practice', 'Throw at the jack, on your own');
-  const match = choice('mn-match', '2 players (same phone)', matchInfoText(points()[loadMatchLength()]));
-  const vs = choice('mn-vs', '1 player vs computer', 'You are Blue');
+  const practice = choice('mn-practice', 'Practice', 'Throw at the jack, on your own', ['j', 'a']);
+  const match = choice('mn-match', '2 players (same phone)', matchInfoText(points()[loadMatchLength()]), ['a', 'b']);
+  const vs = choice('mn-vs', '1 player vs computer', 'You are Blue', ['a', 'b']);
   const level = difficultyPicker();
   const vsBox = el('div', 'mn-vs-box');
   vsBox.append(vs.btn, level.element);
@@ -118,7 +130,7 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   muteBtn.type = 'button';
   paintMuteButton(muteBtn, false);
 
-  root.append(muteBtn, logo, el('h1', 'mn-title', 'Pétanque'), buttons, el('div', 'mn-build', buildId));
+  root.append(muteBtn, head, buttons, el('div', 'mn-build', buildId));
   parent.append(root);
 
   let practiceFn: () => void = () => undefined;
@@ -172,21 +184,30 @@ export function confirmDialog(parent: HTMLElement, o: ConfirmOptions): Promise<b
   return new Promise((resolve) => {
     const backdrop = el('div', 'mn-confirm');
     backdrop.setAttribute('role', 'alertdialog');
+    backdrop.setAttribute('aria-modal', 'true');
     shieldPointer(backdrop);
     const box = el('div', 'mn-confirm-box');
     const row = el('div', 'mn-btn-row');
+    const title = el('div', 'mn-confirm-title', o.title);
+    title.id = 'mn-confirm-title';
+    backdrop.setAttribute('aria-labelledby', title.id);
     document.body.classList.add('is-dialog');
     const done = (v: boolean): void => {
       document.body.classList.remove('is-dialog');
       backdrop.remove();
       resolve(v);
     };
-    row.append(button('mn-small', o.cancelLabel, () => done(false)), button('mn-small mn-danger', o.confirmLabel, () => done(true)));
-    box.append(el('div', 'mn-confirm-title', o.title), el('div', 'mn-confirm-text', o.text), row);
+    const cancel = button('mn-small', o.cancelLabel, () => done(false));
+    row.append(cancel, button('mn-small mn-danger', o.confirmLabel, () => done(true)));
+    box.append(title, el('div', 'mn-confirm-text', o.text), row);
     backdrop.append(box);
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) done(false);
     });
+    backdrop.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') done(false);
+    });
     parent.append(backdrop);
+    cancel.focus({ preventScroll: true });
   });
 }

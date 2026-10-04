@@ -67,7 +67,7 @@ const ctx: AppContext = {
   audio,
   loftPicker,
   refreshInput: () => refreshInput(),
-  uiBlocked: () => panel.isOpen() || menu.isOpen() || dialogOpen,
+  uiBlocked: () => panel.isOpen() || menu.isOpen() || hud.isSheetOpen() || dialogOpen,
   noteThrow: () => {
     throwsDone++;
   },
@@ -83,7 +83,7 @@ const practice = createPracticeMode(ctx);
 const match = createMatchMode(ctx, () => goMenu());
 
 /** Can the player start a throw gesture right now? */
-const inputOpen = (): boolean => mode !== null && mode.canAim() && !panel.isOpen() && !menu.isOpen() && !dialogOpen;
+const inputOpen = (): boolean => mode !== null && mode.canAim() && !ctx.uiBlocked();
 
 const controller = createThrowController(canvas, () => store.config, () => loftPicker.get(), {
   onPreview: (p: AimPreview | null) => {
@@ -122,24 +122,30 @@ function goMenu(): void {
   refreshInput();
 }
 
+/** Asks before throwing away a match in progress; resolves true when it's fine to go on. */
+async function confirmLeave(title: string, confirmLabel: string): Promise<boolean> {
+  if (!mode?.inProgress()) return true;
+  dialogOpen = true;
+  refreshInput();
+  const ok = await confirmDialog(app, {
+    title,
+    text: 'The current match will be lost.',
+    confirmLabel,
+    cancelLabel: 'Keep playing',
+  });
+  dialogOpen = false;
+  refreshInput();
+  return ok;
+}
+
 async function requestMenu(): Promise<void> {
   if (!mode || dialogOpen) return;
-  if (mode.inProgress()) {
-    dialogOpen = true;
-    refreshInput();
-    const leave = await confirmDialog(app, {
-      title: 'Leave the match?',
-      text: 'The current match will be lost.',
-      confirmLabel: 'Leave',
-      cancelLabel: 'Keep playing',
-    });
-    dialogOpen = false;
-    if (!leave) {
-      refreshInput();
-      return;
-    }
-  }
-  goMenu();
+  if (await confirmLeave('Leave the match?', 'Leave')) goMenu();
+}
+
+async function requestRestart(): Promise<void> {
+  if (mode !== match || dialogOpen) return;
+  if (await confirmLeave('Restart the match?', 'Restart')) match.restart();
 }
 
 menu.onPractice(() => enterMode(practice));
@@ -152,7 +158,7 @@ menu.onVsComputer((difficulty, length) => {
   enterMode(match);
 });
 
-// ---- sound: mute buttons (HUD + menu) and loft tick ---------------------------------
+// ---- sound: mute toggles (⋯ sheet + menu) and loft tick ---------------------------------
 const paintMute = (muted: boolean): void => {
   hud.setMuted(muted);
   menu.setMuted(muted);
@@ -167,6 +173,14 @@ hud.onMute(toggleMute);
 menu.onMute(toggleMute);
 loftPicker.onChange(() => audio.tick());
 hud.onMenu(() => void requestMenu());
+hud.onRestart(() => void requestRestart());
+hud.onSheetChange(() => refreshInput());
+
+// ---- tuning: opened from the ⋯ sheet; a dot on ⋯ flags changed values -----------------
+hud.onSettings(() => panel.open());
+const paintTuningDot = (): void => hud.setSettingsChanged(store.diffCount() > 0);
+store.subscribe(paintTuningDot);
+paintTuningDot();
 
 // Any touch on the field while aiming brings the camera back behind the circle.
 canvas.addEventListener('pointerdown', () => {
@@ -185,15 +199,15 @@ canvas.addEventListener('pointerdown', (e) => trackFinger(e, true));
 canvas.addEventListener('pointerup', (e) => trackFinger(e, false));
 canvas.addEventListener('pointercancel', (e) => trackFinger(e, false));
 
-// ---- fullscreen (hidden where unsupported, e.g. iOS Safari) -----------------------
+// ---- fullscreen (sheet row hidden where unsupported, e.g. iOS Safari) ---------------
 if (document.fullscreenEnabled && typeof app.requestFullscreen === 'function') {
-  hud.fullscreenButton.hidden = false;
-  hud.fullscreenButton.addEventListener('click', () => {
+  hud.setFullscreen(true, false);
+  hud.onFullscreen(() => {
     if (document.fullscreenElement) void document.exitFullscreen();
     else void app.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined);
   });
   document.addEventListener('fullscreenchange', () => {
-    hud.fullscreenButton.setAttribute('aria-label', document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen');
+    hud.setFullscreen(true, Boolean(document.fullscreenElement));
     scene.resize();
   });
 }

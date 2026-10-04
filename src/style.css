@@ -1,9 +1,80 @@
+/* ==========================================================================
+   Fonts: self-hosted (no CDN), OFL — see public/fonts/OFL-*.txt.
+   Variable woff2, Latin subset (U+0000-00FF etc.: é è à ç ô …), taken from
+   @fontsource-variable/fredoka 5.3.0 and @fontsource-variable/nunito 5.3.0.
+   ========================================================================== */
+@font-face {
+  font-family: 'Fredoka';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('/fonts/fredoka-latin-wght.woff2') format('woff2-variations'), url('/fonts/fredoka-latin-wght.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Nunito';
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url('/fonts/nunito-latin-wght.woff2') format('woff2-variations'), url('/fonts/nunito-latin-wght.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ==========================================================================
+   Design tokens. Crisp white surfaces + vivid Provençal accents.
+   Contrast (WCAG): ink on white 15.6:1, ink-2 on white 7:1, white on
+   terracotta 4.6:1, on team blue 5.8:1, on team red 5.0:1, on leaf 4.7:1.
+   Teams are never told apart by colour alone: Blue = round mark, Red = diamond.
+   ========================================================================== */
 :root {
-  /* Team colours of the placeholder art (3D tints live in render/pitchScene STYLE.teamBouleColor). */
-  --team-a: #6ea4ff;
-  --team-a-dark: #1e3f7a;
-  --team-b: #ff8556;
-  --team-b-dark: #7d2f16;
+  /* Surfaces */
+  --surface: #ffffff;
+  --surface-2: #f3f1f7;
+  --glass: rgba(255, 255, 255, 0.92);
+  --glass-strong: rgba(255, 255, 255, 0.97);
+  --line: rgba(38, 33, 48, 0.12);
+  /* Text */
+  --ink: #262130;
+  --ink-2: #5c566b;
+  /* Accents */
+  --terracotta: #cc4a16; /* primary / selected (white text 4.6:1) */
+  --terracotta-bright: #ec6a2e;
+  --terracotta-ink: #b33a12; /* as text on white */
+  --leaf: #3a8419;
+  --leaf-bright: #5db82e;
+  --sage: #8fbf5a;
+  --lavender: #7e57c2;
+  --lavender-soft: #ece5fa;
+  --sun: #ffc21a;
+  --danger: #c8102e;
+  /* Teams: Provence blue and tomato red (3D tints live in render/pitchScene STYLE.teamBouleColor). */
+  --team-a: #1f5fd1;
+  --team-a-soft: #e6eefc;
+  --team-b: #d7263d;
+  --team-b-soft: #fde8eb;
+  /* Shape */
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 22px;
+  --r-pill: 999px;
+  --shadow-sm: 0 1px 2px rgba(38, 33, 48, 0.12), 0 2px 6px rgba(38, 33, 48, 0.1);
+  --shadow-md: 0 2px 4px rgba(38, 33, 48, 0.08), 0 8px 22px rgba(38, 33, 48, 0.16);
+  --shadow-lg: 0 4px 10px rgba(38, 33, 48, 0.1), 0 16px 40px rgba(38, 33, 48, 0.22);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --edge: 10px; /* gap between HUD chrome and the screen edge */
+  /* Type */
+  --font-display: 'Fredoka', 'Nunito', ui-rounded, system-ui, sans-serif;
+  --font-body: 'Nunito', ui-rounded, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-1: 0.14s;
+  --dur-2: 0.24s;
+  /* Focus ring (keyboard / switch access) */
+  --focus: 0 0 0 2px #fff, 0 0 0 5px var(--team-a);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -16,13 +87,22 @@ body {
   padding: 0;
   height: 100%;
   overflow: hidden;
-  background: #1b2a1f;
+  background: #2a3550;
+  font-family: var(--font-body);
   touch-action: none;
   overscroll-behavior: none;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+}
+button {
+  font-family: inherit;
+}
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus);
 }
 
 #app {
@@ -43,19 +123,120 @@ body {
   touch-action: none;
 }
 
+/* Shared: a round icon button on frosted white (⋯ in the HUD, sound in the menu). */
+.hud-more,
+.mn-mute {
+  position: absolute;
+  top: calc(var(--safe-top) + var(--edge));
+  right: calc(var(--safe-right) + var(--edge));
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  pointer-events: auto;
+  touch-action: manipulation;
+  transition: transform var(--dur-1) var(--ease-out), background var(--dur-1);
+}
+.hud-more:active,
+.mn-mute:active {
+  transform: scale(0.92);
+}
+.hud-more {
+  z-index: 11;
+}
+.hud-more.is-open {
+  background: var(--ink);
+  color: #fff;
+}
+
+/* Shared buttons: primary (terracotta) and secondary (white, outlined). */
+.hud-next,
+.mh-btn,
+.mn-small {
+  flex: 1;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 16px;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 18px/1 var(--font-display);
+  letter-spacing: 0.2px;
+  touch-action: manipulation;
+  transition: transform var(--dur-1) var(--ease-out), filter var(--dur-1);
+}
+.hud-next,
+.mh-btn.mh-primary {
+  border-color: transparent;
+  background: var(--terracotta);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16), 0 3px 10px rgba(204, 74, 22, 0.3);
+}
+.hud-next:active,
+.mh-btn:active,
+.mn-small:active {
+  transform: translateY(1px) scale(0.98);
+  filter: brightness(1.06);
+}
+
+/* Shared: frosted white surface. */
+.hud-status,
+.hud-dist,
+.mh-bar,
+.mh-msg,
+.touch-hint-text,
+.lp-root {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+}
+
+/* Shared: bottom result card (practice end card, match end / match-over cards). */
+.hud-card,
+.mh-card {
+  position: absolute;
+  left: calc(var(--safe-left) + 12px);
+  right: calc(var(--safe-right) + 12px);
+  bottom: calc(var(--safe-bottom) + 12px);
+  max-width: 440px;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 20px 16px 16px;
+  border-radius: var(--r-lg);
+  /* Team (or sun) band along the top, clipped by the corner radius. */
+  background: linear-gradient(var(--tc, var(--sun)) 0 0) top / 100% 7px no-repeat, var(--glass-strong);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-lg);
+  color: var(--ink);
+  text-align: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
 /* ==========================================================================
    Game HUD (src/app/hud.ts)
-   Right column: fullscreen (top 8), tuning gear (top 52, see --tn-gear-top),
-   new end (top 96, practice only), menu (top 140; 96 in a match), sound (below the menu: 184; 140 in a match). Left: status +
-   distances, power meter mid-left.
-   Bottom: loft picker, or the end card (picker hidden while it shows).
+   Top left: practice status + distances. Top right: the ⋯ button and its
+   sheet. Mid-left: power meter. Bottom: loft picker, or the end card.
    ========================================================================== */
 #hud {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  font: 14px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #fff;
+  font: 15px/1.3 var(--font-body);
+  color: var(--ink);
 }
 #hud [hidden] {
   display: none !important;
@@ -63,95 +244,149 @@ body {
 
 .hud-info {
   position: absolute;
-  top: calc(var(--safe-top) + 8px);
-  left: calc(var(--safe-left) + 8px);
-  max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 72px);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  top: calc(var(--safe-top) + var(--edge));
+  left: calc(var(--safe-left) + var(--edge));
+  max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }
 .hud-status {
-  display: inline-block;
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.5);
-  font-weight: 600;
-  font-size: 15px;
+  padding: 9px 14px;
+  border-radius: var(--r-pill);
+  font: 600 16px/1.1 var(--font-display);
+  font-variant-numeric: tabular-nums;
 }
 .hud-build {
-  margin: 3px 0 0 2px;
-  font: 10px/1.2 ui-monospace, Menlo, Consolas, monospace;
-  color: rgba(255, 255, 255, 0.5);
+  padding: 1px 7px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.6);
+  font: 10px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--ink-2);
 }
 .hud-dist {
-  display: inline-block;
-  margin-top: 6px;
-  padding: 5px 6px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.5);
+  padding: 5px;
+  border-radius: var(--r-md);
+  font-size: 14px;
   font-variant-numeric: tabular-nums;
 }
 .hud-dist-row {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 2px 5px;
-  border-radius: 5px;
+  gap: 14px;
+  padding: 4px 8px;
+  border-radius: 9px;
 }
 .hud-dist-val {
-  font-weight: 600;
+  font-weight: 800;
 }
 .hud-closest {
-  background: #8fd16a;
-  color: #10200a;
-  text-shadow: none;
+  background: var(--leaf);
+  color: #fff;
 }
 .hud-out {
-  color: #ff9a8a;
+  color: var(--danger);
 }
 
-.hud-btn {
+/* ---- ⋯ sheet ---- */
+.hud-scrim {
   position: absolute;
-  right: calc(var(--safe-right) + 8px);
-  width: 40px;
-  height: 40px;
-  padding: 0;
+  z-index: 10;
+  inset: 0;
+  pointer-events: auto;
+  background: rgba(38, 33, 48, 0.12);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+.hud-more-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--terracotta);
+}
+.hud-sheet {
+  position: absolute;
+  z-index: 11;
+  top: calc(var(--safe-top) + var(--edge) + 52px);
+  right: calc(var(--safe-right) + var(--edge));
+  width: 236px;
+  max-width: calc(100vw - 2 * var(--edge));
+  box-sizing: border-box;
+  padding: 6px;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  transform-origin: calc(100% - 22px) -8px;
+  animation: pop-in var(--dur-2) var(--ease-spring) both;
+}
+.hud-item {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  pointer-events: auto;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  font: 700 16px var(--font-body);
+  text-align: left;
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
 }
-.hud-btn:active {
-  background: rgba(60, 90, 40, 0.8);
+.hud-item:active {
+  background: var(--surface-2);
 }
-.hud-fs {
-  top: calc(var(--safe-top) + 8px);
+.hud-item-icon {
+  display: flex;
+  color: var(--terracotta-ink);
 }
-.hud-new {
-  top: calc(var(--safe-top) + 96px);
+.hud-item-label {
+  flex: 1;
 }
-.hud-menu {
-  top: calc(var(--safe-top) + 140px);
+.hud-item-state,
+.hud-item-badge {
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 800;
 }
-.hud-mute {
-  top: calc(var(--safe-top) + 184px);
+.hud-item-state {
+  background: var(--leaf);
+  color: #fff;
 }
-/* Match mode: the match HUD (mh-*) replaces the practice status / new-end button. */
-#hud.hud-mode-match .hud-info,
-#hud.hud-mode-match .hud-new {
-  display: none;
+.hud-item[aria-checked='false'] .hud-item-state {
+  background: var(--surface-2);
+  color: var(--ink-2);
 }
-#hud.hud-mode-match .hud-menu {
-  top: calc(var(--safe-top) + 96px);
+.hud-item-badge {
+  background: var(--lavender-soft);
+  color: var(--lavender);
 }
-#hud.hud-mode-match .hud-mute {
-  top: calc(var(--safe-top) + 140px);
+.hud-sep {
+  height: 1px;
+  margin: 4px 10px;
+  background: var(--line);
+}
+.hud-sheet-build {
+  padding: 6px 12px 4px;
+  font: 11px/1.2 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--ink-2);
 }
 
+/* Match mode: the match HUD (mh-*) replaces the practice status. */
+#hud.hud-mode-match .hud-info {
+  display: none;
+}
+
+/* ---- power meter ---- */
 .hud-power {
   position: absolute;
   left: calc(var(--safe-left) + 12px);
@@ -163,21 +398,23 @@ body {
   gap: 6px;
 }
 .hud-power-label {
-  min-width: 44px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.55);
+  min-width: 46px;
+  padding: 3px 8px;
+  border-radius: var(--r-pill);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
   text-align: center;
-  font-weight: 700;
+  font: 600 15px var(--font-display);
   font-variant-numeric: tabular-nums;
 }
 .hud-power-track {
   position: relative;
-  width: 18px;
+  width: 16px;
   height: 36vh;
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.45);
+  border: 3px solid #fff;
+  border-radius: var(--r-pill);
+  background: rgba(38, 33, 48, 0.25);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 .hud-power-fill {
@@ -186,71 +423,52 @@ body {
   right: 0;
   bottom: 0;
   height: 0;
-  background: linear-gradient(to top, #8fd16a, #ffc857 70%, #ff7a2f);
+  background: linear-gradient(to top, var(--leaf-bright), var(--sun) 65%, var(--terracotta-bright));
 }
 
+/* ---- practice end card ---- */
 .hud-card {
-  position: absolute;
-  left: calc(var(--safe-left) + 16px);
-  right: calc(var(--safe-right) + 16px);
-  bottom: calc(var(--safe-bottom) + 16px);
-  padding: 14px 16px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(12, 18, 14, 0.82);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  text-align: center;
-  pointer-events: auto;
-  touch-action: manipulation;
+  --tc: var(--sun);
+  animation: card-in 0.32s var(--ease-out) both;
 }
 .hud-card-title {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.75);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
 .hud-card-best {
-  font-size: 44px;
-  line-height: 1.1;
-  font-weight: 800;
-  color: #8fd16a;
+  font: 600 48px/1.05 var(--font-display);
+  color: var(--leaf);
   font-variant-numeric: tabular-nums;
 }
 .hud-card-session {
   min-height: 18px;
-  margin-bottom: 10px;
-  font-size: 14px;
-  color: #ffc857;
-}
-.hud-next {
-  width: 100%;
-  min-height: 52px;
-  border: 0;
-  border-radius: 14px;
-  background: #8fd16a;
-  color: #10200a;
-  font: 700 18px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.hud-next:active {
-  background: #a9e287;
+  margin: 2px 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-2);
 }
 #app.is-endover .lp-root {
   display: none;
 }
 
+
 /* ==========================================================================
    Tuning panel (src/tuning/panel.ts)
    ========================================================================== */
 .tn-root {
-  --tn-accent: #8fd16a;
-  --tn-changed: #ffc857;
-  --tn-text: #f2f5f0;
-  --tn-dim: rgba(242, 245, 240, 0.62);
-  --tn-line: rgba(255, 255, 255, 0.14);
-  /* Gear sits below the "Fullscreen" button in #hud; override to move it. */
-  --tn-gear-top: calc(var(--safe-top) + 52px);
-  font: 14px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Dev tool: dense, same tokens as the game UI. Opened from the ⋯ sheet ("Tuning"). */
+  --tn-accent: var(--leaf);
+  --tn-changed: var(--terracotta);
+  --tn-text: var(--ink);
+  --tn-dim: var(--ink-2);
+  --tn-line: var(--line);
+  --tn-fill: rgba(38, 33, 48, 0.06);
+  --tn-fill-strong: rgba(38, 33, 48, 0.14);
+  --tn-gear-top: calc(var(--safe-top) + 64px);
+  font: 14px/1.3 var(--font-body);
   color: var(--tn-text);
   -webkit-text-size-adjust: 100%;
 }
@@ -270,19 +488,23 @@ body {
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  border: 0;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--glass);
   font-size: 22px;
-  line-height: 38px;
+  line-height: 40px;
   text-align: center;
+}
+/* The ⋯ sheet's "Tuning" row replaces the floating gear (which stays in the DOM). */
+.tn-gear {
+  display: none;
 }
 .tn-gear-changed {
   border-color: var(--tn-changed);
   color: var(--tn-changed);
 }
 .tn-gear-open {
-  background: rgba(40, 60, 30, 0.9);
+  background: var(--surface);
 }
 
 .tn-sheet {
@@ -298,22 +520,21 @@ body {
   box-sizing: border-box;
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
-  border-radius: 16px 16px 0 0;
-  border-top: 1px solid var(--tn-line);
-  background: rgba(12, 18, 14, 0.84);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.35);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: rgba(255, 255, 255, 0.96);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -8px 30px rgba(38, 33, 48, 0.25);
   transform: translateY(105%);
   visibility: hidden;
   pointer-events: none;
-  transition: transform 0.22s ease, visibility 0s linear 0.22s;
+  transition: transform 0.22s var(--ease-out), visibility 0s linear 0.22s;
 }
 .tn-sheet.tn-open {
   transform: none;
   visibility: visible;
   pointer-events: auto;
-  transition: transform 0.22s ease, visibility 0s;
+  transition: transform 0.22s var(--ease-out), visibility 0s;
 }
 
 .tn-header {
@@ -335,8 +556,7 @@ body {
   background: var(--tn-line);
 }
 .tn-title {
-  font-weight: 600;
-  font-size: 16px;
+  font: 600 18px var(--font-display);
 }
 .tn-close {
   width: 44px;
@@ -346,6 +566,7 @@ body {
   background: none;
   font-size: 18px;
   color: var(--tn-dim);
+  border-radius: var(--r-sm);
 }
 
 .tn-body {
@@ -372,8 +593,7 @@ body {
   border: 0;
   background: none;
   text-align: left;
-  font-weight: 600;
-  font-size: 15px;
+  font: 600 16px var(--font-display);
 }
 .tn-chevron {
   display: inline-block;
@@ -392,7 +612,7 @@ body {
   padding: 1px 6px;
   border-radius: 9px;
   background: var(--tn-changed);
-  color: #1b1b10;
+  color: #fff;
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -467,13 +687,13 @@ body {
   height: 40px;
   padding: 0;
   border: 1px solid var(--tn-line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+  background: var(--tn-fill);
   font-size: 22px;
   line-height: 38px;
 }
 .tn-step:active {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--tn-fill-strong);
 }
 
 .tn-range {
@@ -490,26 +710,27 @@ body {
 .tn-range::-webkit-slider-runnable-track {
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--tn-fill-strong);
 }
 .tn-range::-moz-range-track {
   height: 6px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--tn-fill-strong);
 }
 .tn-range::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 32px;
   height: 32px;
   margin-top: -13px;
-  border: 2px solid rgba(0, 0, 0, 0.35);
+  border: 3px solid #fff;
   border-radius: 50%;
   background: var(--tn-accent);
+  box-shadow: var(--shadow-sm);
 }
 .tn-range::-moz-range-thumb {
   width: 30px;
   height: 30px;
-  border: 2px solid rgba(0, 0, 0, 0.35);
+  border: 3px solid #fff;
   border-radius: 50%;
   background: var(--tn-accent);
 }
@@ -524,7 +745,7 @@ body {
   display: flex;
   margin-top: 4px;
   border: 1px solid var(--tn-line);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
 }
 .tn-seg-btn {
@@ -533,15 +754,15 @@ body {
   padding: 0 6px;
   border: 0;
   border-left: 1px solid var(--tn-line);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--tn-fill);
 }
 .tn-seg-btn:first-child {
   border-left: 0;
 }
 .tn-seg-btn.tn-on {
   background: var(--tn-accent);
-  color: #10200a;
-  font-weight: 600;
+  color: #fff;
+  font-weight: 700;
 }
 .tn-changed .tn-seg-btn.tn-on {
   background: var(--tn-changed);
@@ -560,8 +781,8 @@ body {
   padding: 0;
   border: 0;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.22);
-  transition: background 0.15s ease;
+  background: var(--tn-fill-strong);
+  transition: background 0.15s var(--ease-out);
 }
 .tn-knob {
   position: absolute;
@@ -571,7 +792,8 @@ body {
   height: 26px;
   border-radius: 50%;
   background: #fff;
-  transition: transform 0.15s ease;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s var(--ease-out);
 }
 .tn-switch.tn-on {
   background: var(--tn-accent);
@@ -587,7 +809,7 @@ body {
   flex: none;
   padding: 8px 12px calc(var(--safe-bottom) + 8px);
   border-top: 1px solid var(--tn-line);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-2);
 }
 .tn-msg {
   min-height: 0;
@@ -600,7 +822,7 @@ body {
   color: var(--tn-accent);
 }
 .tn-msg-error {
-  color: #ff8a7a;
+  color: var(--danger);
 }
 .tn-io[hidden] {
   display: none;
@@ -611,8 +833,8 @@ body {
   box-sizing: border-box;
   padding: 8px;
   border: 1px solid var(--tn-line);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.45);
+  border-radius: 10px;
+  background: #fff;
   color: var(--tn-text);
   font: 16px/1.3 ui-monospace, Menlo, Consolas, monospace;
   resize: none;
@@ -639,24 +861,25 @@ body {
   min-height: 44px;
   padding: 0 10px;
   border: 1px solid var(--tn-line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: #fff;
   font-size: 13px;
+  font-weight: 700;
   white-space: nowrap;
 }
 .tn-btn:active {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--tn-fill-strong);
 }
-.tn-btn-primary {
+.tn-root .tn-btn-primary {
+  border-color: transparent;
   background: var(--tn-accent);
-  color: #10200a;
-  font-weight: 600;
+  color: #fff;
 }
-.tn-btn-danger {
-  color: #ffb0a3;
+.tn-root .tn-btn-danger {
+  color: var(--danger);
 }
-.tn-btn-danger.tn-armed {
-  background: #b3382a;
+.tn-root .tn-btn-danger.tn-armed {
+  background: var(--danger);
   color: #fff;
 }
 .tn-counter {
@@ -670,56 +893,74 @@ body {
 }
 
 /* ==========================================================================
-   Loft picker (src/input/loftPicker.ts)
+   Loft picker (src/input/loftPicker.ts) — segmented control, same look as the
+   menu's difficulty / match-length pickers (.mn-seg).
    ========================================================================== */
 .lp-root {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--safe-bottom) + 12px);
+  bottom: calc(var(--safe-bottom) + 10px);
   transform: translateX(-50%);
   z-index: 500;
   display: flex;
+  gap: 3px;
   max-width: calc(100vw - 16px);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.5);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-  font: 600 15px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #fff;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: 20px;
+  font: 700 14px/1 var(--font-body);
   touch-action: manipulation;
 }
 .lp-btn {
-  min-width: 76px;
-  white-space: nowrap;
-  min-height: 48px;
-  padding: 0 14px;
-  border: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.25);
-  background: none;
-  font: inherit;
-  color: inherit;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.lp-btn {
+  min-width: 74px;
+  min-height: 54px;
+  padding: 0 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
+  font: inherit;
+  color: var(--ink-2);
+  white-space: nowrap;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-1), color var(--dur-1), transform var(--dur-1) var(--ease-out);
+}
+.lp-btn:active {
+  transform: scale(0.96);
 }
 .lp-icon {
   display: block;
   overflow: visible;
 }
-.lp-btn:first-child {
-  border-left: 0;
-}
 .lp-btn[aria-checked='true'] {
-  background: #8fd16a;
-  color: #10200a;
+  background: var(--terracotta);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15);
+}
+@media (max-width: 370px) {
+  .mh-row {
+    height: 25px;
+  }
+  .mh-name {
+    font-size: 13px;
+  }
+  .mh-pts {
+    font-size: 19px;
+  }
+  .mh-banner-title {
+    font-size: 22px;
+  }
+}
+@media (max-width: 340px) {
+  .lp-btn {
+    min-width: 66px;
+    padding: 0 6px;
+  }
 }
 
 /* ---- "Touch here" cue (visual only; the gesture starts anywhere) ---- */
@@ -738,28 +979,32 @@ body {
 .touch-hint-text {
   position: absolute;
   left: 50%;
-  bottom: 62px;
+  /* Below the marker: the far court (jack zone) above it stays visible. */
+  top: 54px;
   transform: translateX(-50%);
   width: max-content;
   max-width: 80vw;
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font: 15px/1.35 system-ui, sans-serif;
+  padding: 9px 16px;
+  border-radius: var(--r-md);
+  font: 600 15px/1.35 var(--font-body);
   text-align: center;
+}
+.touch-hint-text b {
+  font-weight: 900;
+  color: var(--terracotta-ink);
 }
 .touch-hint-marker {
   position: absolute;
   left: 50%;
   top: 0;
-  width: 76px;
-  height: 76px;
-  margin: -38px 0 0 -38px;
+  width: 72px;
+  height: 72px;
+  margin: -36px 0 0 -36px;
+  box-sizing: border-box;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  border: 2px solid rgba(255, 255, 255, 0.7);
-  box-shadow: 0 0 18px rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.28);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 10px rgba(38, 33, 48, 0.25), inset 0 0 0 6px rgba(204, 74, 22, 0.18);
   animation: touch-hint-pulse 1.6s ease-in-out infinite;
 }
 .touch-hint-arrow {
@@ -768,39 +1013,41 @@ body {
   top: 50%;
   width: 14px;
   height: 14px;
-  margin: -12px 0 0 -7px;
-  border-right: 3px solid #fff;
-  border-bottom: 3px solid #fff;
+  margin: -12px 0 0 -9px;
+  border-right: 4px solid var(--terracotta);
+  border-bottom: 4px solid var(--terracotta);
+  border-radius: 0 0 3px 0;
   transform: rotate(45deg);
   animation: touch-hint-pull 1.6s ease-in-out infinite;
 }
 .touch-hint.is-faint {
-  opacity: 0.4;
+  opacity: 0.5;
 }
 .touch-hint.is-faint .touch-hint-text {
   display: none;
 }
 @keyframes touch-hint-pulse {
-  0%, 100% { transform: scale(0.92); opacity: 0.7; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%, 100% { transform: scale(0.92); opacity: 0.75; }
+  50% { transform: scale(1.06); opacity: 1; }
 }
 @keyframes touch-hint-pull {
-  0%, 100% { transform: translateY(-5px) rotate(45deg); opacity: 0.4; }
+  0%, 100% { transform: translateY(-5px) rotate(45deg); opacity: 0.5; }
   50% { transform: translateY(7px) rotate(45deg); opacity: 1; }
 }
 
 /* ==========================================================================
    Match HUD (src/app/matchHud.ts)
-   Top centre, stacked: scoreboard pill, turn chip, settle message. Turn banner
-   (~1.2 s) high on the screen, shrinking toward the chip. Cards at the bottom.
+   Top left: score bar (a row per team: mark, name, boules-left dots, points;
+   the target; a turn line) with the settle toast under it. Turn banner
+   (~1.2 s) low centre, above the loft picker. Cards at the bottom.
    ========================================================================== */
 .mh-team-a {
   --tc: var(--team-a);
-  --tc-dark: var(--team-a-dark);
+  --tc-soft: var(--team-a-soft);
 }
 .mh-team-b {
   --tc: var(--team-b);
-  --tc-dark: var(--team-b-dark);
+  --tc-soft: var(--team-b-soft);
 }
 .mh-root {
   position: absolute;
@@ -808,259 +1055,333 @@ body {
   pointer-events: none;
 }
 
-.mh-score {
-  position: absolute;
-  top: calc(var(--safe-top) + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: stretch;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 20px;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.55);
-  font-weight: 700;
-  font-size: 15px;
-  white-space: nowrap;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+/* Team marks: Blue = circle, Red = diamond (colour + shape). */
+.mh-mark {
+  flex: none;
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--tc, var(--ink-2));
 }
-.mh-target {
-  position: absolute;
-  top: calc(var(--safe-top) + 51px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 11px;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-  color: rgba(255, 255, 255, 0.72);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-  white-space: nowrap;
+.mh-team-b .mh-mark,
+.mh-team-b.mh-mark {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  transform: rotate(45deg);
 }
-.mh-side {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 13px;
-  box-shadow: inset 0 -3px 0 transparent;
-  transition: box-shadow 0.2s;
-}
-.mh-side.mh-team-a {
-  background: linear-gradient(90deg, rgba(70, 120, 220, 0.8), rgba(70, 120, 220, 0.3));
-}
-.mh-side.mh-team-b {
-  flex-direction: row-reverse;
-  background: linear-gradient(270deg, rgba(235, 105, 60, 0.8), rgba(235, 105, 60, 0.3));
-}
-.mh-side.is-active {
-  box-shadow: inset 0 -3px 0 #fff;
-}
-.mh-pts {
-  min-width: 1ch;
-  font-size: 22px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-.mh-dash {
-  align-self: center;
-  padding: 0 1px;
-  opacity: 0.75;
-}
-
-.mh-chip {
-  position: absolute;
-  top: calc(var(--safe-top) + 67px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 11px;
-  border: 1.5px solid var(--tc, rgba(255, 255, 255, 0.5));
-  border-radius: 16px;
-  background: rgba(0, 0, 0, 0.55);
-  font-size: 14px;
-  font-weight: 600;
-  white-space: nowrap;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
-}
-.mh-chip:not(.mh-team-a):not(.mh-team-b) {
-  display: none;
-}
-.mh-chip-dots {
-  display: flex;
-  gap: 7px;
-  padding-left: 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.3);
-}
-.mh-chip.is-delayed {
-  animation: mh-chip-in 0.3s 0.95s ease-out both;
-}
-@keyframes mh-chip-in {
-  from { opacity: 0; transform: translateX(-50%) scale(0.8); }
-  to { opacity: 1; transform: translateX(-50%); }
-}
-
 .mh-dots {
   display: inline-flex;
+  align-items: center;
   gap: 3px;
 }
 .mh-dots i {
   box-sizing: border-box;
-  width: 11px;
-  height: 11px;
+  width: 9px;
+  height: 9px;
   border: 2px solid var(--tc);
   border-radius: 50%;
+}
+.mh-dots.mh-team-b i {
+  width: 8px;
+  height: 8px;
+  margin: 0 0.5px;
+  border-radius: 1.5px;
+  transform: rotate(45deg);
 }
 .mh-dots i.on {
   background: var(--tc);
 }
 
-.mh-msg {
+.mh-top {
   position: absolute;
-  top: calc(var(--safe-top) + 105px);
-  left: 50%;
-  transform: translateX(-50%);
-  box-sizing: border-box;
-  width: max-content;
-  max-width: calc(100vw - 120px);
-  text-wrap: balance;
-  padding: 6px 13px;
-  border-radius: 14px;
-  border-left: 4px solid var(--tc, rgba(255, 255, 255, 0.6));
-  background: rgba(0, 0, 0, 0.6);
+  top: calc(var(--safe-top) + var(--edge));
+  left: calc(var(--safe-left) + var(--edge));
+  max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 2 * var(--edge) - 54px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.mh-bar {
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas: 'rows target' 'chip chip';
+  border-radius: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.mh-rows {
+  grid-area: rows;
+  display: grid;
+  grid-template-columns: auto auto auto auto;
+  row-gap: 2px;
+  padding: 5px 0 5px 5px;
+}
+.mh-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: center;
+  column-gap: 7px;
+  height: 27px;
+  padding: 0 8px 0 7px;
+  border-radius: 9px;
+  transition: background var(--dur-2);
+}
+.mh-row.is-active {
+  background: var(--tc-soft);
+}
+.mh-name {
+  min-width: 0;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  font-weight: 800;
 }
-.mh-msg.is-in {
-  animation: mh-pop 0.25s ease-out both;
+.mh-row-dots {
+  display: flex;
+  padding: 0 2px;
 }
-@keyframes mh-pop {
-  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
-  to { opacity: 1; transform: translateX(-50%); }
+.mh-pts {
+  min-width: 1.3ch;
+  text-align: right;
+  font: 600 21px/1 var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.mh-target {
+  grid-area: target;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  margin: 7px 0;
+  padding: 0 10px 0 9px;
+  border-left: 1px solid var(--line);
+  line-height: 1;
+}
+.mh-target span {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: var(--ink-2);
+}
+.mh-target b {
+  font: 600 19px/1 var(--font-display);
+  color: var(--ink);
+}
+.mh-chip {
+  grid-area: chip;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px 7px;
+  background: var(--tc-soft, transparent);
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.mh-chip:not(.mh-team-a):not(.mh-team-b),
+.mh-root.has-card .mh-chip {
+  display: none;
+}
+.mh-chip.is-delayed .mh-chip-text {
+  animation: fade-in 0.3s var(--ease-out) both;
+}
+/* The computer is thinking: its mark pulses. */
+#app[data-ai='thinking'] .mh-chip .mh-mark {
+  animation: think 0.9s ease-in-out infinite;
+}
+@keyframes think {
+  50% { opacity: 0.25; }
 }
 
+/* Settle toast: under the bar, never over the jack; auto-hides (matchHud.ts). */
+.mh-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: 8px 14px 8px 12px;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: normal;
+}
+.mh-msg:not(.mh-team-a):not(.mh-team-b) .mh-mark {
+  background: var(--sun);
+  box-shadow: 0 0 0 1px rgba(38, 33, 48, 0.25);
+}
+.mh-msg.is-in {
+  animation: toast-in var(--dur-2) var(--ease-out) both;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Turn banner */
 .mh-banner {
   position: absolute;
   left: 16px;
   right: 16px;
-  top: calc(var(--safe-top) + 132px);
+  /* Low on the screen, above the loft picker: the jack is always further up. */
+  bottom: calc(var(--safe-bottom) + 96px);
+  display: flex;
+  justify-content: center;
+  opacity: 0;
+  text-align: center;
+}
+.mh-banner.is-on {
+  animation: mh-banner 1.25s var(--ease-out) both;
+}
+.mh-banner-box {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  opacity: 0;
-  text-align: center;
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  gap: 6px;
+  max-width: 100%;
+  padding: 16px 22px 12px;
+  border-radius: var(--r-lg);
+  background: linear-gradient(var(--tc, var(--sun)) 0 0) top / 100% 6px no-repeat, var(--glass-strong);
+  box-shadow: var(--shadow-lg);
+  color: var(--ink);
 }
-.mh-banner.is-on {
-  animation: mh-banner 1.25s ease both;
+.mh-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.mh-banner-head .mh-mark {
+  width: 14px;
+  height: 14px;
+}
+.mh-team-b .mh-banner-head .mh-mark {
+  width: 12px;
+  height: 12px;
 }
 .mh-banner-title {
-  padding: 10px 22px;
-  border: 2px solid var(--tc, #fff);
-  border-radius: 20px;
-  background: color-mix(in srgb, var(--tc-dark, #222) 88%, transparent);
-  font-size: 25px;
-  font-weight: 800;
-  line-height: 1.15;
+  font: 600 25px/1.15 var(--font-display);
+  text-wrap: balance;
 }
 .mh-banner-hint {
-  padding: 3px 10px;
-  border-radius: 10px;
-  background: rgba(0, 0, 0, 0.5);
   font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
 }
 .mh-banner-dots {
   display: flex;
   gap: 14px;
-  padding: 4px 12px;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.45);
 }
 .mh-banner-dots .mh-dots i {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+}
+.mh-banner-dots .mh-dots.mh-team-b i {
+  width: 10px;
+  height: 10px;
+  margin: 0 1px;
 }
 @keyframes mh-banner {
-  0% { opacity: 0; transform: translateY(10px) scale(0.85); }
+  0% { opacity: 0; transform: translateY(16px) scale(0.9); }
   14% { opacity: 1; transform: none; }
-  74% { opacity: 1; transform: none; }
-  100% { opacity: 0; transform: translateY(-13vh) scale(0.4); }
+  78% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(10px) scale(0.96); }
 }
 
-.mh-card {
-  position: absolute;
-  left: calc(var(--safe-left) + 16px);
-  right: calc(var(--safe-right) + 16px);
-  bottom: calc(var(--safe-bottom) + 16px);
-  padding: 16px 16px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-top: 5px solid var(--tc, rgba(255, 255, 255, 0.4));
-  background: rgba(12, 18, 14, 0.86);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  text-align: center;
-  pointer-events: auto;
-  touch-action: manipulation;
-}
+/* Cards */
+
 .mh-card.is-in {
-  animation: mh-card-in 0.3s ease-out both;
+  animation: card-in 0.32s var(--ease-out) both;
 }
-@keyframes mh-card-in {
-  from { opacity: 0; transform: translateY(24px); }
-  to { opacity: 1; transform: none; }
+.mh-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.mh-card:not(.mh-team-a):not(.mh-team-b) .mh-card-head .mh-mark {
+  display: none;
+}
+.mh-card-head .mh-mark {
+  width: 16px;
+  height: 16px;
+}
+.mh-team-b .mh-card-head .mh-mark {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
 }
 .mh-card-title {
-  font-size: 30px;
-  line-height: 1.15;
-  font-weight: 800;
-  color: var(--tc, #fff);
+  font: 600 29px/1.15 var(--font-display);
+  color: var(--ink);
 }
 .mh-card-detail {
   margin-top: 2px;
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-2);
 }
 .mh-card-score {
-  margin: 8px 0 14px;
-  font-size: 18px;
-  font-weight: 700;
+  display: inline-block;
+  margin: 10px 0 14px;
+  padding: 5px 14px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: 17px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .mh-over .mh-card-detail {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .mh-btn-row {
   display: flex;
   gap: 10px;
 }
-.mh-btn {
-  flex: 1;
-  width: 100%;
-  min-height: 52px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font: 700 18px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
+
+/* Match over: a festive card for a win (bunting + a little bounce). */
+.mh-bunting {
+  display: none;
+  margin: -14px -16px 6px;
+  height: 26px;
 }
-.mh-btn:active {
-  background: rgba(255, 255, 255, 0.25);
+.mh-bunting svg {
+  display: block;
 }
-.mh-btn.mh-primary {
-  border: 0;
-  background: #8fd16a;
-  color: #10200a;
+.mh-over.is-celebrate .mh-bunting {
+  display: block;
 }
-.mh-btn.mh-primary:active {
-  background: #a9e287;
+/* The bunting replaces the team band. */
+.mh-over.is-celebrate {
+  overflow: hidden;
+  padding-top: 14px;
+  background: var(--glass-strong);
+}
+.mh-over .mh-card-title {
+  font-size: 32px;
+}
+.mh-over.is-celebrate.is-in {
+  animation: card-in-bounce 0.55s var(--ease-spring) both;
+}
+.mh-over.is-celebrate .mh-bunting path[fill] {
+  transform-origin: center top;
+  transform-box: fill-box;
+  animation: flag-sway 2.4s ease-in-out infinite;
+}
+.mh-over.is-celebrate .mh-bunting path[fill]:nth-child(odd) {
+  animation-delay: -1.2s;
+}
+@keyframes flag-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
 }
 
 /* ==========================================================================
@@ -1073,8 +1394,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 16px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  color: #fff;
+  font: 16px/1.3 var(--font-body);
+  color: var(--ink);
   touch-action: manipulation;
 }
 .mn-root[hidden] {
@@ -1084,193 +1405,250 @@ body {
   z-index: 2000;
   flex-direction: column;
   gap: 18px;
-  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px);
-  background: linear-gradient(rgba(10, 22, 14, 0.5), rgba(10, 22, 14, 0.84));
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
+  box-sizing: border-box;
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 28px);
+  background:
+    radial-gradient(120% 55% at 50% 18%, rgba(255, 255, 255, 0) 30%, rgba(31, 60, 120, 0.18) 100%),
+    linear-gradient(rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.5) 100%);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+.mn-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 .mn-logo {
+  position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  margin-bottom: -2px;
+  gap: 6px;
+  padding-bottom: 6px;
+}
+.mn-logo::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 0;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(38, 33, 48, 0.4), transparent);
 }
 .mn-ball {
   display: block;
-  width: 46px;
-  height: 46px;
+  flex: none;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+  box-shadow: inset -3px -4px 6px rgba(0, 0, 0, 0.25);
 }
 .mn-ball-a {
-  background: radial-gradient(circle at 35% 30%, #e6f0ff, #6a93d8 45%, #2a3f66);
+  background: radial-gradient(circle at 34% 30%, #ffffff 0, #8fb4f5 18%, var(--team-a) 55%, #133f8f 100%);
 }
 .mn-ball-b {
-  background: radial-gradient(circle at 35% 30%, #ffe6d6, #d9784a 45%, #6b2f18);
+  background: radial-gradient(circle at 34% 30%, #ffffff 0, #f59aa5 18%, var(--team-b) 55%, #8f1325 100%);
 }
 .mn-jack {
-  width: 16px;
-  height: 16px;
-  margin-bottom: 4px;
-  background: radial-gradient(circle at 35% 30%, #fff3b0, #ffd23a 55%, #a07a10);
+  width: 15px;
+  height: 15px;
+  margin-bottom: 2px;
+  background: radial-gradient(circle at 34% 30%, #fffbe6 0, var(--sun) 50%, #c48a00 100%);
 }
 .mn-title {
-  margin: 0 0 14px;
-  font-size: 52px;
-  line-height: 1;
-  font-weight: 800;
+  margin: 0;
+  font: 700 60px/0.95 var(--font-display);
   letter-spacing: 0.5px;
-  text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
+  color: #fff;
+  text-shadow:
+    0 2px 0 var(--terracotta),
+    0 4px 0 var(--terracotta),
+    0 6px 0 #a83b10,
+    0 10px 18px rgba(38, 33, 48, 0.45);
+}
+.mn-tagline {
+  margin-top: 6px;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: var(--ink-2);
 }
 .mn-buttons {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  width: min(86vw, 360px);
+  gap: 12px;
+  width: min(100%, 380px);
 }
 .mn-btn {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 78px;
-  padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 20px;
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  gap: 14px;
+  width: 100%;
+  min-height: 70px;
+  padding: 10px 16px 10px 14px;
+  border: 0;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--ink);
+  text-align: left;
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-1) var(--ease-out);
 }
 .mn-btn:active {
   transform: scale(0.98);
-  filter: brightness(1.15);
 }
-.mn-practice {
-  border-color: transparent;
-  background: #8fd16a;
-  color: #10200a;
+.mn-btn-art {
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  width: 52px;
+  height: 46px;
+  padding-bottom: 8px;
+  box-sizing: border-box;
+  border-radius: 14px;
 }
-.mn-match {
-  background: linear-gradient(90deg, var(--team-a-dark), var(--team-b-dark));
+.mn-btn-art .mn-ball {
+  width: 20px;
+  height: 20px;
 }
+.mn-btn-art .mn-jack {
+  width: 9px;
+  height: 9px;
+}
+.mn-practice .mn-btn-art {
+  background: #fff4d1;
+}
+.mn-vs .mn-btn-art {
+  background: var(--team-a-soft);
+}
+.mn-match .mn-btn-art {
+  background: var(--lavender-soft);
+}
+.mn-btn-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mn-btn-title {
+  font: 600 20px/1.15 var(--font-display);
+}
+.mn-btn-sub {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+/* "vs computer" card holds its difficulty picker. */
 .mn-vs-box {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
 }
-.mn-vs {
-  background: linear-gradient(90deg, var(--team-a-dark), #2b2b2b 55%, #3a3a3a);
+.mn-vs-box .mn-btn {
+  background: none;
+  box-shadow: none;
 }
-.mn-seg {
-  display: flex;
-  padding: 3px;
-  gap: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.35);
+.mn-vs-box .mn-seg {
+  margin: 0 10px 10px;
 }
 .mn-length {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-radius: var(--r-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
 }
 .mn-length-label {
-  padding-left: 4px;
+  padding-left: 6px;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--ink-2);
+}
+/* Segmented control (menu); matches the loft picker. */
+.mn-seg {
+  display: flex;
+  gap: 3px;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--surface-2);
 }
 .mn-seg-btn {
   flex: 1;
-  min-height: 40px;
+  min-height: 44px;
   border: 0;
-  border-radius: 11px;
+  border-radius: 12px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.75);
-  font: 700 15px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: var(--ink-2);
+  font: 800 15px var(--font-body);
   touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-1), color var(--dur-1);
 }
 .mn-seg-btn[aria-checked='true'] {
-  background: #8fd16a;
-  color: #10200a;
-}
-.mn-mute {
-  position: absolute;
-  top: calc(var(--safe-top) + 8px);
-  right: calc(var(--safe-right) + 8px);
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--terracotta);
   color: #fff;
-  touch-action: manipulation;
-  -webkit-tap-highlight-color: transparent;
-}
-.mn-mute:active {
-  background: rgba(60, 90, 40, 0.8);
-}
-.mn-btn-title {
-  font-size: 21px;
-  font-weight: 800;
-}
-.mn-btn-sub {
-  font-size: 13px;
-  opacity: 0.75;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15);
 }
 .mn-build {
   position: absolute;
-  bottom: calc(var(--safe-bottom) + 12px);
-  font: 11px/1.2 ui-monospace, Menlo, Consolas, monospace;
-  color: rgba(255, 255, 255, 0.5);
+  bottom: calc(var(--safe-bottom) + 8px);
+  padding: 1px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.6);
+  font: 11px/1.4 ui-monospace, Menlo, Consolas, monospace;
+  color: var(--ink-2);
 }
 
 .mn-confirm {
   z-index: 2100;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(38, 33, 48, 0.45);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
 }
 .mn-confirm-box {
   width: min(86vw, 340px);
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 18px;
-  background: rgba(18, 26, 20, 0.97);
+  box-sizing: border-box;
+  padding: 22px 18px 18px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
   text-align: center;
+  animation: pop-in var(--dur-2) var(--ease-spring) both;
 }
 .mn-confirm-title {
-  font-size: 20px;
-  font-weight: 800;
+  font: 600 23px/1.15 var(--font-display);
 }
 .mn-confirm-text {
-  margin: 6px 0 16px;
-  color: rgba(255, 255, 255, 0.7);
+  margin: 8px 0 18px;
+  font-weight: 600;
+  color: var(--ink-2);
 }
 .mn-btn-row {
   display: flex;
   gap: 10px;
 }
 .mn-small {
-  flex: 1;
   min-height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  font: 700 16px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  touch-action: manipulation;
+  font-size: 17px;
 }
 .mn-small.mn-danger {
   border-color: transparent;
-  background: #b3382a;
+  background: var(--danger);
+  color: #fff;
 }
 
 /* While the start menu is up, only the menu shows. */
@@ -1282,24 +1660,97 @@ body.is-dialog .tn-root {
   visibility: hidden;
 }
 
-/* A card at the bottom replaces the turn chip. */
-.mh-root.has-card .mh-chip {
-  display: none;
-}
-
 /* Short phones: tighten the menu so all three choices fit. */
-@media (max-height: 620px) {
+@media (max-height: 680px) {
   .mn-root {
-    gap: 10px;
-  }
-  .mn-btn {
-    min-height: 62px;
+    gap: 12px;
   }
   .mn-title {
-    margin-bottom: 6px;
-    font-size: 42px;
+    font-size: 50px;
   }
-  .mn-seg-btn {
-    min-height: 34px;
+  .mn-logo .mn-ball {
+    width: 34px;
+    height: 34px;
+  }
+  .mn-logo .mn-jack {
+    width: 12px;
+    height: 12px;
+  }
+  .mn-tagline {
+    display: none;
+  }
+  .mn-btn {
+    min-height: 60px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+  }
+  .mn-buttons {
+    gap: 9px;
+  }
+}
+
+/* ==========================================================================
+   Shared motion. Short ease-out; reduced motion keeps fades, drops movement.
+   ========================================================================== */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes card-in-bounce {
+  0% { opacity: 0; transform: translateY(40px) scale(0.94); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes mh-banner-fade {
+  0% { opacity: 0; }
+  14%, 74% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-sheet,
+  .mn-confirm-box,
+  .hud-card,
+  .mh-card.is-in,
+  .mh-over.is-celebrate.is-in,
+  .mh-msg.is-in {
+    animation-name: fade-in;
+    animation-timing-function: linear;
+  }
+  .mh-banner.is-on {
+    animation-name: mh-banner-fade;
+  }
+  .touch-hint-marker,
+  .touch-hint-arrow,
+  .mh-over.is-celebrate .mh-bunting path[fill],
+  #app[data-ai='thinking'] .mh-chip .mh-mark {
+    animation: none;
+  }
+  .touch-hint-arrow {
+    transform: rotate(45deg);
+  }
+  .hud-more,
+  .mn-mute,
+  .mn-btn,
+  .lp-btn,
+  .hud-next,
+  .mh-btn,
+  .mn-small {
+    transition: none;
+  }
+  .hud-more:active,
+  .mn-mute:active,
+  .mn-btn:active,
+  .lp-btn:active,
+  .hud-next:active,
+  .mh-btn:active,
+  .mn-small:active {
+    transform: none;
   }
 }

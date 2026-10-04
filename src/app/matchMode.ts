@@ -45,6 +45,8 @@ export const setupVsComputer = (difficulty: AiDifficulty, length: MatchLength): 
 export interface MatchMode extends Mode {
   /** Who plays which team; call before entering (a rematch keeps it). */
   setSetup(setup: MatchSetup): void;
+  /** Starts a fresh match with the same setup (the ⋯ sheet's "Restart match"). */
+  restart(): void;
 }
 
 /** Pause between the last boule coming to rest and the end card (s): time to see the scoring rings. */
@@ -151,7 +153,12 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
       else if (end.winner) ctx.audio.chime('score');
       if (over && state.winner) {
         const ends = state.endNumber;
-        matchHud.showMatchOver({ title: matchOverTitle(state.winner, state.score, v), detail: `after ${ends} end${ends === 1 ? '' : 's'}`, team: state.winner });
+        matchHud.showMatchOver({
+          title: matchOverTitle(state.winner, state.score, v),
+          detail: `after ${ends} end${ends === 1 ? '' : 's'}`,
+          team: state.winner,
+          celebrate: setup.seats[state.winner] === 'human',
+        });
       } else {
         matchHud.showEndCard({ ...endCardView(end, v), score: scoreLine(state.score, v) });
       }
@@ -257,6 +264,7 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     setSetup(next) {
       setup = next;
     },
+    restart: newMatch,
     enter() {
       ctx.hud.setMode('match');
       ctx.hud.showEndCard(null);
