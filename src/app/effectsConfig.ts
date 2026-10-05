@@ -56,7 +56,7 @@ export interface EffectsConfig {
 }
 
 export const effectsConfig: EffectsConfig = {
-  measure: { startMs: 650, drawMs: 550, holdMs: 900, tightGap: 0.08, maxMeasured: 4, lineWidth: 2.4, tickHalf: 5 },
+  measure: { startMs: 650, drawMs: 550, holdMs: 900, tightGap: 0, maxMeasured: 4, lineWidth: 2.4, tickHalf: 5 },
   carreau: { ...DEFAULT_CARREAU },
   burst: {
     carreau: { dust: 12, sparks: 16, ms: 950, puffPx: 46, sparkPx: 95 },

@@ -121,6 +121,7 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     },
     onAim(d: AiDecision) {
       app.dataset['ai'] = 'aiming';
+      clearMeasure();
       if (lastTurn) {
         lastTurn = { ...lastTurn, chip: t('turn.computerPlays') };
         matchHud.setChip(lastTurn);
@@ -371,6 +372,7 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     canAim: isHumanTurn,
     inProgress: () => state.phase !== 'matchOver' && (state.endNumber > 1 || state.throws.length > 0 || state.score.A + state.score.B > 0),
     onPreview(p: AimPreview | null) {
+      if (p) clearMeasure(); // never leave measuring labels over the aim view
       const ball = isHumanTurn() ? (state.phase === 'jack' ? 'jack' : 'boule') : null;
       preview.update(p, ball);
     },
