@@ -1,9 +1,11 @@
 /**
- * Clear late-afternoon light: a low warm-white sun with shadows fitted tightly to the court, a cool
- * blue sky / warm-bounce hemisphere fill (shade reads blue against the sun, with clear contrast),
- * a deep blue sky dome and only a little haze. Tone mapping, saturation grade, sun colour
- * temperature / direction / intensity, fill, shadow darkness, exposure and fog density are read
- * live from config.look (cheap: nothing is recomputed unless they change).
+ * Clear sunny afternoon: a warm-white sun (~5600 K) along the BAKED sun direction (art/lib/layout.py
+ * -> bakedLayout.ts; the static scenery's shadows are baked into lightmaps, src/render/bakedLight.ts),
+ * a soft sky-blue / dusty-ground hemisphere fill, a natural blue sky dome and gentle aerial haze.
+ * The real-time shadow map only holds the boules and the jack (nothing static casts), so it is
+ * fitted tightly around the court and stays crisp. Tone mapping, saturation grade, sun colour
+ * temperature / intensity, fill, shadow darkness, ambient occlusion, ground grain, exposure and fog
+ * density are read live from config.look. The sun direction is not tunable: it must match the bake.
  */
 import {
   ACESFilmicToneMapping,
@@ -23,6 +25,8 @@ import {
   type WebGLRenderer,
 } from 'three';
 import type { GameConfig, ToneMappingChoice } from '../tuning/config';
+import { setBakeStrength, setGroundDetail } from './bakedLight';
+import { BAKED_SUN } from './bakedLayout';
 import { setGradeSaturation } from './grade';
 import { createSky, SKY_STYLE } from './sky';
 
@@ -34,14 +38,15 @@ const TONE_MAPPINGS: Record<ToneMappingChoice, ToneMapping> = {
 };
 
 const STYLE = {
-  /** Fill from the sky (cool blue, so shade reads blue against the warm-white sun) and bounce from the warm ground. */
-  hemiSky: 0x8fb0ff,
-  hemiGround: 0xc58a52,
+  /** Fill from the sky (soft natural blue) and bounce from the pale dusty ground. */
+  hemiSky: 0xb4cbea,
+  hemiGround: 0xb3a184,
   /**
    * Exposure gain per tone-mapping curve, so switching curves in the panel keeps a similar mid-grey
    * (three's ACES pre-multiplies by 1/0.6; AgX darkens the mid-tones).
    */
   toneGain: { neutral: 1, agx: 1.25, aces: 0.6, none: 0.92 } as Record<ToneMappingChoice, number>,
+  /** Only the boules / jack render into it, fitted to the court: ~1 cm texels. */
   shadowMapSize: 2048,
   /** Distance of the sun from the court centre and the depth range of its shadow camera (m). */
   sunDistance: 40,
@@ -51,9 +56,12 @@ const STYLE = {
   shadowMargin: 0.4,
   shadowBias: -0.0004,
   shadowNormalBias: 0.03,
-  /** PCF blur radius in shadow-map texels (softer edges). */
-  shadowRadius: 6,
+  /** PCF blur radius in shadow-map texels (softer edges, like the baked penumbra). */
+  shadowRadius: 3,
   skyRadius: 70,
+  /** Ground grain (public/models/ground_detail.png): tile sizes of its two samples (m). */
+  grainTileA: 0.55,
+  grainTileB: 2.3,
 } as const;
 
 export interface CourtBounds {
@@ -113,15 +121,11 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
   const up = new Vector3();
   const rel = new Vector3();
   const worldUp = new Vector3(0, 1, 0);
-  let lastEl = NaN;
-  let lastAz = NaN;
   let lastTemp = NaN;
 
-  /** Points the sun along (elevation, azimuth) and fits its ortho shadow box around the court rectangle. */
-  function aimSun(elDeg: number, azDeg: number): void {
-    const el = (elDeg * Math.PI) / 180;
-    const az = (azDeg * Math.PI) / 180;
-    dir.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)); // toward the sun
+  /** Points the sun along the baked direction and fits its ortho shadow box around the court rectangle. */
+  function aimSun(): void {
+    dir.set(...BAKED_SUN.dir); // toward the sun
     sun.position.set(cx, 0, cz).addScaledVector(dir, STYLE.sunDistance);
     sky.setSunDirection(dir);
 
@@ -154,20 +158,19 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
     sc.updateProjectionMatrix();
   }
 
+  aimSun();
+
   return {
     update(camera) {
       const { look } = getConfig();
-      if (look.sunElevationDeg !== lastEl || look.sunAzimuthDeg !== lastAz) {
-        lastEl = look.sunElevationDeg;
-        lastAz = look.sunAzimuthDeg;
-        aimSun(lastEl, lastAz);
-      }
       if (look.sunTempK !== lastTemp) {
         lastTemp = look.sunTempK;
         kelvinToColor(lastTemp, sun.color);
       }
       sun.intensity = look.sunIntensity;
       sun.shadow.intensity = look.shadowStrength;
+      setBakeStrength(look.shadowStrength, look.aoStrength);
+      setGroundDetail(STYLE.grainTileA, STYLE.grainTileB, look.groundGrain);
       hemi.intensity = look.fillIntensity;
       const curve = look.toneMapping in TONE_MAPPINGS ? look.toneMapping : 'neutral';
       renderer.toneMapping = TONE_MAPPINGS[curve]; // three recompiles the affected programs on change

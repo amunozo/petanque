@@ -1,6 +1,7 @@
 /**
- * Cheap sky: one big inverted sphere with per-vertex colours (deep zenith blue -> clear pale-blue
- * horizon, plus a soft warm glow toward the sun). Follows the camera so it is always "infinitely" far.
+ * Cheap sky: one big inverted sphere with per-vertex colours (natural clear-day gradient: mid blue
+ * zenith -> softer blue -> hazy pale horizon, plus a faint warm-white glow toward the sun). Follows
+ * the camera so it is always "infinitely" far.
  */
 import { BackSide, BufferAttribute, Color, Mesh, MeshBasicMaterial, SphereGeometry, Vector3, type PerspectiveCamera } from 'three';
 import { gradeMaterial } from './grade';
@@ -10,10 +11,10 @@ import { gradeMaterial } from './grade';
  * sync with art/lib/palette.py "sky_horizon"). The horizon colour is also the fog colour.
  */
 export const SKY_STYLE = {
-  zenith: 0x1f5fd6,
-  mid: 0x5c9cf0,
-  horizon: 0xbcd9f4,
-  glow: 0xffe2a8,
+  zenith: 0x3d70b8,
+  mid: 0x6f9ed4,
+  horizon: 0xc6d6e4,
+  glow: 0xfff3dc,
   /** Elevation (rad) over which the pale horizon blends into the mid blue / the zenith. */
   hazeBand: 0.16,
   midBand: 0.7,
@@ -62,7 +63,7 @@ export function createSky(radius: number): Sky {
         c.lerp(mid, smooth(SKY_STYLE.hazeBand * 0.1, SKY_STYLE.hazeBand + 0.2, elev));
         c.lerp(zenith, smooth(SKY_STYLE.hazeBand, SKY_STYLE.midBand + 0.5, elev) * 0.9);
         const toSun = Math.max(0, v.dot(dir));
-        c.lerp(glow, Math.min(1, Math.pow(toSun, 6) * 0.55 + Math.pow(toSun, 40) * 0.5));
+        c.lerp(glow, Math.min(1, Math.pow(toSun, 8) * 0.35 + Math.pow(toSun, 60) * 0.5));
         col.setXYZ(i, c.r, c.g, c.b);
       }
       col.needsUpdate = true;

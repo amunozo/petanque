@@ -96,7 +96,7 @@ def build():
     mat = palette_material()
     objs = []
     for v in VARIANTS:
-        o = to_object(build_cypress(v), v["name"], mat, location_game=v["at"])
+        o = to_object(build_cypress(v), v["name"], mat, location_game=v["at"], smooth=True)
         triangulate(o)
         objs.append(o)
     return objs

@@ -4,7 +4,10 @@ small dependency-free post-pass that quantizes the vertex data (KHR_mesh_quantiz
 three's GLTFLoader reads natively, no decoder needed):
   NORMAL  float32 x3 -> int8 x3 (normalized, padded to 4 bytes)
   COLOR_0 float32 x3 -> uint8 x4 (normalized, alpha 1)
-Positions and indices stay as exported. That is ~45% smaller before gzip.
+  TEXCOORD_n float32 x2 -> uint16 x2 (normalized; only when every value is within 0..1)
+Positions and indices stay as exported. That is ~45% smaller before gzip. Images, textures and
+material texture references are dropped: the game builds its own materials and loads the few
+textures (leaf atlas, lightmaps) as separate files from public/models/.
 """
 from __future__ import annotations
 
@@ -34,7 +37,7 @@ def export_glb(objects, path: str) -> int:
         export_animations=False,
         export_skins=False,
         export_morph=False,
-        export_texcoords=False,       # no textures in this project
+        export_texcoords=True,        # leaf-card UVs, lightmap UVs
         export_normals=True,
         export_materials="EXPORT",
         export_image_format="AUTO",     # no images exist; "NONE" would also disable vertex-colour detection
@@ -118,6 +121,10 @@ def quantize_glb(path: str) -> None:
                 q.extend([max(0, min(255, round(c * 255))) for c in rgb] + [255])
             view = add_view(q.tobytes(), 4, 34962)
             new = {"bufferView": view, "componentType": 5121, "normalized": True, "count": count, "type": "VEC4"}
+        elif kind.startswith("TEXCOORD") and len(vals) and min(vals) >= 0.0 and max(vals) <= 1.0:
+            q = array("H", (max(0, min(65535, round(x * 65535))) for x in vals))
+            view = add_view(q.tobytes(), None, 34962)
+            new = {"bufferView": view, "componentType": 5123, "normalized": True, "count": count, "type": "VEC2"}
         else:  # copy as is (positions, indices)
             code, size = _COMPONENT[acc["componentType"]]
             target = 34963 if kind == "indices" else 34962
@@ -138,6 +145,13 @@ def quantize_glb(path: str) -> None:
     js["buffers"] = [{"byteLength": len(new_bin)}]
     for mat in js.get("materials", []):
         mat.pop("extensions", None)  # the game uses its own material
+        pbr = mat.get("pbrMetallicRoughness", {})
+        for key in ("baseColorTexture", "metallicRoughnessTexture"):
+            pbr.pop(key, None)
+        for key in ("normalTexture", "occlusionTexture", "emissiveTexture"):
+            mat.pop(key, None)
+    for key in ("images", "textures", "samplers"):
+        js.pop(key, None)
     js["extensionsUsed"] = ["KHR_mesh_quantization"]
     js["extensionsRequired"] = ["KHR_mesh_quantization"]
 

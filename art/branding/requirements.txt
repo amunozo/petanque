@@ -1,0 +1,5 @@
+# Extra Python packages for art/branding/ (icon + store graphics), on top of art/requirements.txt (bpy).
+#   art/.venv/bin/python -m pip install -r art/branding/requirements.txt
+pillow>=12
+fonttools>=4.60
+brotli>=1.1   # fontTools needs it to read the woff2 fonts in public/fonts

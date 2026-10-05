@@ -69,21 +69,56 @@ class MeshData:
         return (nx / ln, ny / ln, nz / ln)
 
 
-def to_object(data: MeshData, name: str, material, location_game: V3 = (0.0, 0.0, 0.0)):
-    """Creates a flat-shaded Blender object with a per-face-corner colour attribute 'Col'."""
+def to_object(data: MeshData, name: str, material, location_game: V3 = (0.0, 0.0, 0.0), smooth: bool = False,
+              uvs: list[tuple[float, float]] | None = None, normals: list[V3] | None = None,
+              vertex_colors: list[Color] | None = None):
+    """
+    Creates a Blender object with a per-face-corner colour attribute 'Col'.
+    Flat shaded with per-face colours by default. `smooth`: smooth normals, and each vertex gets the
+    average colour of its faces (soft colour transitions). Optional per-vertex `uvs` (layer 'UVMap'),
+    custom per-vertex `normals` (game coordinates, e.g. spherical foliage normals) and per-vertex
+    `vertex_colors` (override the face colours).
+    """
     mesh = bpy.data.meshes.new(name)
     mesh.from_pydata([(x, -z, y) for x, y, z in data.verts], [], [list(f) for f in data.faces])
     mesh.update()
+    smooth = smooth or normals is not None
     for p in mesh.polygons:
-        p.use_smooth = False
+        p.use_smooth = smooth
+    vcol = vertex_colors
+    if vcol is None and smooth:
+        acc = [[0.0, 0.0, 0.0, 0] for _ in data.verts]
+        for f, col in zip(data.faces, data.colors):
+            for i in f:
+                a = acc[i]
+                a[0] += col[0]
+                a[1] += col[1]
+                a[2] += col[2]
+                a[3] += 1
+        vcol = [(a[0] / a[3], a[1] / a[3], a[2] / a[3]) if a[3] else (1.0, 1.0, 1.0) for a in acc]
     attr = mesh.color_attributes.new(name="Col", type="FLOAT_COLOR", domain="CORNER")
     flat: list[float] = []
-    for poly, col in zip(mesh.polygons, data.colors):
-        for _ in range(poly.loop_total):
-            flat.extend((col[0], col[1], col[2], 1.0))
+    if vcol is not None:
+        for poly in mesh.polygons:
+            for vi in poly.vertices:
+                c = vcol[vi]
+                flat.extend((c[0], c[1], c[2], 1.0))
+    else:
+        for poly, col in zip(mesh.polygons, data.colors):
+            for _ in range(poly.loop_total):
+                flat.extend((col[0], col[1], col[2], 1.0))
     attr.data.foreach_set("color", flat)
     mesh.color_attributes.active_color = attr
     mesh.color_attributes.render_color_index = 0
+    if uvs is not None:
+        layer = mesh.uv_layers.new(name="UVMap")
+        loop_uv: list[float] = []
+        for poly in mesh.polygons:
+            for vi in poly.vertices:
+                loop_uv.extend(uvs[vi])
+        layer.data.foreach_set("uv", loop_uv)
+    if normals is not None:
+        mesh.normals_split_custom_set_from_vertices([(n[0], -n[2], n[1]) for n in normals])
     mesh.materials.append(material)
     obj = bpy.data.objects.new(name, mesh)
     obj.location = (location_game[0], -location_game[2], location_game[1])

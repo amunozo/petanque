@@ -5,17 +5,22 @@ The court rectangle matches the physics arena in src/tuning/config.ts (x -2..2, 
 and its top is exactly y = 0 (balls roll on it). Keep ARENA in sync with that config.
 Objects: court_gravel (y=0), court_boards (+ stakes), court_surround (packed earth of the square,
 limestone pavements in front of the houses of art/assets/houses.py, fields beyond the village).
-All flat per-face colours.
+The ground (gravel + surround) is smooth shaded with soft per-vertex colour patches; its grain comes
+from a small tiling detail texture (public/models/ground_detail.png, written here) and its light
+from the ground lightmap (lib/bake.py). The boards stay flat shaded.
 """
 from __future__ import annotations
 
 import math
+
+import os
 
 from lib.materials import palette_material
 from lib.mesh import MeshData, box, to_object
 from lib.modifiers import triangulate
 from lib.palette import P, mix, scale, tint
 from lib.rand import Rng, fbm, value_noise
+from lib.textures import ground_detail
 
 NAME = "court"
 SEED = 7
@@ -226,12 +231,17 @@ def _surround_color(x: float, z: float, k: int, rng: Rng):
     return scale(c, 1.0 + rng.jitter(0.03))
 
 
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 def build():
     rng = Rng(SEED)
+    ground_detail(os.path.join(ROOT, "public", "models", "ground_detail.png"))
     mat = palette_material()
     objs = []
-    for name, data in (("court_gravel", build_gravel(rng)), ("court_boards", build_boards(rng)), ("court_surround", build_surround(rng))):
-        o = to_object(data, name, mat)
+    for name, data, smooth in (("court_gravel", build_gravel(rng), True), ("court_boards", build_boards(rng), False),
+                               ("court_surround", build_surround(rng), True)):
+        o = to_object(data, name, mat, smooth=smooth)
         triangulate(o)
         objs.append(o)
     return objs

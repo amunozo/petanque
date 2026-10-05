@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 
+from lib.layout import sun_direction
 from lib.materials import palette_material
 from lib.mesh import MeshData, to_object
 from lib.modifiers import triangulate
@@ -41,7 +42,7 @@ def _ss(a: float, b: float, x: float) -> float:
     return t * t * (3 - 2 * t)
 
 
-SUN = (0.73, 0.53, 0.39)  # toward the sun (matches the game's default look), for baked facet light
+SUN = sun_direction()  # toward the sun (the game's baked sun), for the pre-lit facets
 
 
 def _face_light(a, b, c) -> float:

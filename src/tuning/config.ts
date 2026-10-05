@@ -91,7 +91,11 @@ export interface GameConfig {
     jackMaxDist: number;
     boulesPerEnd: number;
   };
-  /** Scene look: low late-afternoon sun, colour grade, exposure, haze. Read live by src/render/lighting.ts. */
+  /**
+   * Scene look: sun colour / intensity, sky fill, baked-shadow and ambient-occlusion strength, colour
+   * grade, exposure, haze. Read live by src/render/lighting.ts. The sun DIRECTION is not here: the
+   * scenery's shadows are baked with it (art/lib/layout.py -> src/render/bakedLayout.ts).
+   */
   look: {
     /** Tone-mapping curve. */
     toneMapping: ToneMappingChoice;
@@ -99,10 +103,6 @@ export interface GameConfig {
     saturation: number;
     /** Sun colour temperature (K): ~3500 golden, ~5000 warm white, 6500 neutral white. */
     sunTempK: number;
-    /** Sun height above the horizon (degrees). */
-    sunElevationDeg: number;
-    /** Sun direction around the court: 0 = behind the player (+Z), 90 = from the right (+X), -90 = from the left. */
-    sunAzimuthDeg: number;
     /** Directional light intensity. */
     sunIntensity: number;
     /** Tone-mapping exposure. */
@@ -111,8 +111,12 @@ export interface GameConfig {
     fogDensity: number;
     /** Sky/ground fill light (hemisphere) intensity: higher = lighter shade. */
     fillIntensity: number;
-    /** How dark cast shadows are (0 = none, 1 = full). */
+    /** How dark cast shadows are, baked and real-time (0 = none, 1 = full). */
     shadowStrength: number;
+    /** Baked ambient occlusion (contact shade at wall feet, under trees, between boards): 0 = off, 1 = full. */
+    aoStrength: number;
+    /** Gravel grain on the ground (0 = smooth colour only). */
+    groundGrain: number;
   };
   /** Rules of a full match (see games/petanque/match.ts). */
   match: MatchRules;
@@ -188,15 +192,15 @@ export const defaultConfig: GameConfig = {
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
   look: {
     toneMapping: 'neutral',
-    saturation: 1.1,
+    saturation: 1,
     sunTempK: 5600,
-    sunElevationDeg: 34,
-    sunAzimuthDeg: 18,
-    sunIntensity: 4.6,
+    sunIntensity: 4.4,
     exposure: 1,
-    fogDensity: 0.004,
-    fillIntensity: 2.4,
-    shadowStrength: 0.85,
+    fogDensity: 0.006,
+    fillIntensity: 1.45,
+    shadowStrength: 0.93,
+    aoStrength: 0.8,
+    groundGrain: 0.5,
   },
   match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
   ai: {
@@ -303,13 +307,13 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'look.toneMapping', label: 'tone mapping', options: ['neutral', 'agx', 'aces', 'none'] },
       { path: 'look.saturation', label: 'saturation', min: 0, max: 2, step: 0.05 },
       { path: 'look.sunTempK', label: 'sun colour K', min: 2500, max: 8000, step: 100 },
-      { path: 'look.sunElevationDeg', label: 'sun height°', min: 8, max: 80, step: 1 },
-      { path: 'look.sunAzimuthDeg', label: 'sun direction°', min: -180, max: 180, step: 1 },
       { path: 'look.sunIntensity', label: 'sun intensity', min: 0, max: 8, step: 0.1 },
       { path: 'look.exposure', label: 'exposure', min: 0.3, max: 2.5, step: 0.05 },
       { path: 'look.fogDensity', label: 'haze', min: 0, max: 0.08, step: 0.002 },
       { path: 'look.fillIntensity', label: 'shade fill', min: 0, max: 5, step: 0.05 },
       { path: 'look.shadowStrength', label: 'shadow darkness', min: 0, max: 1, step: 0.05 },
+      { path: 'look.aoStrength', label: 'ambient occlusion', min: 0, max: 1, step: 0.05 },
+      { path: 'look.groundGrain', label: 'ground grain', min: 0, max: 1.5, step: 0.05 },
     ],
   },
   {

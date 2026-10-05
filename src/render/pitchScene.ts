@@ -32,6 +32,7 @@ import type { Body } from '../engine/types';
 import type { TeamId } from '../games/petanque/matchTypes';
 import type { Vec3 } from '../engine/vec3';
 import type { GameConfig } from '../tuning/config';
+import { bakedDynamicMaterial, setContactOccluders } from './bakedLight';
 import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
 import { createDevStats } from './devStats';
 import { createLighting } from './lighting';
@@ -118,6 +119,8 @@ export interface PitchScene {
   setScoringHighlight(ids: readonly string[] | null, team: TeamId | null): void;
   /** Faint band on the ground marking where a jack may come to rest; null hides it. */
   setJackZone(zone: JackZoneView | null): void;
+  /** Screen position (CSS px from the canvas's top-left) of a world point with the current camera; null when behind the camera. For DOM overlays (measuring lines, effects). */
+  project(p: Vec3): { x: number; y: number } | null;
 }
 
 /** Grey metal with two dark grooves and two dark patches, so rolling spin is visible. */
@@ -170,20 +173,21 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   // ---- bodies --------------------------------------------------------------
   const unitSphere = new SphereGeometry(1, 32, 20);
   const bouleTex = makeBouleTexture();
+  // Boules and jack darken in the baked shade of the trees / buildings (bakedLight.ts).
   const mkBouleMat = (color: number, current: boolean): MeshStandardMaterial =>
-    new MeshStandardMaterial({
+    bakedDynamicMaterial(new MeshStandardMaterial({
       color,
       map: bouleTex,
       metalness: 0.45,
       roughness: 0.4,
       ...(current ? { emissive: new Color(0x6a4a10), emissiveIntensity: 0.3 } : {}),
-    });
+    }));
   const bouleMats = {
     none: { rest: mkBouleMat(STYLE.bouleColor, false), current: mkBouleMat(STYLE.bouleColor, true) },
     A: { rest: mkBouleMat(STYLE.teamBouleColor.A, false), current: mkBouleMat(STYLE.teamBouleColor.A, true) },
     B: { rest: mkBouleMat(STYLE.teamBouleColor.B, false), current: mkBouleMat(STYLE.teamBouleColor.B, true) },
   };
-  const jackMat = new MeshStandardMaterial({ color: STYLE.jackColor, roughness: 0.5 });
+  const jackMat = bakedDynamicMaterial(new MeshStandardMaterial({ color: STYLE.jackColor, roughness: 0.5 }));
   const meshes = new Map<string, Mesh>();
   const q = new Quaternion();
   const axis = new Vector3();
@@ -284,6 +288,8 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
         ringBase[i] = hb.spec.radius;
       }
     });
+    // Contact shadows of the balls on the ground (sky light they block; bakedLight.ts).
+    setContactOccluders(bodies.filter((b) => b.state !== 'out').map((b) => ({ x: b.pos.x, y: b.pos.y, z: b.pos.z, r: b.spec.radius })));
     for (const [id, mesh] of meshes) {
       if (!seen.has(id)) {
         scene.remove(mesh);
@@ -522,6 +528,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   }
 
   rig.snap(focus);
+  const projected = new Vector3();
 
   return {
     resize,
@@ -548,5 +555,10 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     setResultLine,
     setScoringHighlight,
     setJackZone,
+    project(p) {
+      projected.set(p.x, p.y, p.z).project(camera);
+      if (projected.z > 1) return null;
+      return { x: (projected.x * 0.5 + 0.5) * canvas.clientWidth, y: (-projected.y * 0.5 + 0.5) * canvas.clientHeight };
+    },
   };
 }
