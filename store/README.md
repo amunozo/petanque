@@ -149,3 +149,7 @@ Renders are cached in `$TMPDIR/petanque-branding/`. The scenes:
   flight. It does not load the game's scenery models, so it is stable while those change.
 - `art/branding/stage.py`: shared Blender helpers (world, sun, camera, steel boule / jack
   materials, faceted gravel); `imaging.py`: Pillow helpers (fonts from `public/fonts`, masks).
+
+## Listing copy rules
+
+- Do not mention ads in the store listing or in-game (no "no ads" promises, no "ads coming"). The game ships without ads; the privacy policy only describes current practice and is updated if that changes.
