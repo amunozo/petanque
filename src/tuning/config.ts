@@ -143,7 +143,21 @@ export const defaultConfig: GameConfig = {
   },
   balls: {
     boule: { radius: 0.0375, mass: 0.7, restitution: 0.6 },
-    jack: { radius: 0.015, mass: 0.015, restitution: 0.5 },
+    // The 30 mm wooden jack: sinks into the gravel (more rolling resistance), is
+    // deflected more by small bumps, hops a little more on landing than a boule
+    // and gets kicked sideways by the grit it lands on.
+    jack: {
+      radius: 0.015,
+      mass: 0.015,
+      restitution: 0.5,
+      rollingResistanceMul: 1.6,
+      roughnessMul: 3,
+      impactRestitution: 0.28,
+      impactFriction: 0.22,
+      // Grit kick at each ground contact: unrepeatable placement (deterministic per contact point).
+      landingScatter: 10,
+      landingScatterSpeed: 0.14,
+    },
   },
   throw: {
     originX: 0,
@@ -268,6 +282,12 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'balls.boule.mass', label: 'boule mass kg', min: 0.3, max: 1.5, step: 0.01 },
       { path: 'balls.jack.restitution', label: 'jack bounce', min: 0, max: 1, step: 0.01 },
       { path: 'balls.jack.mass', label: 'jack mass kg', min: 0.005, max: 0.2, step: 0.005 },
+      { path: 'balls.jack.rollingResistanceMul', label: 'jack rolling friction ×', min: 0.5, max: 3, step: 0.05 },
+      { path: 'balls.jack.roughnessMul', label: 'jack bumpiness ×', min: 0, max: 10, step: 0.1 },
+      { path: 'balls.jack.impactRestitution', label: 'jack landing bounce', min: 0, max: 0.8, step: 0.01 },
+      { path: 'balls.jack.impactFriction', label: 'jack landing grip', min: 0, max: 1.5, step: 0.01 },
+      { path: 'balls.jack.landingScatter', label: 'jack landing scatter°', min: 0, max: 30, step: 0.5 },
+      { path: 'balls.jack.landingScatterSpeed', label: 'jack scatter speed', min: 0, max: 0.5, step: 0.01 },
       { path: 'physics.restSpeed', label: 'rest speed', min: 0.005, max: 0.2, step: 0.005 },
     ],
   },

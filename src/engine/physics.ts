@@ -9,6 +9,11 @@
  *      so a steep lob lands and nearly stops while a flat roll keeps its speed.
  *      If the bounce speed e*|vy| is below gravity*fixedDt*BOUNCE_REST_STEPS the
  *      ball starts rolling, otherwise it hops again.
+ *  - Per-ball modifiers (BallSpec.rollingResistanceMul / roughnessMul /
+ *      impactRestitution / impactFriction) adjust the surface values below for
+ *      that ball only; absent = the shared surface values. landingScatter /
+ *      landingScatterSpeed add a deterministic hash-of-impact-point kick to the
+ *      horizontal velocity at each ground impact (see scatter.ts).
  *  - rolling: horizontal deceleration rollingResistance*gravity against the
  *      motion, plus slope acceleration -gravity*slope from the deterministic
  *      bumpiness field. Backspin (Body.spin, rad/s) acts as sliding friction:
@@ -20,7 +25,8 @@
  *  - collisions: see collisions.ts. Boards (dead or bounce): see `applyBounds`.
  */
 import { BOUNCE_REST_STEPS, resolveCollisions, substepCount } from './collisions';
-import { groundSlope } from './ground';
+import { landingKick } from './scatter';
+import { groundSlope, impactFrictionFor, impactRestitutionFor, rollingResistanceFor } from './ground';
 import type { Body, PhysicsConfig, SimEvent, ThrowParams, World } from './types';
 import type { Vec3 } from './vec3';
 import { cloneWorld, createBody, isSettled, launch } from './world';
@@ -31,6 +37,20 @@ export { cloneWorld, createBody, isSettled, launch };
 const LAND_EVENT_MIN_SPEED = 0.05;
 /** Solid-sphere moment of inertia ratio: spin change per unit friction impulse. */
 const SOLID_SPHERE_SPIN_FACTOR = 2.5;
+
+/** Optional per-ball landing kick (BallSpec.landingScatter / landingScatterSpeed); no-op without them. */
+function scatterLanding(b: Body, impact: number): void {
+  const deg = b.spec.landingScatter ?? 0;
+  const frac = b.spec.landingScatterSpeed ?? 0;
+  if (deg <= 0 && frac <= 0) return;
+  const kick = landingKick(b.pos.x, b.pos.z, impact, deg, frac);
+  const c = Math.cos(kick.angle);
+  const sn = Math.sin(kick.angle);
+  const vx = b.vel.x;
+  const vz = b.vel.z;
+  b.vel.x = (vx * c - vz * sn) * kick.speedMul;
+  b.vel.z = (vx * sn + vz * c) * kick.speedMul;
+}
 
 function applyLanding(b: Body, cfg: PhysicsConfig, prev: Vec3, events: SimEvent[]): void {
   const r = b.spec.radius;
@@ -56,13 +76,14 @@ function applyLanding(b: Body, cfg: PhysicsConfig, prev: Vec3, events: SimEvent[
     return;
   }
 
-  const e = surface.impactRestitution;
+  const e = impactRestitutionFor(b.spec, surface);
   const horizontal = Math.hypot(b.vel.x, b.vel.z);
   if (horizontal > 0) {
-    const cut = Math.min(horizontal, surface.impactFriction * (1 + e) * impact);
+    const cut = Math.min(horizontal, impactFrictionFor(b.spec, surface) * (1 + e) * impact);
     const k = (horizontal - cut) / horizontal;
     b.vel.x *= k;
     b.vel.z *= k;
+    scatterLanding(b, impact);
   }
   const bounce = e * impact;
   if (bounce < cfg.gravity * cfg.fixedDt * BOUNCE_REST_STEPS) {
@@ -93,18 +114,20 @@ function stepFlying(b: Body, cfg: PhysicsConfig, h: number, events: SimEvent[]):
 function stepRolling(b: Body, cfg: PhysicsConfig, h: number, events: SimEvent[]): void {
   const { surface } = cfg;
   const g = cfg.gravity;
-  const slope = groundSlope(b.pos.x, b.pos.z, surface);
+  const slope = groundSlope(b.pos.x, b.pos.z, surface, b.spec.roughnessMul);
   const ax = -g * slope.x;
   const az = -g * slope.z;
+  const resistance = rollingResistanceFor(b.spec, surface);
+  const friction = impactFrictionFor(b.spec, surface);
   b.vel.x += ax * h;
   b.vel.z += az * h;
   b.vel.y = 0;
 
   let spin = b.spin ?? 0;
-  let decel = surface.rollingResistance * g;
+  let decel = resistance * g;
   if (spin > 0) {
-    decel += surface.impactFriction * g;
-    spin = Math.max(0, spin - ((SOLID_SPHERE_SPIN_FACTOR * surface.impactFriction * g) / b.spec.radius) * h);
+    decel += friction * g;
+    spin = Math.max(0, spin - ((SOLID_SPHERE_SPIN_FACTOR * friction * g) / b.spec.radius) * h);
   }
   const speed = Math.hypot(b.vel.x, b.vel.z);
   if (speed > 0) {
@@ -122,7 +145,7 @@ function stepRolling(b: Body, cfg: PhysicsConfig, h: number, events: SimEvent[])
   b.rot.x += (b.vel.z * h) / b.spec.radius;
   b.rot.z -= (b.vel.x * h) / b.spec.radius;
 
-  if (Math.hypot(b.vel.x, b.vel.z) < cfg.restSpeed && Math.hypot(ax, az) <= surface.rollingResistance * g) {
+  if (Math.hypot(b.vel.x, b.vel.z) < cfg.restSpeed && Math.hypot(ax, az) <= resistance * g) {
     b.vel.x = 0;
     b.vel.y = 0;
     b.vel.z = 0;

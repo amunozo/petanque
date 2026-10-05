@@ -4,7 +4,7 @@
  * geometrically flat (y = 0); the field only supplies a slope that pulls
  * rolling balls sideways, as if the ground had gentle undulations.
  */
-import type { SurfaceConfig } from './types';
+import type { BallSpec, SurfaceConfig } from './types';
 
 /** Integer hash -> [-1, 1]. */
 function cellValue(ix: number, iz: number): number {
@@ -45,10 +45,25 @@ function noiseGradient(u: number, v: number): { gx: number; gz: number } {
 
 /**
  * Dimensionless ground slope (dh/dx, dh/dz) at (x, z). A ball's acceleration
- * from it is -gravity * slope. Zero when roughness is 0.
+ * from it is -gravity * slope. Zero when roughness is 0. `amplitudeMul` is the
+ * per-ball modifier (BallSpec.roughnessMul); the default 1 reproduces the plain
+ * surface field exactly (x * 1 is exact).
  */
-export function groundSlope(x: number, z: number, surface: SurfaceConfig): { x: number; z: number } {
+export function groundSlope(x: number, z: number, surface: SurfaceConfig, amplitudeMul = 1): { x: number; z: number } {
   if (surface.roughness === 0 || surface.roughnessScale <= 0) return { x: 0, z: 0 };
   const g = noiseGradient(x / surface.roughnessScale, z / surface.roughnessScale);
-  return { x: g.gx * surface.roughness, z: g.gz * surface.roughness };
+  const amp = surface.roughness * amplitudeMul;
+  return { x: g.gx * amp, z: g.gz * amp };
 }
+
+/**
+ * Surface values as felt by one ball: the shared SurfaceConfig adjusted by the
+ * ball's optional modifiers (see BallSpec). A spec without modifiers returns
+ * exactly the surface values (multiplying by 1 is exact).
+ */
+export const rollingResistanceFor = (spec: BallSpec, surface: SurfaceConfig): number =>
+  surface.rollingResistance * (spec.rollingResistanceMul ?? 1);
+export const impactRestitutionFor = (spec: BallSpec, surface: SurfaceConfig): number =>
+  spec.impactRestitution ?? surface.impactRestitution;
+export const impactFrictionFor = (spec: BallSpec, surface: SurfaceConfig): number =>
+  spec.impactFriction ?? surface.impactFriction;

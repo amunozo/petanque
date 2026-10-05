@@ -5,8 +5,14 @@ import type { GameConfig } from '../../tuning/config';
 import { simulateThrow, solvePower, type SimCtx } from './aiSim';
 import { isValidJack } from './matchMeasure';
 
-/** Keep the aimed jack this far inside the legal distance range (m). */
-const RANGE_MARGIN = 0.7;
+/**
+ * Keep the aimed jack this far inside the legal distance range (m). The wooden
+ * jack scatters on landing (BallSpec.landingScatter), so the noisy real throw
+ * ends up tens of cm from the noise-free simulation: leave room for that.
+ */
+const RANGE_MARGIN = 1.0;
+/** Chance that the first attempt is a half-lob instead of a lob (lobs scatter least). */
+const HALF_LOB_CHANCE = 0.25;
 /** Jack stays this far inside the legal side-board margin (m). */
 const SIDE_SLACK = 0.25;
 /** Lateral spread of the aim (degrees, 1 sd). */
@@ -24,7 +30,7 @@ export function planJack(ctx: SimCtx, cfg: GameConfig, rng: Rng): ThrowIntent {
   let fallback: ThrowIntent = { aim: 0, power: 0.6, loft: 'half' };
   for (let attempt = 0; attempt < 3; attempt++) {
     const dist = attempt === 0 ? loD + (hiD - loD) * rng.next() : attempt === 1 ? mid : mid + (rng.next() - 0.5) * 0.5;
-    const loft: Loft = attempt === 0 ? (rng.next() < 0.5 ? 'half' : 'lob') : attempt === 1 ? 'lob' : 'half';
+    const loft: Loft = attempt === 0 ? (rng.next() < HALF_LOB_CHANCE ? 'half' : 'lob') : attempt === 1 ? 'lob' : 'half';
     const sideRoom = Math.max(0, Math.min(cfg.physics.arena.maxX - cfg.throw.originX, cfg.throw.originX - cfg.physics.arena.minX) - rules.jackMinSideMargin - SIDE_SLACK);
     const maxAim = Math.min(cfg.controls.maxAimDeg * DEG, Math.asin(Math.min(1, sideRoom / dist)));
     const aim = attempt === 0 ? Math.max(-maxAim, Math.min(maxAim, rng.normal() * AIM_SD_DEG * DEG)) : 0;

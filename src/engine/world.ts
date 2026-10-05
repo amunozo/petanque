@@ -2,11 +2,23 @@
 import type { BallSpec, Body, ThrowParams, World } from './types';
 import type { Vec3 } from './vec3';
 
+/** Copies a spec, keeping the optional surface modifiers only when present (JSON stays minimal). */
+export const cloneSpec = (s: BallSpec): BallSpec => {
+  const c: BallSpec = { radius: s.radius, mass: s.mass, restitution: s.restitution };
+  if (s.rollingResistanceMul !== undefined) c.rollingResistanceMul = s.rollingResistanceMul;
+  if (s.roughnessMul !== undefined) c.roughnessMul = s.roughnessMul;
+  if (s.impactRestitution !== undefined) c.impactRestitution = s.impactRestitution;
+  if (s.impactFriction !== undefined) c.impactFriction = s.impactFriction;
+  if (s.landingScatter !== undefined) c.landingScatter = s.landingScatter;
+  if (s.landingScatterSpeed !== undefined) c.landingScatterSpeed = s.landingScatterSpeed;
+  return c;
+};
+
 export const cloneBody = (b: Body): Body => {
   const c: Body = {
     id: b.id,
     kind: b.kind,
-    spec: { radius: b.spec.radius, mass: b.spec.mass, restitution: b.spec.restitution },
+    spec: cloneSpec(b.spec),
     pos: { x: b.pos.x, y: b.pos.y, z: b.pos.z },
     vel: { x: b.vel.x, y: b.vel.y, z: b.vel.z },
     rot: { x: b.rot.x, y: b.rot.y, z: b.rot.z },
@@ -27,7 +39,7 @@ export function createBody(id: string, kind: string, spec: BallSpec, pos: Vec3):
   return {
     id,
     kind,
-    spec: { radius: spec.radius, mass: spec.mass, restitution: spec.restitution },
+    spec: cloneSpec(spec),
     pos: { x: pos.x, y: spec.radius, z: pos.z },
     vel: { x: 0, y: 0, z: 0 },
     rot: { x: 0, y: 0, z: 0 },

@@ -167,3 +167,18 @@ describe('config store', () => {
     expect(s.getDefault('throw.maxSpeed')).toBe(11);
   });
 });
+
+describe('jack surface tuning', () => {
+  it('the jack modifiers are tunable leaves of the default config and stay in range', () => {
+    const paths = tuningSchema.flatMap((f) => f.fields.map((x) => x.path));
+    for (const k of ['rollingResistanceMul', 'roughnessMul', 'impactRestitution', 'impactFriction', 'landingScatter', 'landingScatterSpeed']) {
+      expect(paths).toContain(`balls.jack.${k}`);
+    }
+    const store = createConfigStore(defaultConfig, { storage: null, schema: tuningSchema });
+    expect(store.set('balls.jack.rollingResistanceMul', 2)).toBe(true);
+    expect(store.config.balls.jack.rollingResistanceMul).toBe(2);
+    expect(defaultConfig.balls.jack.rollingResistanceMul).toBe(1.6);
+    // Boules carry no modifiers: they use the shared ground values.
+    expect(Object.keys(defaultConfig.balls.boule).sort()).toEqual(['mass', 'radius', 'restitution']);
+  });
+});

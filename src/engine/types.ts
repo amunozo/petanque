@@ -14,6 +14,28 @@ export interface BallSpec {
   mass: number;
   /** Coefficient of restitution used for ball–ball impacts (pair uses the min). */
   restitution: number;
+  /**
+   * Optional per-ball surface modifiers (omitted = 1 / the SurfaceConfig value,
+   * so existing balls and games behave exactly as before). They let a light
+   * small ball (a wooden jack) interact with the same ground differently from
+   * a heavy steel one.
+   */
+  /** Multiplies SurfaceConfig.rollingResistance (small balls sink into gravel: > 1). */
+  rollingResistanceMul?: number;
+  /** Multiplies the bump slope (SurfaceConfig.roughness) felt by this ball (small balls are deflected more: > 1). */
+  roughnessMul?: number;
+  /** Replaces SurfaceConfig.impactRestitution for this ball's landings (wood hops more than steel). */
+  impactRestitution?: number;
+  /** Replaces SurfaceConfig.impactFriction for this ball's landings and backspin (sliding) friction. */
+  impactFriction?: number;
+  /**
+   * Max deflection (degrees) of the horizontal velocity at each ground impact,
+   * a deterministic kick from the unevenness at the exact contact point
+   * (grit, stones). 0/absent = off. Scales with impact speed.
+   */
+  landingScatter?: number;
+  /** Max fractional change of the horizontal speed at each ground impact (0.1 = ±10 %), same kick source as `landingScatter`. */
+  landingScatterSpeed?: number;
 }
 
 export type BodyState = 'flying' | 'rolling' | 'resting' | 'out';
