@@ -94,7 +94,8 @@ def _bark_color(x: float, y: float, z: float, seed: int) -> Color:
     c = mix(c, P["bark_green"], _ss(0.58, 0.63, green) * 0.7)
     c = mix(c, P["bark_cream"], _ss(0.57, 0.62, peel) * 0.9)
     c = mix(c, P["bark_dark"], _ss(0.34, 0.28, plates) * 0.5)
-    c = mix(c, P["bark_dark"], _ss(0.8, 0.0, y) * 0.45)  # darker, rougher at the foot
+    c = mix(c, P["bark_dark"], _ss(0.9, -0.1, y) * 0.35)  # darker, dustier at the foot
+    c = mix(c, P["earth_dark"], _ss(0.25, -0.1, y) * 0.35)
     return c
 
 
@@ -109,7 +110,8 @@ class Wood:
         self.seed = seed
         self.shade_from = shade_from  # height above which the crown shades the wood
 
-    def tube(self, path, radii, sides: int, rng: Rng, jitter: float, cap: bool = True) -> None:
+    def tube(self, path, radii, sides: int, rng: Rng, jitter: float, cap: bool = True, radial=None) -> None:
+        """Tapered tube along `path`; `radial(ring, angle)` -> radius factor (root lobes)."""
         n = len(path)
         base = len(self.m.verts)
         prev_u = None
@@ -125,21 +127,22 @@ class Wood:
             prev_u = u
             for k in range(sides):
                 ang = math.tau * k / sides
-                rad = radii[r] * (1.0 + rng.jitter(jitter))
+                rad = radii[r] * (1.0 + rng.jitter(jitter)) * (radial(r, ang) if radial else 1.0)
                 c, s = math.cos(ang) * rad, math.sin(ang) * rad
                 v = (p[0] + u[0] * c + w[0] * s, p[1] + u[1] * c + w[1] * s, p[2] + u[2] * c + w[2] * s)
                 self.m.verts.append(v)
                 ao = 1.0 - 0.42 * _ss(self.shade_from, self.shade_from + 2.2, v[1])
-                ao *= 0.8 + 0.2 * _ss(0.0, 0.6, v[1])  # contact darkening at the foot
+                ao *= 0.88 + 0.12 * _ss(-0.1, 0.5, v[1])  # soft contact darkening at the foot
                 self.vcol.append(scale(_bark_color(*v, self.seed), ao))
         for r in range(n - 1):
             for k in range(sides):
                 a0, a1 = base + r * sides + k, base + r * sides + (k + 1) % sides
                 b0, b1 = base + (r + 1) * sides + k, base + (r + 1) * sides + (k + 1) % sides
-                self.m.add_face((a0, b0, b1, a1), P["bark_grey"])
+                # counter-clockwise seen from outside (ring angle runs u -> w, counter-clockwise about d)
+                self.m.add_face((a0, a1, b1, b0), P["bark_grey"])
         if cap:
             top = base + (n - 1) * sides
-            self.m.add_face(tuple(top + k for k in reversed(range(sides))), P["bark_grey"])
+            self.m.add_face(tuple(top + k for k in range(sides)), P["bark_grey"])
 
 
 def _branch_path(start, direction, length: float, segs: int, droop: float, rng: Rng, wander: float):
@@ -162,15 +165,32 @@ def build_wood(v: dict, rng: Rng):
     seed, fork, r0 = v["seed"], v["fork"], v["r0"]
     wood = Wood(seed, fork + 0.6)
     lean = math.tan(math.radians(v["lean"]))
-    # trunk: gentle S-curve, flared foot, tapering to the fork
-    rings = 24
-    path, radii = [], []
-    for k in range(rings):
-        h = -0.2 + (fork + 0.35) * k / (rings - 1)
+    # trunk: gentle S-curve tapering to the fork, with a foot that flares out over the bottom ~0.7 m
+    # into 4-5 irregular root buttresses that spread and sink below the ground (no seam, no pinch)
+    # rings close together, so the bark blotches (per-vertex colour) stay crisp
+    hs = [-0.5, -0.3, -0.15, -0.05, 0.03, 0.1, 0.18, 0.27, 0.37, 0.48, 0.6, 0.73, 0.86, 1.0]
+    while hs[-1] < fork + 0.35 - 0.05:
+        hs.append(min(fork + 0.35, hs[-1] + 0.14))
+    path, radii, lobe_w = [], [], []
+    for h in hs:
         wob = 0.06 * math.sin(h * 1.3 + seed)
-        path.append((lean * h + wob, h, 0.05 * math.cos(h * 1.1 + seed)))
-        radii.append(r0 * (1.0 - 0.18 * max(h, 0) / fork + 0.45 * math.exp(-max(h, 0) / 0.25)))
-    wood.tube(path, radii, 16, rng, 0.04)
+        hp = max(h, 0.0)
+        path.append((lean * hp + wob, h, 0.05 * math.cos(h * 1.1 + seed)))
+        flare = 1.0 + 0.42 * math.exp(-hp / 0.38)
+        if h < 0:
+            flare *= 1.0 + 0.9 * -h  # keeps spreading into the ground
+        radii.append(r0 * (1.0 - 0.15 * hp / fork) * flare)
+        lobe_w.append(0.5 * math.exp(-hp / 0.32) + (0.5 * -h if h < 0 else 0.0))
+    n_lobes = 4 + (seed % 2)
+    lrng = Rng(seed + 2000)
+    lobes = [(math.tau * i / n_lobes + lrng.jitter(0.45), lrng.uniform(0.6, 1.0)) for i in range(n_lobes)]
+
+    def root_lobes(r: int, ang: float) -> float:
+        bump = sum(st * max(0.0, math.cos(ang - a)) ** 8 for a, st in lobes)
+        return 1.0 + lobe_w[r] * (bump - 0.2)
+
+    # own generator: trunk tweaks must not reshuffle the limbs and crowns (and their baked shadows)
+    wood.tube(path, radii, 24, Rng(seed + 1000), 0.012, radial=root_lobes)
     top = path[-1]
 
     crowns: list[tuple[tuple[float, float, float], float]] = []

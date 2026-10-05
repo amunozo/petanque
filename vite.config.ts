@@ -22,7 +22,7 @@ export default defineConfig({
       manifest: false,
       workbox: {
         // App shell, hashed JS/CSS chunks (incl. the AI worker), fonts, 3D models, icons, privacy page.
-        globPatterns: ['**/*.{js,css,html,woff2,glb,png,svg,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,woff2,glb,png,webp,svg,webmanifest}'],
         globIgnores: ['**/.well-known/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,

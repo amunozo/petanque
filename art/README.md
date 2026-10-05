@@ -16,7 +16,7 @@ art/
   blend/<name>.blend   generated, hand-editable in Blender
   previews/<name>*.png generated Cycles previews (for approving a look)
   ../public/models/<name>.glb   generated, loaded by src/render/scenery.ts
-  ../public/models/*.png        generated: ground_light / village_light (lightmaps), leaves (leaf
+  ../public/models/*.png|webp   generated: ground_light / village_light / court_light (lightmaps), leaves (leaf
                                 atlas), ground_detail (gravel grain)
   ../src/render/bakedLayout.ts  generated from lib/layout.py (sun direction, tree placements)
 ```
@@ -87,7 +87,10 @@ those no longer matches `village_light.png`; change their scripts instead.
   Per texel: R = sun visibility (direct light with / without shadows, so N.L stays real-time), G =
   ambient occlusion (3 m). `ground_light.png` (2048, planar over `GROUND_RECT`, 38 x 38 m: ~1.9 cm
   texels) and `village_light.png` (1024 atlas over a second UV set made by smart project + pack
-  for the boards, houses, mairie, café, props). The game multiplies its real-time sun term by R
+  for the boards, houses, mairie, café, props), plus `court_light.webp` (1280 x 3072 greyscale sun
+  visibility over `COURT_RECT`, the court + ~2 m: ~6 mm texels where the camera is closest; the game
+  cross-fades it over the ground map and samples the coarser ground map bicubic, so magnified texels
+  never show as blocks). The game multiplies its real-time sun term by R
   and its sky fill by G; only the boules cast real-time shadows. Changing geometry, tree placement
   or the sun means re-baking (`npm run art` does it automatically).
 - **Village** (`houses`, `mairie`, `cafe`, `props`, `hills`) is modelled directly in game coordinates

@@ -25,7 +25,7 @@ import {
   type WebGLRenderer,
 } from 'three';
 import type { GameConfig, ToneMappingChoice } from '../tuning/config';
-import { setBakeStrength, setGroundDetail } from './bakedLight';
+import { setBakedAnisotropy, setBakeStrength, setGroundDetail } from './bakedLight';
 import { BAKED_SUN } from './bakedLayout';
 import { setGradeSaturation } from './grade';
 import { createSky, SKY_STYLE } from './sky';
@@ -92,6 +92,7 @@ export function kelvinToColor(kelvin: number, out: Color): Color {
 export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig: () => GameConfig, court: CourtBounds): Lighting {
   renderer.toneMapping = NeutralToneMapping;
   renderer.shadowMap.enabled = true;
+  setBakedAnisotropy(renderer.capabilities.getMaxAnisotropy());
   renderer.shadowMap.type = PCFShadowMap; // PCFSoftShadowMap was removed in three r18x; PCF is already filtered
 
   const horizon = new Color(SKY_STYLE.horizon);

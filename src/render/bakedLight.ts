@@ -1,7 +1,10 @@
 /**
  * Baked lighting (see art/lib/bake.py): the static scenery's sun shadows and ambient occlusion
- * come from two lightmaps computed in Blender with the same sun as the game:
- *   ground_light.png  (the square's floor, planar over GROUND_LIGHT_RECT; UV from world x/z)
+ * come from lightmaps computed in Blender with the same sun as the game:
+ *   ground_light.png  (the square's floor, planar over GROUND_LIGHT_RECT, ~1.9 cm texels; UV from
+ *                      world x/z; sampled bicubic so magnified texels never show as blocks)
+ *   court_light.webp  (sun visibility only, the court + ~2 m around it, ~6 mm texels; cross-faded
+ *                      over the ground map inside COURT_LIGHT_RECT, where the camera is closest)
  *   village_light.png (atlas for boards, houses, mairie, café, props; the glb's TEXCOORD_0)
  * R = sun visibility (soft, dappled tree shadows), G = ambient occlusion. Lambert still shades N.L
  * and the sky fill in real time; the patch multiplies the direct (sun) term by R and the indirect
@@ -26,13 +29,21 @@ import {
   type Texture,
   type WebGLProgramParametersWithUniforms,
 } from 'three';
-import { BAKED_SUN, GROUND_LIGHT_RECT } from './bakedLayout';
+import { BAKED_SUN, COURT_LIGHT_RECT, GROUND_LIGHT_RECT } from './bakedLayout';
 import { gradeShader } from './grade';
 
 /** Shared uniforms (one write updates every patched material). x = sun shadow strength, y = AO strength. */
 const strength = { value: { x: 1, y: 1 } as { x: number; y: number } };
 const groundMap: { value: Texture } = { value: whiteTexture() };
 const villageMap: { value: Texture } = { value: whiteTexture() };
+const courtMap: { value: Texture } = { value: whiteTexture() };
+const courtRect = { value: new Vector4(COURT_LIGHT_RECT.x0, COURT_LIGHT_RECT.z0, COURT_LIGHT_RECT.w, COURT_LIGHT_RECT.d) };
+let maxAnisotropy = 4;
+
+/** The renderer's max anisotropy, for the ground maps seen at grazing angles (call before loading). */
+export function setBakedAnisotropy(n: number): void {
+  maxAnisotropy = Math.max(1, n);
+}
 const detailMap: { value: Texture } = { value: greyTexture() };
 const rect = { value: new Vector3(GROUND_LIGHT_RECT.x0, GROUND_LIGHT_RECT.z0, GROUND_LIGHT_RECT.size) };
 const sunDir = { value: new Vector3(...BAKED_SUN.dir) };
@@ -88,7 +99,7 @@ export function loadBakedTextures(url: (file: string) => string): void {
         t.minFilter = mips ? LinearMipmapLinearFilter : LinearFilter;
         t.generateMipmaps = mips;
         t.magFilter = LinearFilter;
-        t.anisotropy = 4;
+        t.anisotropy = maxAnisotropy;
         if (repeat) t.wrapS = t.wrapT = RepeatWrapping;
         t.needsUpdate = true;
         slot.value = t;
@@ -96,9 +107,39 @@ export function loadBakedTextures(url: (file: string) => string): void {
       .catch((err: unknown) => console.warn(`${file} failed to load (scenery stays unshadowed)`, err));
   };
   load('ground_light.png', groundMap, false);
+  load('court_light.webp', courtMap, false);
   load('village_light.png', villageMap, false, false);
   load('ground_detail.png', detailMap, true);
 }
+
+/** Cubic B-spline lightmap lookup from 4 bilinear taps (smooth when the texels are magnified). */
+const BICUBIC = /* glsl */ `
+vec3 bakeBicubic( sampler2D tex, vec2 uv ) {
+  vec2 ts = vec2( textureSize( tex, 0 ) );
+  vec2 st = uv * ts - 0.5;
+  vec2 i = floor( st );
+  vec2 f = st - i;
+  vec2 f2 = f * f;
+  vec2 f3 = f2 * f;
+  vec2 w0 = ( 1.0 - 3.0 * f + 3.0 * f2 - f3 ) / 6.0;
+  vec2 w1 = ( 4.0 - 6.0 * f2 + 3.0 * f3 ) / 6.0;
+  vec2 w2 = ( 1.0 + 3.0 * f + 3.0 * f2 - 3.0 * f3 ) / 6.0;
+  vec2 w3 = f3 / 6.0;
+  vec2 g0 = w0 + w1;
+  vec2 g1 = w2 + w3;
+  vec2 h0 = ( i - 0.5 + w1 / g0 ) / ts;
+  vec2 h1 = ( i + 1.5 + w3 / g1 ) / ts;
+  return g0.y * ( g0.x * texture2D( tex, vec2( h0.x, h0.y ) ).rgb + g1.x * texture2D( tex, vec2( h1.x, h0.y ) ).rgb )
+       + g1.y * ( g0.x * texture2D( tex, vec2( h0.x, h1.y ) ).rgb + g1.x * texture2D( tex, vec2( h1.x, h1.y ) ).rgb );
+}
+/** Sun visibility from the dense court map, faded in over 0.4 m inside its rectangle. */
+float bakeCourt( sampler2D tex, vec4 rect, vec2 xz, float fallback ) {
+  vec2 cUv = vec2( ( xz.x - rect.x ) / rect.z, 1.0 - ( xz.y - rect.y ) / rect.w );
+  vec2 cEdge = min( cUv, 1.0 - cUv ) * rect.zw;
+  float w = smoothstep( 0.0, 0.4, min( cEdge.x, cEdge.y ) );
+  return mix( fallback, texture2D( tex, clamp( cUv, 0.0, 1.0 ) ).r, w );
+}
+`;
 
 const BAKE_FRAGMENT = /* glsl */ `
 uniform sampler2D uBakeMap;
@@ -112,7 +153,10 @@ uniform sampler2D uDetailMap;
 uniform vec3 uDetail;
 uniform vec4 uOccluders[ ${MAX_OCCLUDERS} ];
 uniform int uOccluderCount;
+uniform sampler2D uCourtMap;
+uniform vec4 uCourtRect;
 varying vec2 vGroundXZ;
+${BICUBIC}
 #endif
 `;
 
@@ -124,10 +168,13 @@ const PLANAR_UV = /* glsl */ `
 
 /** Lightmap lookup: outside the ground rectangle the floor is in open sun. */
 const SAMPLE = /* glsl */ `
-  vec3 bakeL = texture2D( uBakeMap, vBakeUv ).rgb;
 #ifdef BAKE_PLANAR
+  vec3 bakeL = bakeBicubic( uBakeMap, vBakeUv );
   vec2 bakeEdge = min( vBakeInside, 1.0 - vBakeInside );
   bakeL = mix( vec3( 1.0 ), bakeL, smoothstep( 0.0, 0.004, min( bakeEdge.x, bakeEdge.y ) ) );
+  bakeL.r = bakeCourt( uCourtMap, uCourtRect, vGroundXZ, bakeL.r );
+#else
+  vec3 bakeL = texture2D( uBakeMap, vBakeUv ).rgb;
 #endif
   reflectedLight.directDiffuse *= mix( 1.0, bakeL.r, uBakeStrength.x );
   reflectedLight.indirectDiffuse *= mix( 1.0, bakeL.g, uBakeStrength.y );
@@ -162,6 +209,8 @@ export function bakedMaterial<M extends Material>(material: M, kind: BakeKind): 
       shader.uniforms.uDetail = detail;
       shader.uniforms.uOccluders = occluders;
       shader.uniforms.uOccluderCount = occluderCount;
+      shader.uniforms.uCourtMap = courtMap;
+      shader.uniforms.uCourtRect = courtRect;
     }
     const defs = planar ? '#define BAKE_PLANAR\n#define BAKE_DETAIL\n' : '';
     shader.vertexShader = shader.vertexShader
@@ -186,7 +235,7 @@ export function bakedMaterial<M extends Material>(material: M, kind: BakeKind): 
       .replace('#include <aomap_fragment>', `${SAMPLE}\n#include <aomap_fragment>`);
     gradeShader(shader);
   };
-  material.customProgramCacheKey = () => `baked-${kind}-v1`;
+  material.customProgramCacheKey = () => `baked-${kind}-v2`;
   return material;
 }
 
@@ -200,6 +249,8 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
     shader.uniforms.uBakeStrength = strength;
     shader.uniforms.uBakeRect = rect;
     shader.uniforms.uSunDir = sunDir;
+    shader.uniforms.uCourtMap = courtMap;
+    shader.uniforms.uCourtRect = courtRect;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vBakeWorld;')
       .replace(
@@ -209,7 +260,7 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nuniform sampler2D uBakeMap;\nuniform vec2 uBakeStrength;\nuniform vec3 uBakeRect;\nuniform vec3 uSunDir;\nvarying vec3 vBakeWorld;',
+        `#include <common>\nuniform sampler2D uBakeMap;\nuniform vec2 uBakeStrength;\nuniform vec3 uBakeRect;\nuniform vec3 uSunDir;\nuniform sampler2D uCourtMap;\nuniform vec4 uCourtRect;\nvarying vec3 vBakeWorld;\n${BICUBIC}`,
       )
       .replace(
         '#include <aomap_fragment>',
@@ -219,6 +270,7 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
   vec3 bakeL = texture2D( uBakeMap, clamp( bakeUv, 0.0, 1.0 ) ).rgb;
   vec2 bakeEdge = min( bakeUv, 1.0 - bakeUv );
   bakeL = mix( vec3( 1.0 ), bakeL, step( 0.0, min( bakeEdge.x, bakeEdge.y ) ) );
+  bakeL.r = bakeCourt( uCourtMap, uCourtRect, bakeG, bakeL.r );
   float bakeSun = mix( 1.0, bakeL.r, uBakeStrength.x );
   reflectedLight.directDiffuse *= bakeSun;
   reflectedLight.directSpecular *= bakeSun;
@@ -226,7 +278,7 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
 #include <aomap_fragment>`,
       );
   };
-  material.customProgramCacheKey = () => 'baked-dynamic-v1';
+  material.customProgramCacheKey = () => 'baked-dynamic-v2';
   return material;
 }
 

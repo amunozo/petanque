@@ -91,12 +91,12 @@ HEX = {
     "cypress": "#34432b",
     "cypress_light": "#4f6039",
     # Plane-tree bark (pale camouflage: cream, grey-olive, khaki)
-    "bark_khaki": "#a09674",
-    "bark_grey": "#8b8878",
-    "bark_cream": "#d9d2b8",
-    "bark_green": "#b3b391",
+    "bark_khaki": "#9b9070",
+    "bark_grey": "#7e7b6b",
+    "bark_cream": "#d8cea6",
+    "bark_green": "#a7aa86",
     "bark_dark": "#6c6555",
-    "bark_olive": "#7f7b5c",
+    "bark_olive": "#716e55",
     # Wood (boards, stakes, doors): weathered, greyed timber
     "timber": "#7d6249",
     "timber_light": "#9d8466",

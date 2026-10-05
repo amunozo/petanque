@@ -33,9 +33,10 @@ from PIL import Image
 from . import layout
 
 AO_DISTANCE = 3.0
-SAMPLES_SUN = 24
+SAMPLES_SUN = 32
 SAMPLES_FLAT = 4
 SAMPLES_AO = 32
+SAMPLES_COURT = 40
 LIGHT_UV = "Light"
 
 
@@ -63,10 +64,25 @@ def _instance(objs_by_name: dict, prefix: str, placements) -> list:
     return out
 
 
-def _new_image(name: str, res: int):
-    img = bpy.data.images.new(name, res, res, alpha=False, float_buffer=True)
+def _new_image(name: str, res: int, height: int | None = None):
+    img = bpy.data.images.new(name, res, height or res, alpha=False, float_buffer=True)
     img.colorspace_settings.name = "Non-Color"
     return img
+
+
+def _receiver(name: str, x0: float, z0: float, w: float, d: float):
+    """Flat quad at y = 0 over x0..x0+w, z0..z0+d; UV u along +x, v along +z (the game computes the
+    same from the world position; the PNG rows are flipped on save)."""
+    me = bpy.data.meshes.new(name)
+    me.from_pydata([_bl((x0, 0.0, z0)), _bl((x0 + w, 0.0, z0)), _bl((x0 + w, 0.0, z0 + d)), _bl((x0, 0.0, z0 + d))],
+                   [], [(0, 3, 2, 1)])
+    uv = me.uv_layers.new(name=LIGHT_UV)
+    for loop in me.loops:
+        x, by, _ = me.vertices[loop.vertex_index].co
+        uv.data[loop.index].uv = ((x - x0) / w, (-by - z0) / d)
+    obj = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(obj)
+    return obj
 
 
 def _bake_target(mat, img) -> None:
@@ -117,6 +133,13 @@ def _bake(objs, kind: str, samples: int) -> None:
     bpy.ops.object.bake(type=kind)
 
 
+def _save_grey(path: str, vis: np.ndarray) -> int:
+    """Single-channel map as lossy WebP (greyscale, so no cross-channel chroma artefacts)."""
+    g = np.flipud(np.clip(vis, 0, 1))
+    Image.fromarray((g * 255 + 0.5).astype(np.uint8), "L").save(path, quality=88, method=6)
+    return os.path.getsize(path)
+
+
 def _blur(a: np.ndarray, sigma: float) -> np.ndarray:
     if sigma <= 0:
         return a
@@ -155,20 +178,13 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     for o in built["plane_tree"] + built["cypress"]:
         bpy.data.objects.remove(o)
 
-    # Ground receiver: one flat quad over the lightmap square (the real ground meshes are hidden for
-    # the bake; they are flat to a few cm).
+    # Ground receivers: flat quads over the lightmap rectangles (the real ground meshes are hidden
+    # for the bake; they are flat to a few cm). They are coplanar, so each is baked with the other hidden.
     g = layout.GROUND_RECT
-    x0, z0, size = g["x0"], g["z0"], g["size"]
-    me = bpy.data.meshes.new("ground_receiver")
-    me.from_pydata([_bl((x0, 0.0, z0)), _bl((x0 + size, 0.0, z0)), _bl((x0 + size, 0.0, z0 + size)), _bl((x0, 0.0, z0 + size))],
-                   [], [(0, 3, 2, 1)])
-    uv = me.uv_layers.new(name=LIGHT_UV)
-    # u along +x, v along +z (the game: u = (x - x0) / size, v = (z - z0) / size, flipped for the PNG rows)
-    for loop in me.loops:
-        x, by, _ = me.vertices[loop.vertex_index].co
-        uv.data[loop.index].uv = ((x - x0) / size, (-by - z0) / size)
-    receiver = bpy.data.objects.new("ground_receiver", me)
-    sc.collection.objects.link(receiver)
+    receiver = _receiver("ground_receiver", g["x0"], g["z0"], g["size"], g["size"])
+    c = layout.COURT_RECT
+    court_receiver = _receiver("court_receiver", c["x0"], c["z0"], c["w"], c["d"])
+    court_receiver.hide_render = True
     for o in built["court"]:
         if o.name in ("court_gravel", "court_surround"):
             o.hide_render = True
@@ -181,8 +197,13 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     village_img = _new_image("village_light", layout.VILLAGE_RES)
     gmat = bpy.data.materials.new("GroundReceiver")
     gmat.use_nodes = True
-    me.materials.append(gmat)
+    receiver.data.materials.append(gmat)
     _bake_target(gmat, ground_img)
+    court_img = _new_image("court_light", *layout.COURT_RES)
+    cmat = bpy.data.materials.new("CourtReceiver")
+    cmat.use_nodes = True
+    court_receiver.data.materials.append(cmat)
+    _bake_target(cmat, court_img)
     mats = {s.material for o in atlas_objs for s in o.material_slots if s.material}
     for m in mats:
         _bake_target(m, village_img)
@@ -223,12 +244,25 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     _bake(targets, "AO", max(4, int(SAMPLES_AO * quality)))
     results["ao"] = (_pixels(ground_img), _pixels(village_img))
     print(f"[bake] ambient occlusion ({time.time() - t0:.1f}s)")
+    # High-density court map: sun visibility only (AO comes from the ground map). The unshadowed
+    # sun light on a flat, level receiver is one constant: take it from the ground receiver.
+    receiver.hide_render = True
+    court_receiver.hide_render = False
+    _bake([court_receiver], "DIFFUSE", max(4, int(SAMPLES_COURT * quality)))
+    court_lit = _pixels(court_img)
+    flat_ground = results["flat"][0]
+    flat_const = float(np.median(flat_ground[flat_ground > 1e-3]))
+    court_vis = _blur(np.clip(court_lit / flat_const, 0, 1), 1.3)
+    court_receiver.hide_render = True
+    print(f"[bake] court ({time.time() - t0:.1f}s)")
+    n = _save_grey(os.path.join(models_dir, "court_light.webp"), court_vis)
+    print(f"[bake] court_light.webp {n / 1024:.0f} KB")
 
     for i, name in enumerate(("ground_light", "village_light")):
         lit, flat, ao = results["lit"][i], results["flat"][i], results["ao"][i]
         vis = np.where(flat > 1e-3, lit / np.maximum(flat, 1e-3), 1.0)
         # light denoise (the penumbrae are wider than this); AO is low-frequency, blurred more
-        vis = _blur(np.clip(vis, 0, 1), 0.9 if i == 0 else 0.6)
+        vis = _blur(np.clip(vis, 0, 1), 1.1 if i == 0 else 0.7)
         ao = _blur(np.clip(ao, 0, 1), 2.5 if i == 0 else 1.0)
         n = _save(os.path.join(models_dir, f"{name}.png"), vis, ao)
         print(f"[bake] {name}.png {n / 1024:.0f} KB")
