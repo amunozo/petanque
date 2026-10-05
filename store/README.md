@@ -23,8 +23,8 @@ and Nunito (tagline), read from `public/fonts/`.
 | `store/feature-graphic.png` | Main store listing > **Feature graphic** | 1024 x 500, 24-bit PNG (no alpha); title kept away from the edges | `art/branding/feature.py` (+ `feature_scene.py`) |
 | `store/adaptive-foreground-432.png` | Android adaptive icon **foreground** (Bubblewrap / Android Studio Image Asset), background = solid `#a95f3a` | 432 x 432 (108 dp @ xxxhdpi), transparent; balls inside the 66 dp safe circle | `art/branding/icon.py` |
 | `store/splash-512.png` | TWA splash image (Bubblewrap shows it centred on the splash background colour) | 512 x 512, opaque PNG on `#a95f3a` | `art/branding/icon.py` |
-| `store/screenshots/01..06.png` | Main store listing > **Phone screenshots** | 1080 x 1920 (9:16) | **on hold**: waiting for the in-game scene rework (natural look) to land |
-| `store/screenshots-captioned/` | optional captioned set of the same | 1080 x 1920 | **on hold** (same reason) |
+| `store/screenshots/<lang>/01..06.jpg` (`en fr es it pt`) | Main store listing > **Phone screenshots** (one set per listing language, see [Screenshots](#screenshots)) | 1080 x 1920 (9:16), 24-bit PNG (RGB, no alpha) | `store/screenshots-src/capture.cjs` |
+| `store/screenshots-captioned/<lang>/01..06.jpg` | same slot; the same six shots under a terracotta caption band (**recommended upload**) | 1080 x 1920, JPEG (quality 90) | `store/screenshots-src/caption.py` |
 | `public/icons/icon-192.png`, `icon-512.png` | web manifest icons, `purpose: "any"` | rounded square (22% radius), transparent corners | `art/branding/icon.py` |
 | `public/icons/maskable-192.png`, `maskable-512.png` | web manifest icons, `purpose: "maskable"` (also Bubblewrap `maskableIconUrl`) | full bleed, opaque; balls within 74% of the width (inside the 80% safe circle) | `art/branding/icon.py` |
 | `public/icons/monochrome-512.png` | web manifest icon, `purpose: "monochrome"` (Android 13+ themed icons; Bubblewrap `monochromeIconUrl`) | white silhouette on transparent, drawn as vectors from the 3D layout | `art/branding/icon.py` |
@@ -38,6 +38,74 @@ Wiring (owned by the app code): `public/manifest.webmanifest` already lists the 
 fallback, and the apple-touch-icon at `./icons/apple-touch-icon.png` (it currently uses
 `icon-192.png`, whose transparent corners turn black on iOS). The manifest / `theme-color` still
 use navy `#2a3550`; switching `background_color` to `#a95f3a` makes the install splash match the icon.
+
+## Screenshots
+
+Real captures of the production build (`npm run build`, served by `vite preview`), not mock-ups: 30 plain shots
+(6 x 5 languages) and 30 captioned ones. Every language shows the same six moments, so the listings match. All
+files are 1080 x 1920, 24-bit RGB PNG (no alpha), 0.8 to 1.5 MB each (about 70 MB for the 60 files).
+
+| # | Moment | What it shows | Caption (EN; the other languages are in `store/screenshots-src/caption.py`) |
+| --- | --- | --- | --- |
+| 01 | Aiming in a vs-computer match (medium) | Pull-down drag held on a Lob: dotted arc, orange landing ring next to the jack, loft picker, score bar | Pull, aim, release. |
+| 02 | Lob mid-flight | The boule high over the court, plane trees and town hall behind it (flight camera) | Real physics. Real pétanque. |
+| 03 | After a throw | Close-up with the "You hold the point (by 12 cm)" toast, boules, jack and the orange point line | Point closer than your rival |
+| 04 | End of an end | Measuring lines jack to each team's nearest boule (29 cm vs 42 cm), scoring rings, "You score 2 points" card | Every centimetre counts |
+| 05 | Computer shoots | Its aim arc and landing ring over the cluster, "Computer shoots!" toast, "Computer plays" chip | Point or shoot? |
+| 06 | Start menu | Language chips, logotype, Practice / vs computer (difficulty) / 2 players, match length | Play the computer or a friend — offline |
+
+Files: `store/screenshots/<lang>/01.png` .. `06.png` (plain) and `store/screenshots-captioned/<lang>/01.jpg` .. (plain set is git-ignored; regenerate it with the scripts below)
+`06.png` (same images under a terracotta caption band), for `<lang>` in `en fr es it pt`.
+
+**Which to upload where** (Play Console > Grow > Store presence > Main store listing; add each language under
+"Manage translations" and upload its own phone screenshots). Upload the captioned set; the plain set is the fallback
+(for example if a review asks for screenshots without marketing text).
+
+| Play listing language | Upload from |
+| --- | --- |
+| English (default listing; en-US, en-GB, ...) | `store/screenshots-captioned/en/` |
+| French (fr-FR, fr-CA) | `store/screenshots-captioned/fr/` |
+| Spanish (es-ES, es-419, es-US) | `store/screenshots-captioned/es/` |
+| Italian (it-IT) | `store/screenshots-captioned/it/` |
+| Portuguese (pt-PT, pt-BR) | `store/screenshots-captioned/pt/` |
+
+Other listing languages fall back to the default (English) listing's images. Play needs at least two phone
+screenshots per listing (up to eight); the file number is the order. 7" / 10" tablet screenshots are a separate
+slot and are not made here.
+
+How they were made:
+
+- Playwright Chromium (software GL), viewport 360 x 640 CSS px, `deviceScaleFactor` 3, mobile + touch, localStorage
+  cleared first, `petanque.howtoSeen=1` (no first-launch overlay), default tuning (physics at normal speed, never
+  sped up). The dev/build-id chip is hidden by CSS injected by the capture script only.
+- Fixed seed 17, vs the medium computer, and a scripted set of pull-down drags (`PLAN` in `capture.cjs`: a half-lob
+  jack, a lob, a roll, a half-lob). The page runs on a virtual clock (`requestAnimationFrame` / `performance.now` only
+  advance when the script steps them), so "0.40 s after release" is the same frame on every run; the 4.2 s toast
+  timer is stretched because a 3x screenshot takes seconds. Nothing in `src/` is touched or special-cased.
+- The plan tells the same story in every language: your lob lands next to the jack, the computer answers and finally
+  shoots at it, then your last two boules win the end 2-0. It was found by replaying candidate drags through the real
+  rules + engine + AI in node (same code as the game) and checking where each element would land on screen (HUD, toast,
+  end card, measuring labels). If the scenery, camera, AI or physics change, the story must be re-checked; a quick
+  look at all 60 images is the test.
+- The 3D layer is rendered at pixel ratio 2 (`STYLE.maxPixelRatio` in `src/render/pitchScene.ts`) and the browser
+  upscales it to the 3x screenshot, so scenery is a touch softer than the HUD text. Raising that cap to 3 for a
+  re-shoot would sharpen it.
+- Captioned set: the whole screenshot, scaled to 82 %, rounded, on the brand terracotta `#a95f3a`, under a 330 px band;
+  Fredoka 650 at 75 px (the largest size at which every caption in every language fits in two lines of at most 940 px).
+  Wording follows the game's own vocabulary (`pointer` / `tirer`, `arrimar` / `tirar`, `accostare` / `bocciare`, `apontar` / `atirar`).
+
+Regenerate (a full run is about 3.5 minutes per language):
+
+```sh
+npm run build && npx vite preview --port 4180 &            # the real production build
+node store/screenshots-src/capture.cjs en fr es it pt       # store/screenshots/<lang>/01..06.jpg
+art/.venv/bin/python store/screenshots-src/caption.py       # store/screenshots-captioned/<lang>/ (Pillow, fontTools, brotli in art/.venv)
+```
+
+`capture.cjs` reads `PREVIEW_URL`, `PLAYWRIGHT_DIR`, `CHROME`, `SEED`, `PLAN` (JSON) and `RAW_DIR` from the environment;
+every captured frame (flight series, toast frames, the computer's aim and flight) lands in `RAW_DIR` (default
+`$TMPDIR/petanque-shots/<lang>/`) and `PICK` selects the six that are copied to `store/screenshots/`. Captions are
+edited in `caption.py` (`CAPTIONS`) and need no browser.
 
 ## Regenerate
 

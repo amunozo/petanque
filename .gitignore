@@ -4,3 +4,6 @@ dist
 art/.venv
 __pycache__/
 *.blend1
+
+# Plain store screenshots (regenerate with store/screenshots-src)
+store/screenshots/
