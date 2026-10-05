@@ -6,6 +6,11 @@ terracotta extrusion) and a Nunito tagline.
     art/.venv/bin/python art/branding/feature.py             # render (2x, ~10 min) + compose
     art/.venv/bin/python art/branding/feature.py --preview   # quick low-res/low-sample render
     art/.venv/bin/python art/branding/feature.py --reuse     # only recompose the cached render
+    art/.venv/bin/python art/branding/feature.py --reuse --lang fr   # one language -> store/feature-graphic/fr.png
+    art/.venv/bin/python art/branding/feature.py --reuse --lang all  # en es fr it pt (en also -> store/feature-graphic.png)
+
+Taglines match 'menu.tagline' in src/i18n/messages/*.ts. The 3D render is language-independent, so it
+is rendered once (cached in $TMPDIR/petanque-branding/) and only the lettering is redone per language.
 """
 from __future__ import annotations
 
@@ -21,13 +26,23 @@ from PIL import Image, ImageDraw, ImageFilter  # noqa: E402
 from imaging import ROOT, font, hex_rgb, save_rgb  # noqa: E402
 
 CACHE = os.path.join(tempfile.gettempdir(), "petanque-branding")
-OUT = os.path.join(ROOT, "store", "feature-graphic.png")
+OUT = os.path.join(ROOT, "store", "feature-graphic.png")          # English default listing
+OUT_DIR = os.path.join(ROOT, "store", "feature-graphic")             # <lang>.png per listing language
 W, H = 1024, 500
 SCALE = 2          # render at 2x, downsample
 SAMPLES = 96
 
 TITLE = "Pétanque"
-TAGLINE = "Boules in the village square"
+TAGLINES = {  # keep in sync with 'menu.tagline' in src/i18n/messages/<lang>.ts
+    "en": "Boules in the village square",
+    "es": "Petanca en la plaza del pueblo",
+    "fr": "Les boules sur la place du village",
+    "it": "Bocce nella piazza del paese",
+    "pt": "Petanca na praça da vila",
+}
+LANGS = tuple(TAGLINES)
+TAGLINE_PX = 27                # shrunk per language only if the pill would get too wide
+PILL_MAX_W = 0.43              # pill width limit as a fraction of W (keeps >=25 px clear of the first boule)
 TITLE_PX = 132                 # cap height ~ 0.19 of the graphic height
 TITLE_POS = (0.075, 0.24)      # top-left of the title, as fractions of W, H (safe margins)
 EXTRUDE = "#b5532c"            # terracotta (a touch deeper/less saturated than the UI's --terracotta)
@@ -45,7 +60,7 @@ def render(path: str, preview: bool) -> None:
     stage.render(path)
 
 
-def logotype(img: Image.Image) -> Image.Image:
+def logotype(img: Image.Image, tagline: str) -> Image.Image:
     """Title with a solid extrusion (stacked offsets) and a soft drop shadow, then a tagline pill."""
     s = img.width / W
     f = font(int(TITLE_PX * s), "fredoka", 650)
@@ -63,11 +78,16 @@ def logotype(img: Image.Image) -> Image.Image:
     d.text((x, y), TITLE, font=f, fill=(255, 255, 255, 255))
 
     # tagline in a white pill under the title
-    tf = font(int(27 * s), "nunito", 800)
-    tb = d.textbbox((0, 0), TAGLINE, font=tf)
-    tw, th = tb[2] - tb[0], tb[3] - tb[1]
-    title_box = d.textbbox((x, y), TITLE, font=f)
     px, py = 18 * s, 10 * s
+    size = TAGLINE_PX
+    while True:
+        tf = font(int(size * s), "nunito", 800)
+        tb = d.textbbox((0, 0), tagline, font=tf)
+        tw, th = tb[2] - tb[0], tb[3] - tb[1]
+        if tw + 2 * px <= PILL_MAX_W * img.width or size <= 20:
+            break
+        size -= 1
+    title_box = d.textbbox((x, y), TITLE, font=f)
     cx = (title_box[0] + title_box[2]) / 2
     top = title_box[3] + depth + 22 * s
     pill = (cx - tw / 2 - px, top, cx + tw / 2 + px, top + th + 2 * py)
@@ -76,7 +96,7 @@ def logotype(img: Image.Image) -> Image.Image:
                                                   radius=(pill[3] - pill[1]) / 2, fill=(40, 20, 10, 90))
     shadow.alpha_composite(pill_shadow.filter(ImageFilter.GaussianBlur(6 * s)))
     d.rounded_rectangle(pill, radius=(pill[3] - pill[1]) / 2, fill=(255, 255, 255, 240))
-    d.text((cx - tw / 2 - tb[0], top + py - tb[1]), TAGLINE, font=tf, fill=(*hex_rgb(INK), 255))
+    d.text((cx - tw / 2 - tb[0], top + py - tb[1]), tagline, font=tf, fill=(*hex_rgb(INK), 255))
 
     out = img.convert("RGBA")
     out.alpha_composite(shadow)
@@ -86,16 +106,29 @@ def logotype(img: Image.Image) -> Image.Image:
 
 def main(argv) -> None:
     preview = "--preview" in argv
+    langs = ["en"]
+    if "--lang" in argv:
+        v = argv[argv.index("--lang") + 1]
+        langs = list(LANGS) if v == "all" else v.split(",")
+        for lang in langs:
+            if lang not in TAGLINES:
+                raise SystemExit(f"unknown --lang {lang!r} (one of {', '.join(LANGS)}, all)")
     os.makedirs(CACHE, exist_ok=True)
     raw = os.path.join(CACHE, "feature_preview.png" if preview else "feature_raw.png")
-    if "--reuse" not in argv:
+    if "--reuse" not in argv and not (os.path.exists(raw) and "--lang" in argv):
         render(raw, preview)
-    img = Image.open(raw).convert("RGB")
-    img = logotype(img)
-    img = img.resize((W, H), Image.LANCZOS)
-    path = OUT if not preview else os.path.join(CACHE, "feature_preview_logo.png")
-    save_rgb(img, path)
-    print(f"[feature] wrote {path}")
+    base = Image.open(raw).convert("RGB")
+    for lang in langs:
+        img = logotype(base, TAGLINES[lang]).resize((W, H), Image.LANCZOS)
+        if preview:
+            paths = [os.path.join(CACHE, f"feature_preview_logo_{lang}.png")]
+        else:
+            paths = [os.path.join(OUT_DIR, f"{lang}.png")] if "--lang" in argv else []
+            if lang == "en":
+                paths.append(OUT)
+        for path in paths:
+            save_rgb(img, path)
+            print(f"[feature] wrote {path}")
 
 
 if __name__ == "__main__":

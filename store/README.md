@@ -20,7 +20,7 @@ and Nunito (tagline), read from `public/fonts/`.
 | File | Play Console / platform slot | Size, format | Made by |
 | --- | --- | --- | --- |
 | `store/icon-512.png` | Play Console > Main store listing > **App icon** | 512 x 512, 32-bit PNG (RGBA, fully opaque), full bleed (Play applies its own mask) | `art/branding/icon.py` |
-| `store/feature-graphic.png` | Main store listing > **Feature graphic** | 1024 x 500, 24-bit PNG (no alpha); title kept away from the edges | `art/branding/feature.py` (+ `feature_scene.py`) |
+| `store/feature-graphic.png` (= `store/feature-graphic/en.png`) and `store/feature-graphic/<lang>.png` (`en fr es it pt`) | Main store listing > **Feature graphic** (one per listing language, see [Feature graphics](#feature-graphics)) | 1024 x 500, 24-bit PNG (no alpha); title kept away from the edges | `art/branding/feature.py` (+ `feature_scene.py`) |
 | `store/adaptive-foreground-432.png` | Android adaptive icon **foreground** (Bubblewrap / Android Studio Image Asset), background = solid `#a95f3a` | 432 x 432 (108 dp @ xxxhdpi), transparent; balls inside the 66 dp safe circle | `art/branding/icon.py` |
 | `store/splash-512.png` | TWA splash image (Bubblewrap shows it centred on the splash background colour) | 512 x 512, opaque PNG on `#a95f3a` | `art/branding/icon.py` |
 | `store/screenshots/<lang>/01..06.jpg` (`en fr es it pt`) | Main store listing > **Phone screenshots** (one set per listing language, see [Screenshots](#screenshots)) | 1080 x 1920 (9:16), 24-bit PNG (RGB, no alpha) | `store/screenshots-src/capture.cjs` |
@@ -107,6 +107,25 @@ every captured frame (flight series, toast frames, the computer's aim and flight
 `$TMPDIR/petanque-shots/<lang>/`) and `PICK` selects the six that are copied to `store/screenshots/`. Captions are
 edited in `caption.py` (`CAPTIONS`) and need no browser.
 
+## Feature graphics
+
+One 1024 x 500 graphic per Play listing language, all from the same cached 3D render (rendered once, language
+independent); only the tagline pill differs. The title stays "Pétanque" everywhere (the brand). Taglines are the
+in-game `menu.tagline` strings (`src/i18n/messages/*.ts`), in Nunito 800 inside the white pill under the title.
+
+| Play listing language | Upload | Tagline |
+| --- | --- | --- |
+| English (default listing) | `store/feature-graphic/en.png` (same as `store/feature-graphic.png`) | Boules in the village square |
+| French | `store/feature-graphic/fr.png` | Les boules sur la place du village |
+| Spanish | `store/feature-graphic/es.png` | Petanca en la plaza del pueblo |
+| Italian | `store/feature-graphic/it.png` | Bocce nella piazza del paese |
+| Portuguese | `store/feature-graphic/pt.png` | Petanca na praça da vila |
+
+Layout: the pill is centred under the title and capped at 43 % of the width (`PILL_MAX_W` in `feature.py`) so it
+stays clear of the boules; the tagline font starts at 27 px and shrinks only if needed (only French does, to about
+25 px). Title and pill sit well inside the safe area (at least 75 px from the left edge, 150 px from the top, 140 px
+from the bottom). Accents (é, ç) were checked in all five images.
+
 ## Regenerate
 
 ```sh
@@ -115,7 +134,9 @@ art/.venv/bin/python art/branding/icon.py             # all icons + adaptive + s
 art/.venv/bin/python art/branding/icon.py --reuse     # recompose only (framing, colours, vectors) - seconds
 art/.venv/bin/python art/branding/feature.py          # feature graphic (~10-15 min, 2x render + downsample)
 art/.venv/bin/python art/branding/feature.py --preview  # quick low-res check (written to $TMPDIR/petanque-branding/)
-art/.venv/bin/python art/branding/feature.py --reuse  # re-letter the cached render only
+art/.venv/bin/python art/branding/feature.py --reuse  # re-letter the cached render only (English -> store/feature-graphic.png)
+art/.venv/bin/python art/branding/feature.py --reuse --lang all  # en es fr it pt -> store/feature-graphic/<lang>.png (+ the default)
+art/.venv/bin/python art/branding/feature.py --reuse --lang fr   # a single language
 art/.venv/bin/python art/branding/review.py out.png   # contact sheet of the icons at real sizes (48-128 px, masks)
 ```
 
