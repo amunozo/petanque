@@ -6,6 +6,9 @@
  *   court_light.webp  (sun visibility only, the court + ~2 m around it, ~6 mm texels; cross-faded
  *                      over the ground map inside COURT_LIGHT_RECT, where the camera is closest)
  *   village_light.png (atlas for boards, houses, mairie, café, props; the glb's TEXCOORD_0)
+ *   ground_bounce.webp / village_bounce.webp (RGB indirect sun light after 3 diffuse bounces off
+ *                      the real albedos: the warm fill that sunlit gravel and limestone throw into
+ *                      shaded walls, boards and props; stored sqrt(v / BOUNCE_MAX))
  * R = sun visibility (soft, dappled tree shadows), G = ambient occlusion. Lambert still shades N.L
  * and the sky fill in real time; the patch multiplies the direct (sun) term by R and the indirect
  * (sky) term by G, scaled by the live `look.shadowStrength` / `look.aoStrength`.
@@ -37,6 +40,14 @@ const strength = { value: { x: 1, y: 1 } as { x: number; y: number } };
 const groundMap: { value: Texture } = { value: whiteTexture() };
 const villageMap: { value: Texture } = { value: whiteTexture() };
 const courtMap: { value: Texture } = { value: whiteTexture() };
+const groundBounce: { value: Texture } = { value: blackTexture() };
+const villageBounce: { value: Texture } = { value: blackTexture() };
+/** Scale of the baked bounce light (look.bounceStrength). */
+const bounceStrength = { value: 1 };
+/** Decode range of the bounce maps (keep in sync with BOUNCE_MAX in art/lib/bake.py). */
+const BOUNCE_MAX = '0.3';
+/** Linear albedo of the court gravel (palette "dust"), for the light the ground throws up onto boules and trunks. */
+const groundAlbedo = { value: new Vector3(0.5, 0.41, 0.27) };
 const courtRect = { value: new Vector4(COURT_LIGHT_RECT.x0, COURT_LIGHT_RECT.z0, COURT_LIGHT_RECT.w, COURT_LIGHT_RECT.d) };
 let maxAnisotropy = 4;
 
@@ -68,6 +79,17 @@ function whiteTexture(): Texture {
   const t = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat);
   t.needsUpdate = true;
   return t;
+}
+
+function blackTexture(): Texture {
+  const t = new DataTexture(new Uint8Array([0, 0, 0, 255]), 1, 1, RGBAFormat);
+  t.needsUpdate = true;
+  return t;
+}
+
+/** Strength of the baked bounce (indirect sun) light: 0 = off, 1 = as baked. */
+export function setBounceStrength(k: number): void {
+  bounceStrength.value = k;
 }
 
 function greyTexture(): Texture {
@@ -108,9 +130,29 @@ export function loadBakedTextures(url: (file: string) => string): void {
   };
   load('ground_light.png', groundMap, false);
   load('court_light.webp', courtMap, false);
+  load('ground_bounce.webp', groundBounce, false);
+  load('village_bounce.webp', villageBounce, false, false);
   load('village_light.png', villageMap, false, false);
   load('ground_detail.png', detailMap, true);
 }
+
+/**
+ * Light the sunlit ground throws up onto a surface (boules, trunks): ground radiance (its albedo x
+ * (sun x visibility + baked bounce)) over the lower half of the surface's view, plus a little of the
+ * bounce arriving there. Needs the sun (directional light 0) and uBounceStrength, uGroundAlbedo, uSunDir.
+ */
+const GROUND_FILL = /* glsl */ `
+vec3 groundFill( vec3 viewNormal, vec3 albedo, float groundSun, vec3 bounce ) {
+#if NUM_DIR_LIGHTS > 0
+  vec3 wn = inverseTransformDirection( viewNormal, viewMatrix );
+  float down = 0.5 * ( 1.0 - wn.y );
+  vec3 up = uGroundAlbedo * ( uSunDir.y * groundSun + bounce );
+  return BRDF_Lambert( albedo ) * directionalLights[ 0 ].color * ( up * down + bounce * 0.5 ) * uBounceStrength;
+#else
+  return vec3( 0.0 );
+#endif
+}
+`;
 
 /** Cubic B-spline lightmap lookup from 4 bilinear taps (smooth when the texels are magnified). */
 const BICUBIC = /* glsl */ `
@@ -143,6 +185,8 @@ float bakeCourt( sampler2D tex, vec4 rect, vec2 xz, float fallback ) {
 
 const BAKE_FRAGMENT = /* glsl */ `
 uniform sampler2D uBakeMap;
+uniform sampler2D uBounceMap;
+uniform float uBounceStrength;
 uniform vec2 uBakeStrength;
 varying vec2 vBakeUv;
 #ifdef BAKE_PLANAR
@@ -190,6 +234,12 @@ const SAMPLE = /* glsl */ `
   }
   reflectedLight.indirectDiffuse *= 1.0 - clamp( bakeOcc, 0.0, 1.0 ) * uBakeStrength.y;
 #endif
+#if NUM_DIR_LIGHTS > 0
+  // baked bounce: the sun's light reflected off the ground and walls (already occluded where it should be)
+  vec3 bounceT = texture2D( uBounceMap, vBakeUv ).rgb;
+  reflectedLight.indirectDiffuse += BRDF_Lambert( diffuseColor.rgb ) * directionalLights[ 0 ].color
+    * bounceT * bounceT * ${BOUNCE_MAX} * uBounceStrength;
+#endif
 `;
 
 export type BakeKind = 'ground' | 'atlas';
@@ -202,6 +252,8 @@ export function bakedMaterial<M extends Material>(material: M, kind: BakeKind): 
   const planar = kind === 'ground';
   material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
     shader.uniforms.uBakeMap = planar ? groundMap : villageMap;
+    shader.uniforms.uBounceMap = planar ? groundBounce : villageBounce;
+    shader.uniforms.uBounceStrength = bounceStrength;
     shader.uniforms.uBakeStrength = strength;
     if (planar) {
       shader.uniforms.uBakeRect = rect;
@@ -235,7 +287,7 @@ export function bakedMaterial<M extends Material>(material: M, kind: BakeKind): 
       .replace('#include <aomap_fragment>', `${SAMPLE}\n#include <aomap_fragment>`);
     gradeShader(shader);
   };
-  material.customProgramCacheKey = () => `baked-${kind}-v2`;
+  material.customProgramCacheKey = () => `baked-${kind}-v3`;
   return material;
 }
 
@@ -251,6 +303,9 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
     shader.uniforms.uSunDir = sunDir;
     shader.uniforms.uCourtMap = courtMap;
     shader.uniforms.uCourtRect = courtRect;
+    shader.uniforms.uBounceMap = groundBounce;
+    shader.uniforms.uBounceStrength = bounceStrength;
+    shader.uniforms.uGroundAlbedo = groundAlbedo;
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vBakeWorld;')
       .replace(
@@ -260,8 +315,9 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        `#include <common>\nuniform sampler2D uBakeMap;\nuniform vec2 uBakeStrength;\nuniform vec3 uBakeRect;\nuniform vec3 uSunDir;\nuniform sampler2D uCourtMap;\nuniform vec4 uCourtRect;\nvarying vec3 vBakeWorld;\n${BICUBIC}`,
+        `#include <common>\nuniform sampler2D uBakeMap;\nuniform vec2 uBakeStrength;\nuniform vec3 uBakeRect;\nuniform vec3 uSunDir;\nuniform sampler2D uCourtMap;\nuniform vec4 uCourtRect;\nuniform sampler2D uBounceMap;\nuniform float uBounceStrength;\nuniform vec3 uGroundAlbedo;\nvarying vec3 vBakeWorld;\n${BICUBIC}`,
       )
+      .replace('void main() {', `${GROUND_FILL}\nvoid main() {`)
       .replace(
         '#include <aomap_fragment>',
         `
@@ -275,10 +331,41 @@ export function bakedDynamicMaterial<M extends Material>(material: M): M {
   reflectedLight.directDiffuse *= bakeSun;
   reflectedLight.directSpecular *= bakeSun;
   reflectedLight.indirectDiffuse *= mix( 1.0, bakeL.g, uBakeStrength.y * 0.6 );
+  vec2 bakeHere = vec2( ( vBakeWorld.x - uBakeRect.x ) / uBakeRect.z, 1.0 - ( vBakeWorld.z - uBakeRect.y ) / uBakeRect.z );
+  float groundSun = texture2D( uBakeMap, clamp( bakeHere, 0.0, 1.0 ) ).r;
+  groundSun = bakeCourt( uCourtMap, uCourtRect, vBakeWorld.xz, groundSun );
+  vec3 groundBounce = texture2D( uBounceMap, clamp( bakeHere, 0.0, 1.0 ) ).rgb;
+  groundBounce *= groundBounce * ${BOUNCE_MAX};
+  reflectedLight.indirectDiffuse += groundFill( normal, diffuseColor.rgb, mix( 1.0, groundSun, uBakeStrength.x ), groundBounce );
 #include <aomap_fragment>`,
       );
   };
-  material.customProgramCacheKey = () => 'baked-dynamic-v2';
+  material.customProgramCacheKey = () => 'baked-dynamic-v4';
+  return material;
+}
+
+/**
+ * Tree wood (instanced, not in the lightmaps): the grade + the light thrown up by the sunlit
+ * ground, so the shaded side of the pale trunks is warm, not grey.
+ */
+export function woodMaterial<M extends Material>(material: M): M {
+  material.onBeforeCompile = (shader: WebGLProgramParametersWithUniforms) => {
+    shader.uniforms.uBounceStrength = bounceStrength;
+    shader.uniforms.uGroundAlbedo = groundAlbedo;
+    shader.uniforms.uSunDir = sunDir;
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform float uBounceStrength;\nuniform vec3 uGroundAlbedo;\nuniform vec3 uSunDir;',
+      )
+      .replace('void main() {', `${GROUND_FILL}\nvoid main() {`)
+      .replace(
+        '#include <aomap_fragment>',
+        'reflectedLight.indirectDiffuse += groundFill( normal, diffuseColor.rgb, 0.75, vec3( 0.04 ) );\n#include <aomap_fragment>',
+      );
+    gradeShader(shader);
+  };
+  material.customProgramCacheKey = () => 'wood-v2';
   return material;
 }
 

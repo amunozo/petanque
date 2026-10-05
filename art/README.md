@@ -90,7 +90,9 @@ those no longer matches `village_light.png`; change their scripts instead.
   for the boards, houses, mairie, café, props), plus `court_light.webp` (1280 x 3072 greyscale sun
   visibility over `COURT_RECT`, the court + ~2 m: ~6 mm texels where the camera is closest; the game
   cross-fades it over the ground map and samples the coarser ground map bicubic, so magnified texels
-  never show as blocks). The game multiplies its real-time sun term by R
+  never show as blocks). Plus `ground_bounce.webp` / `village_bounce.webp` (1024, RGB): the sun's indirect light after 3
+  diffuse bounces off the real albedos (warm fill from sunlit gravel / limestone into the shade),
+  stored sqrt(v / BOUNCE_MAX); the game adds it to the shade fill (`look.bounceStrength`). The game multiplies its real-time sun term by R
   and its sky fill by G; only the boules cast real-time shadows. Changing geometry, tree placement
   or the sun means re-baking (`npm run art` does it automatically).
 - **Village** (`houses`, `mairie`, `cafe`, `props`, `hills`) is modelled directly in game coordinates

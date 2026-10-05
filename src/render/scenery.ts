@@ -31,7 +31,7 @@ import {
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Object3D } from 'three';
-import { bakedMaterial, foliageMaterial, loadBakedTextures } from './bakedLight';
+import { bakedMaterial, foliageMaterial, loadBakedTextures, woodMaterial } from './bakedLight';
 import { CYPRESSES, TREES, type Placement } from './bakedLayout';
 import { gradeMaterial } from './grade';
 
@@ -74,7 +74,7 @@ export function loadScenery(scene: Scene, court: CourtRect): void {
   loadBakedTextures(modelUrl);
   const ground = bakedMaterial(new MeshLambertMaterial({ vertexColors: true }), 'ground');
   const atlas = bakedMaterial(new MeshLambertMaterial({ vertexColors: true }), 'atlas');
-  const wood = gradeMaterial(new MeshLambertMaterial({ vertexColors: true }));
+  const wood = woodMaterial(new MeshLambertMaterial({ vertexColors: true }));
   const leafMap = new TextureLoader().load(modelUrl('leaves.png'));
   leafMap.colorSpace = SRGBColorSpace;
   leafMap.flipY = false; // glTF UV convention

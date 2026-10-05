@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import math
 
-from .building import quad
 from .mesh import MeshData, icosphere
 from .palette import P, mix, scale
 from .rand import Rng
@@ -14,13 +13,14 @@ def ring(cx, cy, cz, r, n, phase=0.0):
 
 
 def cylinder(m: MeshData, cx, cz, y0, y1, r0, r1, n, color, top_color=None, cap=True):
-    a = ring(cx, y0, cz, r0, n)
-    b = ring(cx, y1, cz, r1, n)
+    """Round sides share their vertices and are shaded smooth; the cap stays flat."""
+    a = [m.add_vert(p) for p in ring(cx, y0, cz, r0, n)]
+    b = [m.add_vert(p) for p in ring(cx, y1, cz, r1, n)]
     for k in range(n):
         k2 = (k + 1) % n
-        quad(m, a[k2], a[k], b[k], b[k2], color)
+        m.add_face((a[k2], a[k], b[k], b[k2]), color, smooth=True)
     if cap:
-        i = [m.add_vert(p) for p in reversed(b)]  # reversed ring = counter-clockwise seen from above
+        i = [m.add_vert(p) for p in reversed(ring(cx, y1, cz, r1, n))]  # counter-clockwise seen from above
         m.add_face(tuple(i), top_color or color)
 
 
@@ -36,7 +36,7 @@ def lavender_bush(m: MeshData, x, y0, z, r, rng: Rng, subdiv: int = 1):
         fc = tuple(base + i for i in f)
         ny = sum(m.verts[i][1] for i in fc) / 3 - cy
         col = mix(P["sage"], P["lavender"], 0.85) if ny > -0.1 * r else P["sage"]
-        m.add_face(fc, scale(col, 1.0 + rng.jitter(0.08)))
+        m.add_face(fc, scale(col, 1.0 + rng.jitter(0.04)), smooth=True)
 
 
 def lavender_planter(m: MeshData, x, z, rng: Rng, scale_: float = 1.0):

@@ -498,7 +498,7 @@ def _bay_tree(m: MeshData, x: float, z: float, rng: Rng) -> None:
         fc = tuple(base + i for i in f)
         ny = sum(m.verts[i][1] for i in fc) / 3 - cy
         c = mix(P["leaf_dark"], P["leaf_mid"], max(0.0, ny / R) * 0.7)
-        m.add_face(fc, jit(c, rng, 0.08))
+        m.add_face(fc, jit(c, rng, 0.04), smooth=True)
 
 
 def build():

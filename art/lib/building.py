@@ -99,12 +99,11 @@ def _facade(m: MeshData, spec: HouseSpec, rng: Rng, H: float) -> None:
         for i in range(nx):
             cx, cy = (xs[i] + xs[i + 1]) / 2, (ys[j] + ys[j + 1]) / 2
             n = fbm(cx * 0.45 + spec.seed * 3.1, cy * 0.45, 0.0, spec.seed, 2)
-            c = mix(base, P["cream"], _ss(0.6, 0.85, n) * 0.35)        # sun-bleached patches
-            c = mix(c, P["ochre_dark"], _ss(0.4, 0.15, n) * 0.25)       # stained patches
-            c = scale(c, 1.0 - 0.16 * _ss(H - 1.2, H, cy))              # shade under the eave
-            c = scale(c, 1.0 - 0.10 * _ss(1.2, 0.0, cy))                # dusty foot
+            c = mix(base, P["cream"], _ss(0.6, 0.85, n) * 0.2)         # sun-bleached patches
+            c = mix(c, P["ochre_dark"], _ss(0.4, 0.15, n) * 0.14)       # stained patches
+            c = scale(c, 1.0 - 0.06 * _ss(1.2, 0.0, cy))                # dusty foot (eave shade is baked)
             quad(m, (xs[i], ys[j], 0.0), (xs[i + 1], ys[j], 0.0), (xs[i + 1], ys[j + 1], 0.0), (xs[i], ys[j + 1], 0.0),
-                 jit(c, rng, 0.025))
+                 jit(c, rng, 0.012))
     # Stone plinth along the foot.
     m.append(box(spec.width / 2, (0.45 - SINK) / 2, 0.02, spec.width, 0.45 + SINK, 0.04,
                  jit(mix(P["stone_grey"], base, 0.35), rng), top_color=jit(mix(P["limestone"], base, 0.3), rng)))
@@ -190,7 +189,7 @@ def _window(m: MeshData, cx: float, sill: float, w: float, h: float, spec: House
             for f in faces:
                 fc = tuple(base + i for i in f)
                 ny = sum(m.verts[i][1] for i in fc) / 3 - (sill - 0.06)
-                m.add_face(fc, jit(col if ny > -0.02 else P["leaf_dark"], rng, 0.08))
+                m.add_face(fc, jit(col if ny > -0.02 else P["leaf_dark"], rng, 0.04), smooth=True)
 
 
 def _door(m: MeshData, cx: float, spec: HouseSpec, rng: Rng) -> None:

@@ -23,25 +23,31 @@ class MeshData:
     verts: list[V3] = field(default_factory=list)
     faces: list[tuple[int, ...]] = field(default_factory=list)
     colors: list[Color] = field(default_factory=list)  # one per face
+    smooth: set[int] = field(default_factory=set)  # faces shaded smooth (rounded shapes) in flat meshes
 
     def add_vert(self, v: V3) -> int:
         self.verts.append(v)
         return len(self.verts) - 1
 
-    def add_face(self, idx: tuple[int, ...], color: Color) -> None:
+    def add_face(self, idx: tuple[int, ...], color: Color, smooth: bool = False) -> None:
+        if smooth:
+            self.smooth.add(len(self.faces))
         self.faces.append(idx)
         self.colors.append(color)
 
     def append(self, other: "MeshData", color: Color | None = None) -> None:
         """Merge another MeshData in (optionally overriding its face colours)."""
         base = len(self.verts)
+        fbase = len(self.faces)
+        self.smooth.update(i + fbase for i in other.smooth)
         self.verts.extend(other.verts)
         for f, c in zip(other.faces, other.colors):
             self.faces.append(tuple(i + base for i in f))
             self.colors.append(color if color is not None else c)
 
     def transformed(self, fn) -> "MeshData":
-        out = MeshData(verts=[fn(v) for v in self.verts], faces=list(self.faces), colors=list(self.colors))
+        out = MeshData(verts=[fn(v) for v in self.verts], faces=list(self.faces), colors=list(self.colors),
+                       smooth=set(self.smooth))
         return out
 
     def tri_count(self) -> int:
@@ -83,8 +89,8 @@ def to_object(data: MeshData, name: str, material, location_game: V3 = (0.0, 0.0
     mesh.from_pydata([(x, -z, y) for x, y, z in data.verts], [], [list(f) for f in data.faces])
     mesh.update()
     smooth = smooth or normals is not None
-    for p in mesh.polygons:
-        p.use_smooth = smooth
+    for i, p in enumerate(mesh.polygons):
+        p.use_smooth = smooth or i in data.smooth
     vcol = vertex_colors
     if vcol is None and smooth:
         acc = [[0.0, 0.0, 0.0, 0] for _ in data.verts]
@@ -98,7 +104,26 @@ def to_object(data: MeshData, name: str, material, location_game: V3 = (0.0, 0.0
         vcol = [(a[0] / a[3], a[1] / a[3], a[2] / a[3]) if a[3] else (1.0, 1.0, 1.0) for a in acc]
     attr = mesh.color_attributes.new(name="Col", type="FLOAT_COLOR", domain="CORNER")
     flat: list[float] = []
-    if vcol is not None:
+    if vcol is None and data.smooth:
+        # smooth-shaded parts of a flat mesh (rounded props) blend their face colours per vertex too
+        acc: dict[int, list[float]] = {}
+        for fi in data.smooth:
+            col = data.colors[fi]
+            for vi in data.faces[fi]:
+                a_ = acc.setdefault(vi, [0.0, 0.0, 0.0, 0])
+                a_[0] += col[0]
+                a_[1] += col[1]
+                a_[2] += col[2]
+                a_[3] += 1
+        for poly, col in zip(mesh.polygons, data.colors):
+            sm = poly.index in data.smooth
+            for vi in poly.vertices:
+                if sm:
+                    a_ = acc[vi]
+                    flat.extend((a_[0] / a_[3], a_[1] / a_[3], a_[2] / a_[3], 1.0))
+                else:
+                    flat.extend((col[0], col[1], col[2], 1.0))
+    elif vcol is not None:
         for poly in mesh.polygons:
             for vi in poly.vertices:
                 c = vcol[vi]

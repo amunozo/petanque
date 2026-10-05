@@ -25,7 +25,7 @@ import {
   type WebGLRenderer,
 } from 'three';
 import type { GameConfig, ToneMappingChoice } from '../tuning/config';
-import { setBakedAnisotropy, setBakeStrength, setGroundDetail } from './bakedLight';
+import { setBakedAnisotropy, setBakeStrength, setBounceStrength, setGroundDetail } from './bakedLight';
 import { BAKED_SUN } from './bakedLayout';
 import { setGradeSaturation } from './grade';
 import { createSky, SKY_STYLE } from './sky';
@@ -38,9 +38,9 @@ const TONE_MAPPINGS: Record<ToneMappingChoice, ToneMapping> = {
 };
 
 const STYLE = {
-  /** Fill from the sky (soft natural blue) and bounce from the pale dusty ground. */
-  hemiSky: 0xb4cbea,
-  hemiGround: 0xb3a184,
+  /** Fill from the sky (soft, slightly hazy blue: never grey-blue shade) and the warm dusty ground. */
+  hemiSky: 0xc8d4e2,
+  hemiGround: 0xcdb48e,
   /**
    * Exposure gain per tone-mapping curve, so switching curves in the panel keeps a similar mid-grey
    * (three's ACES pre-multiplies by 1/0.6; AgX darkens the mid-tones).
@@ -171,6 +171,7 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
       sun.intensity = look.sunIntensity;
       sun.shadow.intensity = look.shadowStrength;
       setBakeStrength(look.shadowStrength, look.aoStrength);
+      setBounceStrength(look.bounceStrength);
       setGroundDetail(STYLE.grainTileA, STYLE.grainTileB, look.groundGrain);
       hemi.intensity = look.fillIntensity;
       const curve = look.toneMapping in TONE_MAPPINGS ? look.toneMapping : 'neutral';

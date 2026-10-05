@@ -31,12 +31,17 @@ import numpy as np
 from PIL import Image
 
 from . import layout
+from .palette import P
 
 AO_DISTANCE = 3.0
 SAMPLES_SUN = 32
 SAMPLES_FLAT = 4
 SAMPLES_AO = 32
 SAMPLES_COURT = 40
+SAMPLES_BOUNCE = 96
+BOUNCES = 3
+BOUNCE_RES = 1024
+BOUNCE_MAX = 0.3  # keep in sync with src/render/bakedLight.ts
 LIGHT_UV = "Light"
 
 
@@ -85,6 +90,15 @@ def _receiver(name: str, x0: float, z0: float, w: float, d: float):
     return obj
 
 
+def _set_albedo(mat, color) -> None:
+    """The flat receivers stand in for the ground in the bake, so they bounce light with its colour."""
+    bsdf = mat.node_tree.nodes.get("Principled BSDF")
+    bsdf.inputs["Base Color"].default_value = (*color, 1.0)
+    bsdf.inputs["Roughness"].default_value = 1.0
+    if "Specular IOR Level" in bsdf.inputs:
+        bsdf.inputs["Specular IOR Level"].default_value = 0.0
+
+
 def _bake_target(mat, img) -> None:
     nt = mat.node_tree
     node = nt.nodes.get("BakeTarget") or nt.nodes.new("ShaderNodeTexImage")
@@ -109,10 +123,20 @@ def _unwrap(objs, margin: float) -> None:
     bpy.ops.object.mode_set(mode="OBJECT")
 
 
-def _pixels(img) -> np.ndarray:
+def _pixels(img, rgb: bool = False) -> np.ndarray:
     a = np.empty(img.size[0] * img.size[1] * 4, dtype=np.float32)
     img.pixels.foreach_get(a)
-    return a.reshape(img.size[1], img.size[0], 4)[..., 0].copy()
+    a = a.reshape(img.size[1], img.size[0], 4)
+    return a[..., :3].copy() if rgb else a[..., 0].copy()
+
+
+def _save_bounce(path: str, rgb: np.ndarray) -> int:
+    """Indirect sun light (RGB, relative to a sun of irradiance 1) as lossy WebP: sqrt(v / BOUNCE_MAX),
+    so the dim values keep their precision. The game decodes v = t^2 * BOUNCE_MAX."""
+    t = np.sqrt(np.clip(rgb / BOUNCE_MAX, 0, 1))
+    t = np.flipud(t)
+    Image.fromarray((t * 255 + 0.5).astype(np.uint8), "RGB").save(path, quality=90, method=6)
+    return os.path.getsize(path)
 
 
 def _bake(objs, kind: str, samples: int) -> None:
@@ -197,11 +221,13 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     village_img = _new_image("village_light", layout.VILLAGE_RES)
     gmat = bpy.data.materials.new("GroundReceiver")
     gmat.use_nodes = True
+    _set_albedo(gmat, P["earth"])
     receiver.data.materials.append(gmat)
     _bake_target(gmat, ground_img)
     court_img = _new_image("court_light", *layout.COURT_RES)
     cmat = bpy.data.materials.new("CourtReceiver")
     cmat.use_nodes = True
+    _set_albedo(cmat, P["dust"])
     court_receiver.data.materials.append(cmat)
     _bake_target(cmat, court_img)
     mats = {s.material for o in atlas_objs for s in o.material_slots if s.material}
@@ -257,6 +283,34 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     print(f"[bake] court ({time.time() - t0:.1f}s)")
     n = _save_grey(os.path.join(models_dir, "court_light.webp"), court_vis)
     print(f"[bake] court_light.webp {n / 1024:.0f} KB")
+
+    # Bounce light: the sun's indirect light after BOUNCES diffuse bounces off the real (vertex-colour)
+    # albedos: warm fill from the sunlit ground and limestone into shaded walls, boards and props.
+    receiver.hide_render = False
+    sc.cycles.max_bounces = BOUNCES
+    sc.cycles.diffuse_bounces = BOUNCES
+    gb_img = _new_image("ground_bounce", BOUNCE_RES)
+    vb_img = _new_image("village_bounce", BOUNCE_RES)
+    _bake_target(gmat, gb_img)
+    for m in mats:
+        _bake_target(m, vb_img)
+    bk = sc.render.bake
+    bk.use_pass_direct, bk.use_pass_indirect, bk.use_pass_color = False, True, False
+    sc.cycles.samples = max(8, int(SAMPLES_BOUNCE * quality))
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in targets:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = targets[0]
+    bk.margin, bk.margin_type, bk.use_clear = 4, "EXTEND", True
+    bpy.ops.object.bake(type="DIFFUSE")
+    print(f"[bake] bounce ({time.time() - t0:.1f}s)")
+    for img, name, sigma in ((gb_img, "ground_bounce", 2.5), (vb_img, "village_bounce", 1.2)):
+        # Cycles' colourless indirect pass is irradiance / pi (the direct pass is not): x pi, same units
+        rgb = _pixels(img, rgb=True) * math.pi
+        rgb = np.stack([_blur(rgb[..., k], sigma) for k in range(3)], axis=-1)
+        print(f"[bake] {name}: mean {rgb.reshape(-1, 3).mean(0)}, p99 {np.percentile(rgb, 99):.3f}")
+        n = _save_bounce(os.path.join(models_dir, f"{name}.webp"), rgb)
+        print(f"[bake] {name}.webp {n / 1024:.0f} KB")
 
     for i, name in enumerate(("ground_light", "village_light")):
         lit, flat, ao = results["lit"][i], results["flat"][i], results["ao"][i]

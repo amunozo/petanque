@@ -117,6 +117,8 @@ export interface GameConfig {
     aoStrength: number;
     /** Gravel grain on the ground (0 = smooth colour only). */
     groundGrain: number;
+    /** Baked bounce light (sunlight reflected by the ground and walls into the shade): 0 = off, 1 = as baked. */
+    bounceStrength: number;
   };
   /** Rules of a full match (see games/petanque/match.ts). */
   match: MatchRules;
@@ -193,14 +195,15 @@ export const defaultConfig: GameConfig = {
   look: {
     toneMapping: 'neutral',
     saturation: 1,
-    sunTempK: 5600,
-    sunIntensity: 4.4,
-    exposure: 1,
+    sunTempK: 5200,
+    sunIntensity: 4.3,
+    exposure: 1.08,
     fogDensity: 0.006,
-    fillIntensity: 1.45,
-    shadowStrength: 0.93,
+    fillIntensity: 1.6,
+    shadowStrength: 0.86,
     aoStrength: 0.8,
     groundGrain: 0.5,
+    bounceStrength: 1,
   },
   match: { pointsToWin: 13, boulesPerTeam: 3, jackMinDist: 6, jackMaxDist: 10, jackMinSideMargin: 0.5 },
   ai: {
@@ -314,6 +317,7 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'look.shadowStrength', label: 'shadow darkness', min: 0, max: 1, step: 0.05 },
       { path: 'look.aoStrength', label: 'ambient occlusion', min: 0, max: 1, step: 0.05 },
       { path: 'look.groundGrain', label: 'ground grain', min: 0, max: 1.5, step: 0.05 },
+      { path: 'look.bounceStrength', label: 'bounce light', min: 0, max: 3, step: 0.05 },
     ],
   },
   {
