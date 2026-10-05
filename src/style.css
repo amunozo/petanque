@@ -2268,3 +2268,9 @@ body.is-dialog .tn-root {
     transform: none;
   }
 }
+
+/* ---- Developer mode: build chips only for playtesting (see app/devMode.ts) ---- */
+:root:not(.is-dev) .hud-build,
+:root:not(.is-dev) .mn-build {
+  display: none;
+}

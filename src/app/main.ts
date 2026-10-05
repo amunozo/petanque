@@ -10,6 +10,7 @@ import { resolveLang, setLang, t } from '../i18n';
 import { createLoftPicker, createThrowController, type AimPreview, type ThrowIntent } from '../input';
 import { createPitchScene } from '../render';
 import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema } from '../tuning';
+import { resolveDevMode } from './devMode';
 import type { AppContext, Mode } from './context';
 import { createFx } from './fx';
 import { createHaptics } from './haptics';
@@ -48,7 +49,10 @@ const app = byId<HTMLElement>('app');
 const canvas = byId<HTMLCanvasElement>('scene');
 const hudRoot = byId<HTMLElement>('hud');
 
-const store = createConfigStore(defaultConfig, { schema: tuningSchema });
+// Players get the official defaults; saved tuning and the panel are dev-only.
+const devMode = resolveDevMode(params, import.meta.env.DEV);
+document.documentElement.classList.toggle('is-dev', devMode);
+const store = createConfigStore(defaultConfig, { schema: tuningSchema, ...(devMode ? {} : { storage: null }) });
 const cfg = store.config;
 
 const scene = createPitchScene(canvas, () => store.config);
@@ -241,6 +245,7 @@ hud.onSheetChange(() => refreshInput());
 
 // ---- tuning: opened from the ⋯ sheet; a dot on ⋯ flags changed values -----------------
 hud.onSettings(() => panel.open());
+hud.setSettingsAvailable(devMode);
 const paintTuningDot = (): void => hud.setSettingsChanged(store.diffCount() > 0);
 store.subscribe(paintTuningDot);
 paintTuningDot();

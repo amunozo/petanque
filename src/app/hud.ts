@@ -43,6 +43,8 @@ export interface Hud {
   /** "Tuning" row (opens the tuning panel); `changed` puts a dot on the ⋯ button. */
   onSettings(fn: () => void): void;
   setSettingsChanged(changed: boolean): void;
+  /** Shows the "Tuning" row (developer mode only). */
+  setSettingsAvailable(available: boolean): void;
   /** "Install app" row: shown only while `available` (see install.ts). */
   setInstallable(available: boolean): void;
   onInstall(fn: () => void): void;
@@ -274,6 +276,9 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
     },
     onSettings(fn) {
       settingsFn = fn;
+    },
+    setSettingsAvailable(available) {
+      settings.btn.hidden = !available;
     },
     setSettingsChanged(changed) {
       settingsBadge.hidden = !changed;
