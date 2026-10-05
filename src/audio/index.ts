@@ -12,7 +12,7 @@ import type { Body, SimEvent } from '../engine';
 import { audioConfig } from './config';
 import { createRumble, type Rumble } from './rumble';
 import { fillNoise, level01, loudest } from './shape';
-import { playBoard, playChime, playHit, playJackHit, playLand, playTick, type ChimeKind, type Runtime } from './voices';
+import { playBoard, playCarreau, playChime, playGoodHit, playHit, playJackHit, playLand, playTick, type ChimeKind, type Runtime } from './voices';
 
 export { audioConfig } from './config';
 export type { AudioConfig } from './config';
@@ -31,6 +31,8 @@ export interface Audio {
   /** Soft UI tick (loft change). */
   tick(): void;
   chime(kind: ChimeKind): void;
+  /** Stinger for a good shot: 'carreau' (the big one) or 'hit' (tir réussi). Silent while muted. */
+  celebrate(kind: 'carreau' | 'hit'): void;
   isMuted(): boolean;
   setMuted(muted: boolean): void;
   toggleMute(): void;
@@ -187,6 +189,12 @@ export function createAudio(opts: AudioOptions = {}): Audio {
     chime(kind) {
       const r = live();
       if (r) playChime(r, kind);
+    },
+    celebrate(kind) {
+      const r = live();
+      if (!r) return;
+      if (kind === 'carreau') playCarreau(r);
+      else playGoodHit(r);
     },
     isMuted: () => muted,
     setMuted,

@@ -7,6 +7,7 @@
  */
 import type { Body, World } from '../engine';
 import {
+  analyseShot,
   beginMatchThrow,
   canThrow,
   createMatch,
@@ -18,15 +19,19 @@ import {
 } from '../games/petanque';
 import type { AiDecision, AiDifficulty, AiRequest } from '../games/petanque/aiTypes';
 import type { AimPreview, ThrowIntent } from '../input';
+import { onLangChange, t } from '../i18n';
 import type { JackZoneView, TeamResolver } from '../render';
 import { createAimPreviewer } from './aimPreview';
 import { createAiClient } from './aiClient';
 import { createAiTurn } from './aiTurn';
 import type { AppContext, Mode } from './context';
+import { effectsConfig } from './effectsConfig';
 import type { TurnData } from './matchHud';
-import { endCardView, jackFault, matchOverTitle, scoreLine, settleMessage, TEAM_NAME, turnView, VOICE_2P, VOICE_VS } from './matchText';
+import { endCardView, jackFault, matchOverDetail, matchOverTitle, scoreLine, settleMessage, turnView, voice2p, voiceVs, type JackFault } from './matchText';
 import { matchConfig, type MatchLength } from './matchLength';
+import { formatMeasure, isTight, measureTargets } from './measureLines';
 import { createPlayback } from './playback';
+import { playShotEffects } from './shotEffects';
 
 export type Seat = 'human' | 'ai';
 
@@ -49,7 +54,7 @@ export interface MatchMode extends Mode {
   restart(): void;
 }
 
-/** Pause between the last boule coming to rest and the end card (s): time to see the scoring rings. */
+/** Pause between the last boule coming to rest and the end card (ms) when there is nothing to measure: time to see the scoring rings. */
 const CARD_DELAY_MS = 900;
 
 /** Boule bodies are named `${team}${n}` by the rules; the jack and practice balls stay neutral. */
@@ -66,12 +71,19 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
   /** A rejected jack: the rules drop it from the state, but it stays on screen until the next throw. */
   let ghostJack: Body | null = null;
   let cardTimer: ReturnType<typeof setTimeout> | undefined;
+  let measureTimer: ReturnType<typeof setTimeout> | undefined;
+  /** The cards are up (so a language change re-words them). */
+  let cardsUp = false;
+  let active = false;
+  /** Resting bodies before the throw in flight, to judge the shot once it settles. */
+  let shotBefore: readonly Body[] = [];
   let lastTurn: TurnData | null = null;
   /** Throws made in this match (both seats): feeds the AI seed. */
   let throwCount = 0;
   const aiClient = createAiClient(() => cfg);
 
-  const voice = () => (setup.seats.A !== setup.seats.B ? VOICE_VS : VOICE_2P);
+  const isVs = (): boolean => setup.seats.A !== setup.seats.B;
+  const voice = () => (isVs() ? voiceVs() : voice2p());
   const isAiTurn = (): boolean => canThrow(state, thrower()) && setup.seats[thrower()] === 'ai';
   const isHumanTurn = (): boolean => canThrow(state, thrower()) && setup.seats[thrower()] === 'human';
 
@@ -110,19 +122,19 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     onAim(d: AiDecision) {
       app.dataset['ai'] = 'aiming';
       if (lastTurn) {
-        lastTurn = { ...lastTurn, chip: 'Computer plays' };
+        lastTurn = { ...lastTurn, chip: t('turn.computerPlays') };
         matchHud.setChip(lastTurn);
       }
       // Same dots arc + landing ring a human sees while aiming, from its intent without noise.
       preview.showIntent(d.intent, state.phase === 'jack' ? 'jack' : 'boule');
-      if (d.plan === 'shoot') matchHud.setMessage(`${TEAM_NAME[thrower()]} shoots!`, thrower());
+      if (d.plan === 'shoot') matchHud.setMessage(t('toast.shoots', { name: voice().name[thrower()] }), thrower());
     },
     onFire(d: AiDecision) {
       delete app.dataset['ai'];
       const shoots = d.plan === 'shoot';
       const team = thrower();
       doThrow(team, d.intent);
-      if (shoots) matchHud.setMessage(`${TEAM_NAME[team]} shoots!`, team);
+      if (shoots) matchHud.setMessage(t('toast.shoots', { name: voice().name[team] }), team);
     },
   });
 
@@ -133,40 +145,71 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     ai.start();
   }
 
+  function clearMeasure(): void {
+    clearTimeout(measureTimer);
+    measureTimer = undefined;
+    ctx.measure.hide();
+  }
+
   function clearCards(): void {
     clearTimeout(cardTimer);
     cardTimer = undefined;
+    cardsUp = false;
+    clearMeasure();
     matchHud.showEndCard(null);
     matchHud.showMatchOver(null);
     app.classList.remove('is-endover');
   }
 
-  function showResultCards(): void {
+  /** (Re)words whichever card is up. */
+  function renderCards(): void {
+    const end = state.lastEnd;
+    if (!end) return;
+    const v = voice();
+    if (state.phase === 'matchOver' && state.winner) {
+      matchHud.showMatchOver({
+        title: matchOverTitle(state.winner, state.score, v),
+        detail: matchOverDetail(state.endNumber),
+        team: state.winner,
+        celebrate: setup.seats[state.winner] === 'human',
+      });
+    } else {
+      matchHud.showEndCard({ ...endCardView(end, v), score: scoreLine(state.score, v) });
+    }
+  }
+
+  function showResultCards(delayMs: number): void {
     const end = state.lastEnd;
     if (!end) return;
     const over = state.phase === 'matchOver';
     cardTimer = setTimeout(() => {
       app.classList.add('is-endover');
       ctx.refreshInput();
-      const v = voice();
-      if (over && state.winner) ctx.audio.chime(v === VOICE_VS && setup.seats[state.winner] === 'ai' ? 'lose' : 'win');
+      if (over && state.winner) ctx.audio.chime(isVs() && setup.seats[state.winner] === 'ai' ? 'lose' : 'win');
       else if (end.winner) ctx.audio.chime('score');
-      if (over && state.winner) {
-        const ends = state.endNumber;
-        matchHud.showMatchOver({
-          title: matchOverTitle(state.winner, state.score, v),
-          detail: `after ${ends} end${ends === 1 ? '' : 's'}`,
-          team: state.winner,
-          celebrate: setup.seats[state.winner] === 'human',
-        });
-      } else {
-        matchHud.showEndCard({ ...endCardView(end, v), score: scoreLine(state.score, v) });
-      }
-    }, CARD_DELAY_MS);
+      cardsUp = true;
+      renderCards();
+    }, delayMs);
   }
 
+  /** Shows the measuring lines after `delayMs` (the camera needs a moment to reach the close-up). */
+  function scheduleMeasure(delayMs: number): void {
+    clearTimeout(measureTimer);
+    measureTimer = setTimeout(() => showMeasure(), delayMs);
+  }
+
+  function showMeasure(): void {
+    const targets = measureTargets(state, effectsConfig.measure.maxMeasured);
+    if (targets.length === 0) return;
+    scene.setResultLine(null, null); // the lines below replace the single ground line
+    ctx.measure.show(targets.map((tg) => ({ team: tg.team, from: tg.from, to: tg.to, label: formatMeasure(tg.distance) })));
+  }
+
+  /** A contested end (both teams have a boule in play) is measured before the card. */
+  const isContested = (): boolean => measureTargets(state, effectsConfig.measure.maxMeasured).length === 2 && state.lastEnd?.reason !== 'jackOut';
+
   /** Everything that follows a settle: message chip, turn banner, rings, cards. */
-  function afterSettle(fault: string | null): void {
+  function afterSettle(fault: JackFault | null): void {
     matchHud.setScore(state.score, state.phase === 'jack' || state.phase === 'boule' ? state.toThrow : null);
     scene.setCameraMode('rest');
     scene.setJackZone(state.phase === 'jack' ? zone() : null);
@@ -175,7 +218,11 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
       matchHud.setMessage(null, null);
       const end = state.lastEnd;
       scene.setScoringHighlight(end ? end.scoringIds : null, end ? end.winner : null);
-      showResultCards();
+      if (isContested()) {
+        const m = effectsConfig.measure;
+        scheduleMeasure(m.startMs);
+        showResultCards(m.startMs + m.drawMs + m.holdMs);
+      } else showResultCards(CARD_DELAY_MS);
       return;
     }
     const msg = settleMessage(state, fault, voice());
@@ -185,17 +232,31 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
     const nearest = distances(state)[0];
     const nb = nearest ? state.bodies.find((b) => b.id === nearest.id) : undefined;
     scene.setResultLine(jack && nb ? jack.pos : null, jack && nb ? nb.pos : null);
+    // A photo finish in the middle of an end is measured too.
+    if (isTight(measureTargets(state, effectsConfig.measure.maxMeasured), effectsConfig.measure.tightGap)) scheduleMeasure(effectsConfig.measure.startMs);
     announceTurn();
     maybeStartAi();
+  }
+
+  /** Celebrates a good shot (sound, haptics, dust, a nudge of the view); a carreau is the big one. No words. */
+  function celebrateShot(w: World): void {
+    const thrownId = lastThrow()?.id;
+    if (!thrownId || thrownId === 'jack') return;
+    const shot = analyseShot(
+      { thrownId, teamOf: (id) => state.throws.find((th) => th.id === id)?.team ?? null, events: playback.events(), before: shotBefore, after: w.bodies },
+      effectsConfig.carreau,
+    );
+    if (shot.kind !== 'none') playShotEffects(ctx, shot.kind, shot.spot);
   }
 
   function onSettled(w: World): void {
     const wasJack = isJackThrow();
     const jackBody = w.bodies.find((b) => b.id === 'jack');
+    celebrateShot(w);
     state = settle(state, w.bodies, cfg);
     world = null;
     playback.reset();
-    let fault: string | null = null;
+    let fault: JackFault | null = null;
     ghostJack = null;
     if (wasJack && state.phase === 'jack') {
       fault = jackFault(jackBody, state.rules, cfg);
@@ -238,6 +299,8 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
   function doThrow(team: TeamId, intent: ThrowIntent): void {
     if (!canThrow(state, team)) return;
     throwCount++;
+    clearMeasure();
+    shotBefore = state.bodies;
     const r = beginMatchThrow(state, team, intent, cfg);
     state = r.state;
     world = r.world;
@@ -260,18 +323,37 @@ export function createMatchMode(ctx: AppContext, goMenu: () => void): MatchMode 
   matchHud.onRematch(newMatch);
   matchHud.onMenu(goMenu);
 
+  // A language change re-words what was built from state: names, turn line, cards, measuring labels.
+  onLangChange(() => {
+    if (!active) return;
+    matchHud.setNames(voice().name);
+    matchHud.setScore(state.score, state.phase === 'jack' || state.phase === 'boule' ? state.toThrow : null);
+    matchHud.setTarget(state.rules.pointsToWin);
+    if (state.phase === 'jack' || state.phase === 'boule') {
+      lastTurn = turnData();
+      matchHud.setChip(lastTurn);
+    }
+    if (cardsUp) renderCards();
+    if (ctx.measure.isShown()) {
+      const targets = measureTargets(state, effectsConfig.measure.maxMeasured);
+      ctx.measure.relabel(targets.map((tg) => formatMeasure(tg.distance)));
+    }
+  });
+
   return {
     setSetup(next) {
       setup = next;
     },
     restart: newMatch,
     enter() {
+      active = true;
       ctx.hud.setMode('match');
       ctx.hud.showEndCard(null);
       matchHud.show();
       newMatch();
     },
     exit() {
+      active = false;
       ai.cancel();
       delete app.dataset['ai'];
       aiClient.dispose();

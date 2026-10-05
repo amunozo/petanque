@@ -13,6 +13,7 @@ import {
   settleThrow,
   type PracticeState,
 } from '../games/petanque';
+import { onLangChange, t } from '../i18n';
 import type { AimPreview, ThrowIntent } from '../input';
 import { createAimPreviewer } from './aimPreview';
 import type { AppContext, Mode } from './context';
@@ -33,19 +34,19 @@ export function createPracticeMode(ctx: AppContext): Mode {
   function updateStatus(): void {
     const total = cfg.practice.boulesPerEnd;
     const n = Math.min(total, state.throws.length + (state.phase === 'aiming' ? 1 : 0));
-    hud.setStatus(state.phase === 'endOver' ? `End ${state.endNumber} · done` : `End ${state.endNumber} · Boule ${n}/${total}`);
+    hud.setStatus(state.phase === 'endOver' ? t('practice.done', { end: state.endNumber }) : t('practice.status', { end: state.endNumber, n, total }));
   }
 
   function showResult(): void {
     const d = distancesToJack(state);
     const best = closestBoule(state);
     const rows: DistanceRow[] = d.entries.map((e) => ({
-      label: `Boule ${e.throwNumber}:`,
-      text: e.out ? 'OUT' : e.distance === null ? '-' : formatDistance(e.distance),
+      label: t('practice.boule', { n: e.throwNumber }),
+      text: e.out ? t('practice.out') : e.distance === null ? '-' : formatDistance(e.distance),
       closest: best !== null && best.id === e.id,
       out: e.out,
     }));
-    if (d.jackOut) rows.unshift({ label: 'Jack:', text: 'OUT', closest: false, out: true });
+    if (d.jackOut) rows.unshift({ label: t('practice.jack'), text: t('practice.out'), closest: false, out: true });
     hud.setDistances(rows);
 
     const jack = state.bodies.find((b) => b.id === JACK_ID);
@@ -55,9 +56,9 @@ export function createPracticeMode(ctx: AppContext): Mode {
     if (state.phase === 'endOver') {
       if (best && best.distance !== null && (sessionBest === null || best.distance < sessionBest)) sessionBest = best.distance;
       hud.showEndCard({
-        best: best && best.distance !== null ? formatDistance(best.distance) : null,
-        sessionBest: sessionBest === null ? null : formatDistance(sessionBest),
-        ...(d.jackOut ? { note: 'Jack out' } : best ? {} : { note: 'All boules out' }),
+        best: best && best.distance !== null ? best.distance : null,
+        sessionBest,
+        ...(d.jackOut ? { note: 'jackOut' as const } : best ? {} : { note: 'allOut' as const }),
       });
     }
   }
@@ -92,8 +93,17 @@ export function createPracticeMode(ctx: AppContext): Mode {
     ctx.refreshInput();
   }
 
+  let active = false;
+  // A language change repaints the texts that were built from state.
+  onLangChange(() => {
+    if (!active) return;
+    updateStatus();
+    if (state.phase !== 'inFlight' && state.throws.length > 0) showResult();
+  });
+
   return {
     enter() {
+      active = true;
       hud.setMode('practice');
       hud.onNewEnd(startNewEnd);
       hud.onNextEnd(startNewEnd);
@@ -107,6 +117,7 @@ export function createPracticeMode(ctx: AppContext): Mode {
       updateStatus();
     },
     exit() {
+      active = false;
       world = null;
       resetView();
       hud.setStatus('');

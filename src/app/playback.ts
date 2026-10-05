@@ -8,7 +8,10 @@ const MAX_STEPS_PER_FRAME = 600;
 const MAX_THROW_SECONDS = 40;
 
 export interface Playback {
+  /** Forgets the events collected for the current throw (call when a throw starts or ends). */
   reset(): void;
+  /** Every event of the throw in progress, in order (for shot analysis once it settles). */
+  events(): readonly SimEvent[];
   /** Advances `world` by `dtReal` real seconds (x playbackSpeed); true once it has settled (or timed out). */
   advance(world: World, dtReal: number): boolean;
 }
@@ -22,11 +25,14 @@ export function fastestRolling(w: World): number {
 
 export function createPlayback(ctx: AppContext): Playback {
   let accumulator = 0;
+  let collected: SimEvent[] = [];
   return {
     reset() {
       accumulator = 0;
+      collected = [];
       ctx.audio.setRolling(0);
     },
+    events: () => collected,
     advance(w, dtReal) {
       const { cfg } = ctx;
       accumulator += dtReal * cfg.camera.playbackSpeed;
@@ -40,6 +46,7 @@ export function createPlayback(ctx: AppContext): Playback {
         if (isSettled(w) || w.time > MAX_THROW_SECONDS) break;
       }
       if (steps >= MAX_STEPS_PER_FRAME) accumulator = 0; // drop the backlog instead of spiralling
+      for (const e of events) collected.push(e);
       ctx.haptics.handle(events);
       ctx.audio.handle(events, w.bodies);
       const done = isSettled(w) || w.time > MAX_THROW_SECONDS;

@@ -1,4 +1,5 @@
 /** Match length choice (start menu): a rules preset applied when a match is created. Pure, no DOM. */
+import { t } from '../i18n';
 import type { GameConfig } from '../tuning';
 
 export type MatchLength = 'quick' | 'standard';
@@ -21,4 +22,4 @@ export const matchConfig = <C extends Pick<GameConfig, 'match'>>(cfg: C, length:
 });
 
 /** Menu subtitle of the "2 players" button. */
-export const matchInfoText = (points: number): string => `Pass and play · first to ${points}`;
+export const matchInfoText = (points: number): string => t('menu.match.sub', { points });

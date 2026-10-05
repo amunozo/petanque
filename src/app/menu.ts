@@ -1,6 +1,10 @@
 /** Start menu + confirm dialog (plain DOM overlays; styles in the "Menu" section of src/style.css, classes mn-*). */
 import type { AiDifficulty } from '../games/petanque/aiTypes';
+import { onLangChange, t, type MessageKey } from '../i18n';
 import { button, el, shieldPointer } from './dom';
+import { icon } from './icons';
+import { createLangPicker } from './langPicker';
+import { PRIVACY_URL } from './links';
 import { MATCH_LENGTHS, matchInfoText, type MatchLength } from './matchLength';
 import { DIFFICULTIES, loadDifficulty, loadMatchLength, saveDifficulty, saveMatchLength } from './prefs';
 import { paintMuteButton } from './soundIcon';
@@ -17,18 +21,22 @@ export interface Menu {
   /** Speaker button in the top-right corner. */
   setMuted(muted: boolean): void;
   onMute(fn: () => void): void;
+  /** "Install app" link in the footer: shown only while `available` (see install.ts). */
+  setInstallable(available: boolean): void;
+  onInstall(fn: () => void): void;
+  /** "How to play" link in the footer. */
+  onHowTo(fn: () => void): void;
 }
 
-const DIFFICULTY_LABEL: Record<AiDifficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
+const DIFFICULTY_KEY = { easy: 'diff.easy', medium: 'diff.medium', hard: 'diff.hard' } as const satisfies Record<AiDifficulty, MessageKey>;
 
 /** Inline Easy / Medium / Hard segmented control; the choice is remembered (localStorage). */
 function difficultyPicker(): { element: HTMLElement; get(): AiDifficulty } {
   let value = loadDifficulty();
   const row = el('div', 'mn-seg');
   row.setAttribute('role', 'radiogroup');
-  row.setAttribute('aria-label', 'Computer difficulty');
   const buttons = DIFFICULTIES.map((d) => {
-    const b = button('mn-seg-btn', DIFFICULTY_LABEL[d], () => {
+    const b = button('mn-seg-btn', '', () => {
       value = d;
       saveDifficulty(d);
       render();
@@ -39,23 +47,29 @@ function difficultyPicker(): { element: HTMLElement; get(): AiDifficulty } {
     return b;
   });
   function render(): void {
-    DIFFICULTIES.forEach((d, i) => buttons[i]?.setAttribute('aria-checked', String(d === value)));
+    row.setAttribute('aria-label', t('diff.aria'));
+    DIFFICULTIES.forEach((d, i) => {
+      const b = buttons[i];
+      if (!b) return;
+      b.textContent = t(DIFFICULTY_KEY[d]);
+      b.setAttribute('aria-checked', String(d === value));
+    });
   }
   render();
+  onLangChange(render);
   return { element: row, get: () => value };
 }
 
 /** Points to win per length, read when the menu opens (Standard follows the tunable target). */
 export type LengthPoints = () => Record<MatchLength, number>;
 
-const LENGTH_NAME: Record<MatchLength, string> = { quick: 'Quick', standard: 'Standard' };
+const LENGTH_KEY = { quick: 'length.quick', standard: 'length.standard' } as const satisfies Record<MatchLength, MessageKey>;
 
 /** "Quick · 7" / "Standard · 13" segmented control, shared by both match buttons; the choice is remembered. */
 function lengthPicker(points: LengthPoints, onChange: (l: MatchLength) => void): { element: HTMLElement; get(): MatchLength; refresh(): void } {
   let value = loadMatchLength();
   const row = el('div', 'mn-seg');
   row.setAttribute('role', 'radiogroup');
-  row.setAttribute('aria-label', 'Match length');
   const buttons = MATCH_LENGTHS.map((l) => {
     const b = button('mn-seg-btn', '', () => {
       value = l;
@@ -68,18 +82,22 @@ function lengthPicker(points: LengthPoints, onChange: (l: MatchLength) => void):
     row.append(b);
     return b;
   });
+  const label = el('div', 'mn-length-label');
   function refresh(): void {
     const p = points();
+    label.textContent = t('length.label');
+    row.setAttribute('aria-label', t('length.label'));
     MATCH_LENGTHS.forEach((l, i) => {
       const b = buttons[i];
       if (!b) return;
-      b.textContent = `${LENGTH_NAME[l]} · ${p[l]}`;
+      b.textContent = `${t(LENGTH_KEY[l])} · ${p[l]}`;
       b.setAttribute('aria-checked', String(l === value));
     });
   }
   refresh();
   const wrap = el('div', 'mn-length');
-  wrap.append(el('div', 'mn-length-label', 'Match length'), row);
+  wrap.append(label, row);
+  onLangChange(refresh);
   return { element: wrap, get: () => value, refresh };
 }
 
@@ -91,31 +109,32 @@ function balls(kinds: readonly ('a' | 'b' | 'j')[]): HTMLElement {
   return art;
 }
 
-function choice(cls: string, title: string, sub: string, art: readonly ('a' | 'b' | 'j')[]): { btn: HTMLButtonElement; sub: HTMLElement } {
+function choice(cls: string, art: readonly ('a' | 'b' | 'j')[]): { btn: HTMLButtonElement; title: HTMLElement; sub: HTMLElement } {
   const btn = button(`mn-btn ${cls}`, '');
-  const subEl = el('span', 'mn-btn-sub', sub);
+  const titleEl = el('span', 'mn-btn-title');
+  const subEl = el('span', 'mn-btn-sub');
   const text = el('span', 'mn-btn-text');
-  text.append(el('span', 'mn-btn-title', title), subEl);
+  text.append(titleEl, subEl);
   btn.append(balls(art), text);
-  return { btn, sub: subEl };
+  return { btn, title: titleEl, sub: subEl };
 }
 
 export function createMenu(parent: HTMLElement, buildId: string, points: LengthPoints): Menu {
   const root = el('div', 'mn-root');
   root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-label', 'Main menu');
   shieldPointer(root);
 
   // Emblem: a jack between one boule per team, drawn in CSS, over a little ground shadow.
   const logo = el('div', 'mn-logo');
   logo.setAttribute('aria-hidden', 'true');
   logo.append(el('i', 'mn-ball mn-ball-a'), el('i', 'mn-ball mn-jack'), el('i', 'mn-ball mn-ball-b'));
+  const tagline = el('div', 'mn-tagline');
   const head = el('div', 'mn-head');
-  head.append(logo, el('h1', 'mn-title', 'Pétanque'), el('div', 'mn-tagline', 'Boules in the village square'));
+  head.append(logo, el('h1', 'mn-title', 'Pétanque'), tagline);
 
-  const practice = choice('mn-practice', 'Practice', 'Throw at the jack, on your own', ['j', 'a']);
-  const match = choice('mn-match', '2 players (same phone)', matchInfoText(points()[loadMatchLength()]), ['a', 'b']);
-  const vs = choice('mn-vs', '1 player vs computer', 'You are Blue', ['a', 'b']);
+  const practice = choice('mn-practice', ['j', 'a']);
+  const match = choice('mn-match', ['a', 'b']);
+  const vs = choice('mn-vs', ['a', 'b']);
   const level = difficultyPicker();
   const vsBox = el('div', 'mn-vs-box');
   vsBox.append(vs.btn, level.element);
@@ -128,19 +147,57 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
 
   const muteBtn = el('button', 'mn-mute');
   muteBtn.type = 'button';
-  paintMuteButton(muteBtn, false);
+  let muted = false;
+  paintMuteButton(muteBtn, muted);
+  const langs = createLangPicker('mn-langs');
 
-  root.append(muteBtn, head, buttons, el('div', 'mn-build', buildId));
+  // Footer: quiet links ("Install app" only where the browser offers it), then the build id.
+  const howtoBtn = button('mn-link mn-howto', '');
+  const installBtn = button('mn-link mn-install', '');
+  installBtn.hidden = true;
+  const privacy = el('a', 'mn-link');
+  privacy.href = PRIVACY_URL;
+  privacy.target = '_blank';
+  privacy.rel = 'noopener';
+  const links = el('div', 'mn-links');
+  links.append(howtoBtn, installBtn, privacy);
+  const foot = el('div', 'mn-foot');
+  foot.append(links, el('div', 'mn-build', buildId));
+
+  root.append(langs.element, muteBtn, head, buttons, foot);
   parent.append(root);
+
+  const relabel = (): void => {
+    root.setAttribute('aria-label', t('menu.aria'));
+    tagline.textContent = t('menu.tagline');
+    practice.title.textContent = t('menu.practice.title');
+    practice.sub.textContent = t('menu.practice.sub');
+    vs.title.textContent = t('menu.vs.title');
+    vs.sub.textContent = t('menu.vs.sub');
+    match.title.textContent = t('menu.match.title');
+    paintMatchInfo();
+    howtoBtn.replaceChildren();
+    howtoBtn.insertAdjacentHTML('afterbegin', icon('help', 16));
+    howtoBtn.append(t('menu.howto'));
+    installBtn.textContent = t('menu.install');
+    privacy.textContent = t('menu.privacy');
+    paintMuteButton(muteBtn, muted);
+  };
+  relabel();
+  onLangChange(relabel);
 
   let practiceFn: () => void = () => undefined;
   let matchFn: (l: MatchLength) => void = () => undefined;
   let vsFn: (d: AiDifficulty, l: MatchLength) => void = () => undefined;
   let muteFn: () => void = () => undefined;
+  let howtoFn: () => void = () => undefined;
   practice.btn.addEventListener('click', () => practiceFn());
   match.btn.addEventListener('click', () => matchFn(length.get()));
   vs.btn.addEventListener('click', () => vsFn(level.get(), length.get()));
   muteBtn.addEventListener('click', () => muteFn());
+  howtoBtn.addEventListener('click', () => howtoFn());
+  let installFn: () => void = () => undefined;
+  installBtn.addEventListener('click', () => installFn());
 
   return {
     show() {
@@ -163,11 +220,21 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
     onVsComputer(fn) {
       vsFn = fn;
     },
-    setMuted(muted) {
+    setMuted(next) {
+      muted = next;
       paintMuteButton(muteBtn, muted);
     },
     onMute(fn) {
       muteFn = fn;
+    },
+    setInstallable(available) {
+      installBtn.hidden = !available;
+    },
+    onInstall(fn) {
+      installFn = fn;
+    },
+    onHowTo(fn) {
+      howtoFn = fn;
     },
   };
 }

@@ -344,6 +344,13 @@ button:focus-visible,
 .hud-item:active {
   background: var(--surface-2);
 }
+a.hud-item {
+  box-sizing: border-box;
+  text-decoration: none;
+}
+.hud-item[hidden] {
+  display: none;
+}
 .hud-item-icon {
   display: flex;
   color: var(--terracotta-ink);
@@ -1406,7 +1413,7 @@ button:focus-visible,
   flex-direction: column;
   gap: 18px;
   box-sizing: border-box;
-  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 28px);
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 64px);
   background:
     radial-gradient(120% 55% at 50% 18%, rgba(255, 255, 255, 0) 30%, rgba(31, 60, 120, 0.18) 100%),
     linear-gradient(rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.5) 100%);
@@ -1604,9 +1611,50 @@ button:focus-visible,
   color: #fff;
   box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.15);
 }
-.mn-build {
+.mn-foot {
   position: absolute;
+  left: 0;
+  right: 0;
   bottom: calc(var(--safe-bottom) + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.mn-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: calc(100vw - 16px);
+}
+.mn-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--ink-2);
+  font: 700 13px/1 var(--font-body);
+  text-decoration: none;
+  touch-action: manipulation;
+  pointer-events: auto;
+}
+.mn-link[hidden] {
+  display: none;
+}
+.mn-howto {
+  gap: 5px;
+  padding: 0 12px 0 9px;
+  color: var(--ink);
+}
+.mn-link:active {
+  background: var(--glass-strong);
+}
+.mn-build {
   padding: 1px 8px;
   border-radius: var(--r-pill);
   background: rgba(255, 255, 255, 0.6);
@@ -1660,10 +1708,24 @@ body.is-dialog .tn-root {
   visibility: hidden;
 }
 
+/* Narrow phones: translated titles are longer. */
+@media (max-width: 380px) {
+  .mn-btn-title {
+    font-size: 18px;
+  }
+  .mn-btn-sub {
+    font-size: 13px;
+  }
+}
+
 /* Short phones: tighten the menu so all three choices fit. */
 @media (max-height: 680px) {
   .mn-root {
     gap: 12px;
+  }
+  /* The emblem makes room for the language pill and longer translated titles. */
+  .mn-logo {
+    display: none;
   }
   .mn-title {
     font-size: 50px;
@@ -1687,6 +1749,458 @@ body.is-dialog .tn-root {
   .mn-buttons {
     gap: 9px;
   }
+}
+
+/* ==========================================================================
+   Update toast (src/app/updateToast.ts): "New version available — Update".
+   Above the loft picker; over the menu and dialogs so it is never missed.
+   ========================================================================== */
+.up-toast {
+  position: absolute;
+  z-index: 2200;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 72px);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: max-content; /* left:50% would otherwise squeeze it to half the screen */
+  max-width: calc(100vw - 2 * var(--edge) - var(--safe-left) - var(--safe-right));
+  box-sizing: border-box;
+  padding: 6px 6px 6px 16px;
+  border-radius: var(--r-pill);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-lg);
+  font: 700 14px/1.2 var(--font-body);
+  color: var(--ink);
+  transform: translateX(-50%);
+  touch-action: manipulation;
+  animation: up-toast-in var(--dur-2) var(--ease-out) both;
+}
+.up-toast[hidden] {
+  display: none;
+}
+@keyframes up-toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.up-text {
+  flex: 1;
+  min-width: 0;
+}
+.up-update {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--terracotta);
+  color: #fff;
+  font: 800 15px var(--font-body);
+  touch-action: manipulation;
+}
+.up-update:active {
+  background: var(--terracotta-ink);
+}
+.up-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  touch-action: manipulation;
+}
+.up-close:active {
+  background: var(--surface-2);
+}
+
+/* ==========================================================================
+   Language picker (src/app/langPicker.ts): EN FR ES IT PT chips. In the menu it
+   is a frosted pill top left (mirrors the sound button); in the ⋯ sheet a full row.
+   ========================================================================== */
+.lg-row {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+}
+.lg-chip {
+  flex: 1;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-2);
+  font: 800 12.5px/1 var(--font-body);
+  letter-spacing: 0.3px;
+  touch-action: manipulation;
+  transition: background var(--dur-1), color var(--dur-1);
+}
+.lg-chip[aria-checked='true'] {
+  background: var(--terracotta);
+  color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.15);
+}
+.mn-langs {
+  position: absolute;
+  z-index: 1;
+  top: calc(var(--safe-top) + var(--edge));
+  left: calc(var(--safe-left) + var(--edge));
+  height: 44px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 3px 4px;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+}
+.mn-langs .lg-chip {
+  min-width: 32px;
+  min-height: 36px;
+}
+.hud-lang {
+  padding: 4px 6px 8px;
+}
+.hud-lang-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 6px;
+  font: 700 16px var(--font-body);
+}
+.hud-langs {
+  background: var(--surface-2);
+}
+
+/* ==========================================================================
+   How to play (src/app/howto.ts): paginated cards over a scrim.
+   ========================================================================== */
+.ht-root {
+  --ht-ground: #ecd9b0;
+  --ht-ground-dark: #c4a674;
+  --ht-board: #8d6038;
+  position: absolute;
+  z-index: 2050;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: calc(var(--safe-top) + 12px) calc(var(--safe-right) + 12px) calc(var(--safe-bottom) + 12px) calc(var(--safe-left) + 12px);
+  background: rgba(38, 33, 48, 0.55);
+  font: 16px/1.35 var(--font-body);
+  color: var(--ink);
+  touch-action: manipulation;
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+.ht-root[hidden] {
+  display: none;
+}
+.ht-card {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 400px);
+  max-height: 100%;
+  box-sizing: border-box;
+  padding: 14px 0 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: pop-in var(--dur-2) var(--ease-spring) both;
+}
+.ht-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px 0 20px;
+}
+.ht-title {
+  margin: 0;
+  font: 600 14px/1.2 var(--font-display);
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.ht-skip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font: 800 14px var(--font-body);
+  touch-action: manipulation;
+}
+.ht-skip[hidden] {
+  display: none;
+}
+.ht-track {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+.ht-track::-webkit-scrollbar {
+  display: none;
+}
+.ht-track:focus-visible {
+  outline: none;
+}
+.ht-page {
+  flex: 0 0 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  padding: 6px 20px 4px;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.ht-art {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+.ht-svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: min(176px, 22dvh);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.ht-page-title {
+  margin: 0 0 6px;
+  font: 600 24px/1.15 var(--font-display);
+  color: var(--ink);
+}
+.ht-text {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ht-types {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.ht-type {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.ht-type-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--terracotta);
+  color: #fff;
+}
+.ht-type-shoot .ht-type-icon {
+  background: var(--lavender);
+}
+.ht-type-words {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ht-type-name {
+  font: 600 17px/1.15 var(--font-display);
+}
+.ht-type-desc {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--ink-2);
+}
+.ht-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ht-rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 700;
+}
+.ht-rule-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #fff;
+}
+.ht-rule-icon.is-ok {
+  background: var(--leaf);
+}
+.ht-rule-icon.is-no {
+  background: var(--danger);
+}
+.ht-dots {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 0 8px;
+}
+.ht-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background var(--dur-1), transform var(--dur-1) var(--ease-out);
+}
+.ht-dots i.on {
+  background: var(--terracotta);
+  transform: scale(1.3);
+}
+.ht-nav {
+  display: flex;
+  gap: 10px;
+  padding: 0 16px;
+}
+.ht-btn {
+  flex: 1;
+  min-height: 50px;
+  padding: 0 12px;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: 600 18px/1 var(--font-display);
+  touch-action: manipulation;
+  transition: transform var(--dur-1) var(--ease-out), filter var(--dur-1);
+}
+.ht-btn:disabled {
+  opacity: 0.35;
+}
+.ht-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.98);
+}
+.ht-next {
+  flex: 1.6;
+  border-color: transparent;
+  background: var(--terracotta);
+  color: #fff;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16), 0 3px 10px rgba(204, 74, 22, 0.3);
+}
+@media (max-height: 700px) {
+  .ht-svg {
+    height: min(176px, 19dvh);
+  }
+  .ht-art {
+    margin-bottom: 10px;
+  }
+  .ht-page-title {
+    font-size: 21px;
+  }
+  .ht-text,
+  .ht-rule {
+    font-size: 15px;
+  }
+  .ht-type {
+    padding: 6px 8px;
+  }
+  .ht-type-icon {
+    height: 34px;
+  }
+  .ht-type-desc {
+    font-size: 13px;
+  }
+}
+
+/* ==========================================================================
+   Measuring (src/app/measure.ts) + effects canvas (src/app/fx.ts): drawn over
+   the scene, under the HUD.
+   ========================================================================== */
+.ms-root,
+.fx-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.ms-root[hidden] {
+  display: none;
+}
+.ms-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.ms-casing {
+  stroke: #fff;
+  stroke-opacity: 0.8;
+  stroke-linecap: round;
+}
+.ms-line,
+.ms-tick {
+  stroke: var(--tc, var(--ink));
+  stroke-linecap: round;
+}
+.ms-tick {
+  stroke-width: 2.4;
+  transition: opacity var(--dur-2);
+}
+.ms-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  will-change: transform;
+}
+.ms-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--r-pill);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-sm);
+  font: 800 13px/1 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ink);
+  opacity: 0;
+  transform: scale(0.8);
+}
+.ms-root.is-labels .ms-pill {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-spring);
 }
 
 /* ==========================================================================

@@ -73,8 +73,8 @@ function grain(rt: Runtime, t: number, filter: BiquadFilterType, hz: number, q: 
  * Inharmonic ring of decaying sines + a tiny noise tick. `level` 0..1 scales
  * volume, upper partials and ring time. Metal for boule–boule, wood for the jack.
  */
-function impact(rt: Runtime, c: ImpactSoundConfig, level: number): void {
-  const t = rt.ctx.currentTime;
+function impact(rt: Runtime, c: ImpactSoundConfig, level: number, delay = 0): void {
+  const t = rt.ctx.currentTime + delay;
   const seed = rt.seq++;
   const bright = lerp(c.brightness, 1, level);
   const ring = lerp(0.55, 1, level);
@@ -143,4 +143,78 @@ export function playChime(rt: Runtime, kind: ChimeKind): void {
     tone(rt, at, hz, peak, 0.006, ring);
     tone(rt, at, hz * 2, peak * 0.22, 0.004, ring * 0.5, undefined, 'triangle');
   });
+}
+
+/**
+ * Voiced "oh!" of a crowd: a few detuned sawtooth voices through two formant
+ * band-passes (F1/F2 glide from "oo" towards "oh"), pitch rising a little, swelling and fading.
+ */
+function oh(rt: Runtime, t: number, level: number): void {
+  const c = audioConfig.celebrate.oh;
+  const { ctx } = rt;
+  c.pitchHz.forEach((hz, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(hz, t);
+    osc.frequency.exponentialRampToValueAtTime(hz * c.pitchEnd, t + c.seconds * 0.8);
+    const amp = ctx.createGain();
+    const peak = Math.max(FLOOR, c.gain * level * (i === 0 ? 1 : 0.7));
+    amp.gain.setValueAtTime(FLOOR, t);
+    amp.gain.linearRampToValueAtTime(peak, t + c.seconds * 0.3);
+    amp.gain.exponentialRampToValueAtTime(FLOOR, t + c.seconds);
+    const nodes: AudioNode[] = [osc, amp];
+    for (const [from, to, q] of [
+      [c.f1[0], c.f1[1], 5],
+      [c.f2[0], c.f2[1], 7],
+    ] as const) {
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.Q.value = q;
+      f.frequency.setValueAtTime(from, t);
+      f.frequency.exponentialRampToValueAtTime(to, t + c.seconds * 0.7);
+      osc.connect(f).connect(amp);
+      nodes.push(f);
+    }
+    amp.connect(rt.out);
+    osc.start(t);
+    osc.stop(t + c.seconds + 0.05);
+    track(rt, osc, nodes);
+  });
+}
+
+/** Crowd murmur: a slow swell of band-passed noise. */
+function crowd(rt: Runtime, t: number, level: number): void {
+  const c = audioConfig.celebrate.crowd;
+  grain(rt, t, 'bandpass', c.hz, 0.7, c.gain * level, c.seconds * 0.3, c.seconds * 0.7);
+}
+
+/** Bright rising chime from `notes`, starting at `t`. */
+function risingChime(rt: Runtime, t: number, notes: readonly number[], step: number, level: number): void {
+  const peak = audioConfig.ui.chimeGain * level;
+  notes.forEach((hz, i) => {
+    const last = i === notes.length - 1;
+    const ring = last ? 0.9 : 0.4;
+    tone(rt, t + i * step, hz, peak, 0.004, ring);
+    tone(rt, t + i * step, hz * 2, peak * 0.2, 0.003, ring * 0.5, undefined, 'triangle');
+  });
+}
+
+/** Carreau: bright double clack, a rising chime and a crowd "oh!". */
+export function playCarreau(rt: Runtime): void {
+  const c = audioConfig.celebrate;
+  const t = rt.ctx.currentTime;
+  impact(rt, audioConfig.hit, 1);
+  impact(rt, audioConfig.hit, 0.85, c.clackGap);
+  risingChime(rt, t + c.clackGap + 0.07, c.chimeNotes, c.chimeStep, c.chimeLevel);
+  oh(rt, t + c.clackGap + 0.05, 1);
+  crowd(rt, t + c.clackGap + 0.02, 1);
+}
+
+/** Tir réussi: one clack, a soft two-note ping and a short murmur. */
+export function playGoodHit(rt: Runtime): void {
+  const c = audioConfig.celebrate.hit;
+  const t = rt.ctx.currentTime;
+  impact(rt, audioConfig.hit, c.clack);
+  risingChime(rt, t + 0.07, c.notes, 0.07, c.chime);
+  crowd(rt, t + 0.05, c.crowd);
 }

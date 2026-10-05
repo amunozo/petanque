@@ -47,3 +47,7 @@ export type {
   TeamId,
   ThrowRecord,
 } from './matchTypes';
+
+// Shot analysis for the celebrations (tir réussi / carreau)
+export { analyseShot, DEFAULT_CARREAU } from './carreau';
+export type { CarreauConfig, ShotInput, ShotKind, ShotOutcome } from './carreau';

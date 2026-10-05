@@ -72,6 +72,21 @@ export interface AudioConfig {
     crackle: number;
   };
   ui: { tickGain: number; tickHz: number; chimeGain: number };
+  /** Good-shot stingers (carreau / tir réussi): double clack + rising chime + a crowd-ish "oh!". */
+  celebrate: {
+    /** Delay between the two clacks of a carreau (s). */
+    clackGap: number;
+    /** Rising chime notes (Hz), spacing (s) and loudness relative to ui.chimeGain. */
+    chimeNotes: number[];
+    chimeStep: number;
+    chimeLevel: number;
+    /** The "oh!": voiced formant synth (pitch Hz start -> end, formants F1/F2 Hz start -> end), level and length (s). */
+    oh: { pitchHz: number[]; pitchEnd: number; f1: [number, number]; f2: [number, number]; gain: number; seconds: number };
+    /** Crowd murmur under it: band-passed noise swell (Hz), level, length (s). */
+    crowd: { hz: number; gain: number; seconds: number };
+    /** The milder "tir réussi" version: level of the clack / chime and of the crowd. */
+    hit: { clack: number; chime: number; crowd: number; notes: number[] };
+  };
 }
 
 export const audioConfig: AudioConfig = {
@@ -131,4 +146,13 @@ export const audioConfig: AudioConfig = {
     crackle: 0.35,
   },
   ui: { tickGain: 0.18, tickHz: 2600, chimeGain: 0.3 },
+  celebrate: {
+    clackGap: 0.085,
+    chimeNotes: [783.99, 987.77, 1174.66, 1567.98],
+    chimeStep: 0.07,
+    chimeLevel: 0.85,
+    oh: { pitchHz: [138, 174, 208], pitchEnd: 1.22, f1: [380, 560], f2: [820, 1180], gain: 0.2, seconds: 0.62 },
+    crowd: { hz: 1150, gain: 0.16, seconds: 0.85 },
+    hit: { clack: 0.8, chime: 0.45, crowd: 0.35, notes: [1318.51, 1760] },
+  },
 };

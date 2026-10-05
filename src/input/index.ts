@@ -14,5 +14,5 @@ export {
 export type { ControlsConfig, Point, Sample } from './gestures';
 export { createThrowController } from './throwController';
 export type { ThrowController, ThrowHandlers } from './throwController';
-export { createLoftPicker, LOFT_OPTIONS } from './loftPicker';
+export { createLoftPicker, iconSvg as loftIconSvg, LOFT_OPTIONS } from './loftPicker';
 export type { LoftOption, LoftPicker } from './loftPicker';

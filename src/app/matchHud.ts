@@ -6,8 +6,9 @@
  * Teams are told apart by colour AND shape: Blue = round mark, Red = diamond.
  */
 import type { TeamId } from '../games/petanque/matchTypes';
+import { onLangChange, t } from '../i18n';
 import { button, el, replay, shieldPointer } from './dom';
-import { TEAM_NAME } from './matchText';
+import { teamName } from './matchText';
 
 export interface EndCardData {
   title: string;
@@ -41,7 +42,7 @@ export interface MatchHud {
   setScore(score: Record<TeamId, number>, active: TeamId | null): void;
   /** Points needed to win, shown at the end of the score bar ("to 7"). */
   setTarget(points: number): void;
-  /** Labels on the score bar (default "Blue" / "Red"). */
+  /** Labels on the score bar (default "Blue" / "Red", translated). */
   setNames(names: Record<TeamId, string>): void;
   /** Big banner for ~1.2 s, then the score bar's turn line takes over. */
   announceTurn(turn: TurnData): void;
@@ -70,10 +71,10 @@ const mark = (): HTMLElement => {
   return m;
 };
 
-function dots(left: number, total: number, team: TeamId): HTMLElement {
+function dots(left: number, total: number, team: TeamId, name: string): HTMLElement {
   const wrap = el('span', `mh-dots ${teamClass(team)}`);
   wrap.setAttribute('role', 'img');
-  wrap.setAttribute('aria-label', `${TEAM_NAME[team]}: ${left} of ${total} boules left`);
+  wrap.setAttribute('aria-label', t('match.dots', { name, count: left, total }));
   for (let i = 0; i < total; i++) wrap.append(el('i', i < left ? 'on' : ''));
   return wrap;
 }
@@ -102,10 +103,10 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   // ---- score bar --------------------------------------------------------------------
   const bar = el('div', 'mh-bar');
   const rows = el('div', 'mh-rows');
-  const side = (t: TeamId): { row: HTMLElement; pts: HTMLElement; name: HTMLElement; dots: HTMLElement } => {
-    const row = el('div', `mh-row ${teamClass(t)}`);
+  const side = (team: TeamId): { row: HTMLElement; pts: HTMLElement; name: HTMLElement; dots: HTMLElement } => {
+    const row = el('div', `mh-row ${teamClass(team)}`);
     const pts = el('span', 'mh-pts', '0');
-    const name = el('span', 'mh-name', TEAM_NAME[t]);
+    const name = el('span', 'mh-name', teamName(team));
     const d = el('span', 'mh-row-dots');
     row.append(mark(), name, d, pts);
     return { row, pts, name, dots: d };
@@ -142,7 +143,7 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   const endTitle = el('div', 'mh-card-title');
   const endDetail = el('div', 'mh-card-detail');
   const endScore = el('div', 'mh-card-score');
-  const nextBtn = button('mh-btn mh-primary', 'Next end');
+  const nextBtn = button('mh-btn mh-primary', '');
   const endHead = el('div', 'mh-card-head');
   endHead.append(mark(), endTitle);
   endCard.append(endHead, endDetail, endScore, nextBtn);
@@ -153,8 +154,8 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   const overTitle = el('div', 'mh-card-title');
   const overDetail = el('div', 'mh-card-detail');
   const overRow = el('div', 'mh-btn-row');
-  const rematchBtn = button('mh-btn mh-primary', 'Rematch');
-  const menuBtn = button('mh-btn', 'Menu');
+  const rematchBtn = button('mh-btn mh-primary', '');
+  const menuBtn = button('mh-btn', '');
   overRow.append(menuBtn, rematchBtn);
   const overHead = el('div', 'mh-card-head');
   overHead.append(mark(), overTitle);
@@ -181,11 +182,33 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   rematchBtn.addEventListener('click', () => rematchFn());
   menuBtn.addEventListener('click', () => menuFn());
 
+  let names: Record<TeamId, string> = { A: teamName('A'), B: teamName('B') };
+  let targetPoints = 0;
+  let lastDots: Pick<TurnData, 'left' | 'total'> | null = null;
+  const paintDots = (): void => {
+    if (!lastDots) return;
+    sideA.dots.replaceChildren(dots(lastDots.left.A, lastDots.total, 'A', names.A));
+    sideB.dots.replaceChildren(dots(lastDots.left.B, lastDots.total, 'B', names.B));
+  };
+  const paintTarget = (): void => {
+    if (targetPoints === 0) return;
+    target.replaceChildren(el('span', '', t('match.to')), ' ', el('b', '', String(targetPoints)));
+    target.setAttribute('aria-label', t('match.toAria', { points: targetPoints }));
+  };
+  const paintStatic = (): void => {
+    nextBtn.textContent = t('end.next');
+    rematchBtn.textContent = t('over.rematch');
+    menuBtn.textContent = t('over.menu');
+    paintTarget();
+    paintDots();
+  };
+  paintStatic();
+  onLangChange(paintStatic);
   const paintChip = (turn: TurnData): void => {
     chip.className = `mh-chip ${teamClass(turn.team)}`;
     chipText.textContent = turn.chip;
-    sideA.dots.replaceChildren(dots(turn.left.A, turn.total, 'A'));
-    sideB.dots.replaceChildren(dots(turn.left.B, turn.total, 'B'));
+    lastDots = turn;
+    paintDots();
   };
   const hideMessage = (): void => {
     clearTimeout(toastTimer);
@@ -206,18 +229,20 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
       sideB.row.classList.toggle('is-active', active === 'B');
     },
     setTarget(points) {
-      target.innerHTML = `<span>to</span> <b>${points}</b>`;
-      target.setAttribute('aria-label', `First to ${points} points`);
+      targetPoints = points;
+      paintTarget();
     },
-    setNames(names) {
-      sideA.name.textContent = names.A;
-      sideB.name.textContent = names.B;
+    setNames(next) {
+      names = next;
+      sideA.name.textContent = next.A;
+      sideB.name.textContent = next.B;
+      paintDots();
     },
     announceTurn(turn) {
       bannerTitle.textContent = turn.banner;
       bannerHint.textContent = turn.hint;
       bannerHint.hidden = turn.hint === '';
-      bannerDots.replaceChildren(dots(turn.left.A, turn.total, 'A'), dots(turn.left.B, turn.total, 'B'));
+      bannerDots.replaceChildren(dots(turn.left.A, turn.total, 'A', names.A), dots(turn.left.B, turn.total, 'B', names.B));
       banner.className = `mh-banner ${teamClass(turn.team)}`;
       replay(banner, 'is-on');
       paintChip(turn);
@@ -267,6 +292,7 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
       chipText.textContent = '';
       sideA.dots.replaceChildren();
       sideB.dots.replaceChildren();
+      lastDots = null;
       hideMessage();
       endCard.hidden = true;
       overCard.hidden = true;

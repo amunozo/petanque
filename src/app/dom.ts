@@ -27,3 +27,23 @@ export function replay(target: HTMLElement, cls: string): void {
   void target.offsetWidth; // reflow so the animation restarts
   target.classList.add(cls);
 }
+
+/**
+ * Fills `target` with catalogue text: `**bold**` becomes <strong>, "\n" a line break.
+ * Built from DOM nodes (never innerHTML), so params can't inject markup.
+ */
+export function setRich(target: HTMLElement, text: string): void {
+  const nodes: Node[] = [];
+  text.split('\n').forEach((line, i) => {
+    if (i > 0) nodes.push(document.createElement('br'));
+    line.split('**').forEach((part, j) => {
+      if (part === '') return;
+      if (j % 2 === 1) {
+        const b = document.createElement('b');
+        b.textContent = part;
+        nodes.push(b);
+      } else nodes.push(document.createTextNode(part));
+    });
+  });
+  target.replaceChildren(...nodes);
+}

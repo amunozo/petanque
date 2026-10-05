@@ -6,19 +6,27 @@
  */
 import '../style.css';
 import { createAudio } from '../audio';
+import { resolveLang, setLang, t } from '../i18n';
 import { createLoftPicker, createThrowController, type AimPreview, type ThrowIntent } from '../input';
 import { createPitchScene } from '../render';
 import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema } from '../tuning';
 import type { AppContext, Mode } from './context';
+import { createFx } from './fx';
 import { createHaptics } from './haptics';
+import { createHowTo } from './howto';
 import { createHud } from './hud';
+import { createInstaller } from './install';
 import { createMatchHud } from './matchHud';
 import { pointsFor } from './matchLength';
 import { createMatchMode, setup2p, setupVsComputer } from './matchMode';
+import { createMeasureOverlay } from './measure';
 import { confirmDialog, createMenu } from './menu';
-import { isDifficulty, loadDifficulty, loadMatchLength } from './prefs';
+import { hasSeenHowTo, isDifficulty, loadDifficulty, loadLang, loadMatchLength, markHowToSeen } from './prefs';
 import { createPracticeMode } from './practiceMode';
+import { registerServiceWorker } from './pwa';
 import { createTouchHint } from './touchHint';
+import { playShotEffects } from './shotEffects';
+import { createUpdateToast } from './updateToast';
 
 /** Longest real-time gap one frame may simulate (after a tab switch etc.). */
 const MAX_FRAME_SECONDS = 0.25;
@@ -29,6 +37,13 @@ const byId = <T extends HTMLElement>(id: string): T => {
   return el as T;
 };
 
+// Language first: every screen below is built in it. `?lang=fr` (dev, screenshots) beats the saved choice, which beats the browser's.
+const params = new URLSearchParams(location.search);
+setLang(resolveLang({ param: params.get('lang'), saved: loadLang(), preferred: navigator.languages }));
+
+// Listen for the browser's install offer right away: the event can fire before the rest has loaded.
+const installer = createInstaller();
+
 const app = byId<HTMLElement>('app');
 const canvas = byId<HTMLCanvasElement>('scene');
 const hudRoot = byId<HTMLElement>('hud');
@@ -37,6 +52,10 @@ const store = createConfigStore(defaultConfig, { schema: tuningSchema });
 const cfg = store.config;
 
 const scene = createPitchScene(canvas, () => store.config);
+// Overlays drawn over the 3D view (under the HUD): measuring lines, dust bursts.
+const project = (p: Parameters<typeof scene.project>[0]) => scene.project(p);
+const fx = createFx(app, canvas, project, hudRoot);
+const measure = createMeasureOverlay(app, project, hudRoot);
 const hud = createHud(hudRoot, __BUILD_ID__);
 const matchHud = createMatchHud(hudRoot);
 const menu = createMenu(app, __BUILD_ID__, () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }));
@@ -47,7 +66,6 @@ const loftPicker = createLoftPicker('half');
 app.append(loftPicker.element);
 
 // ---- session / mode plumbing -----------------------------------------------------
-const params = new URLSearchParams(location.search);
 const seedParam = Number(params.get('seed'));
 let seedPending = Number.isFinite(seedParam) && seedParam !== 0 ? seedParam : null;
 
@@ -66,8 +84,10 @@ const ctx: AppContext = {
   haptics,
   audio,
   loftPicker,
+  fx,
+  measure,
   refreshInput: () => refreshInput(),
-  uiBlocked: () => panel.isOpen() || menu.isOpen() || hud.isSheetOpen() || dialogOpen,
+  uiBlocked: () => panel.isOpen() || menu.isOpen() || hud.isSheetOpen() || dialogOpen || howTo.isOpen(),
   noteThrow: () => {
     throwsDone++;
   },
@@ -77,6 +97,25 @@ const ctx: AppContext = {
     return s;
   },
 };
+
+const howTo = createHowTo(app, () => ({
+  quick: pointsFor('quick', cfg),
+  standard: pointsFor('standard', cfg),
+  jackMin: cfg.match.jackMinDist,
+  jackMax: cfg.match.jackMaxDist,
+}));
+howTo.onClose(() => {
+  markHowToSeen();
+  refreshInput();
+});
+const openHowTo = (): void => {
+  if (dialogOpen || howTo.isOpen()) return;
+  hud.closeSheet();
+  howTo.open();
+  refreshInput();
+};
+menu.onHowTo(openHowTo);
+hud.onHowTo(openHowTo);
 
 const panel = createTuningPanel(store, tuningSchema, { onOpenChange: () => refreshInput() });
 const practice = createPracticeMode(ctx);
@@ -118,6 +157,7 @@ function goMenu(): void {
   mode = null;
   scene.setAimPreview(null);
   scene.setCameraMode('aim');
+  fx.clear();
   menu.show();
   refreshInput();
 }
@@ -129,9 +169,9 @@ async function confirmLeave(title: string, confirmLabel: string): Promise<boolea
   refreshInput();
   const ok = await confirmDialog(app, {
     title,
-    text: 'The current match will be lost.',
+    text: t('confirm.text'),
     confirmLabel,
-    cancelLabel: 'Keep playing',
+    cancelLabel: t('confirm.keep'),
   });
   dialogOpen = false;
   refreshInput();
@@ -140,12 +180,12 @@ async function confirmLeave(title: string, confirmLabel: string): Promise<boolea
 
 async function requestMenu(): Promise<void> {
   if (!mode || dialogOpen) return;
-  if (await confirmLeave('Leave the match?', 'Leave')) goMenu();
+  if (await confirmLeave(t('confirm.leave.title'), t('confirm.leave.ok'))) goMenu();
 }
 
 async function requestRestart(): Promise<void> {
   if (mode !== match || dialogOpen) return;
-  if (await confirmLeave('Restart the match?', 'Restart')) match.restart();
+  if (await confirmLeave(t('confirm.restart.title'), t('confirm.restart.ok'))) match.restart();
 }
 
 menu.onPractice(() => enterMode(practice));
@@ -157,6 +197,29 @@ menu.onVsComputer((difficulty, length) => {
   match.setSetup(setupVsComputer(difficulty, length));
   enterMode(match);
 });
+
+// ---- PWA: "Install app" (menu + ⋯ sheet) and the "new version" toast ----------------------
+const paintInstall = (): void => {
+  const available = installer.canInstall();
+  menu.setInstallable(available);
+  hud.setInstallable(available);
+};
+installer.onChange(paintInstall);
+paintInstall();
+menu.onInstall(() => void installer.install());
+hud.onInstall(() => void installer.install());
+
+// A new version waits until the player taps "Update" (a match in progress asks first).
+const updates = registerServiceWorker();
+const updateToast = createUpdateToast(app);
+updates.onUpdate(() =>
+  updateToast.show(() => {
+    if (dialogOpen) return;
+    void confirmLeave(t('confirm.update.title'), t('confirm.update.ok')).then((ok) => {
+      if (ok) updates.apply();
+    });
+  }),
+);
 
 // ---- sound: mute toggles (⋯ sheet + menu) and loft tick ---------------------------------
 const paintMute = (muted: boolean): void => {
@@ -227,6 +290,8 @@ function frame(now: number): void {
   if (mode) mode.frame(dtReal);
   else scene.syncBodies([], null);
   scene.render(dtReal);
+  measure.frame(now);
+  fx.frame(now);
   requestAnimationFrame(frame);
 }
 
@@ -241,5 +306,22 @@ else if (startMode === 'match') {
 } else if (startMode === 'ai') {
   match.setSetup(setupVsComputer(isDifficulty(levelParam) ? levelParam : loadDifficulty(), loadMatchLength()));
   enterMode(match);
-} else goMenu();
+} else {
+  goMenu();
+  // First launch: offer "How to play" once (skippable). Not with the dev shortcuts above.
+  if (!hasSeenHowTo()) {
+    markHowToSeen();
+    openHowTo();
+  }
+}
 requestAnimationFrame(frame);
+
+// Dev shortcut: `?fxdemo=carreau|hit` plays a good-shot celebration once, in front of the throwing circle (to tune sound and visuals).
+const demo = params.get('fxdemo');
+if (demo === 'carreau' || demo === 'hit') {
+  const kind = demo;
+  window.setTimeout(() => {
+    scene.setCameraMode('rest');
+    playShotEffects(ctx, kind, { x: cfg.throw.originX, y: 0, z: cfg.throw.originZ - 3 });
+  }, 1800);
+}

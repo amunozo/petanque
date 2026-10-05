@@ -1,5 +1,6 @@
 /** Tiny localStorage helpers: best effort, the app must work without storage. */
 import type { AiDifficulty } from '../games/petanque/aiTypes';
+import { isLang, type Lang } from '../i18n';
 import { DEFAULT_MATCH_LENGTH, isMatchLength, type MatchLength } from './matchLength';
 
 const DIFFICULTY_KEY = 'petanque.aiDifficulty';
@@ -38,6 +39,45 @@ export function loadMatchLength(): MatchLength {
 export function saveMatchLength(l: MatchLength): void {
   try {
     localStorage.setItem(MATCH_LENGTH_KEY, l);
+  } catch {
+    /* storage blocked */
+  }
+}
+
+const LANG_KEY = 'petanque.lang';
+
+/** The language the player picked, or null while they never did (then the browser's language applies). */
+export function loadLang(): Lang | null {
+  try {
+    const v = localStorage.getItem(LANG_KEY);
+    return isLang(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLang(l: Lang): void {
+  try {
+    localStorage.setItem(LANG_KEY, l);
+  } catch {
+    /* storage blocked */
+  }
+}
+
+const HOWTO_KEY = 'petanque.howtoSeen';
+
+/** Has the player been offered "How to play" yet? (It is offered once, on first launch.) */
+export function hasSeenHowTo(): boolean {
+  try {
+    return localStorage.getItem(HOWTO_KEY) === '1';
+  } catch {
+    return true; // no storage: never nag
+  }
+}
+
+export function markHowToSeen(): void {
+  try {
+    localStorage.setItem(HOWTO_KEY, '1');
   } catch {
     /* storage blocked */
   }

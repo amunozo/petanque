@@ -24,6 +24,9 @@ src/
   input/         Touch gestures -> serializable throw parameters.
   tuning/        Live-tunable config (all game-feel numbers) + in-game panel.
   app/           Wiring, screens, main loop.
+  i18n/          Typed string catalogues (en/fr/es/it/pt); all player-facing
+                 text goes through t(); missing keys fail typecheck.
+  audio/         Procedural WebAudio sounds driven by engine events.
 ```
 - Every game-feel number lives in a tunable config object, never as a magic
   constant inside engine/render code.

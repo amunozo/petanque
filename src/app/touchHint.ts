@@ -4,6 +4,8 @@
  * still starts anywhere on the screen. Text appears only before the player's
  * first throw; afterwards a fainter marker stays for a couple more throws.
  */
+import { onLangChange, t } from '../i18n';
+import { el, setRich } from './dom';
 
 /** Throws (per page load) during which a faint marker (no text) stays after the first one. */
 export const FAINT_THROWS = 2;
@@ -25,10 +27,14 @@ export function createTouchHint(parent: HTMLElement): TouchHint {
   const root = document.createElement('div');
   root.className = 'touch-hint';
   root.hidden = true;
-  root.innerHTML =
-    '<div class="touch-hint-text">Put your finger anywhere,<br><b>pull down</b> and <b>let go</b> to throw</div>' +
-    '<div class="touch-hint-marker"><span class="touch-hint-arrow"></span></div>';
+  const text = el('div', 'touch-hint-text');
+  const marker = el('div', 'touch-hint-marker');
+  marker.append(el('span', 'touch-hint-arrow'));
+  root.append(text, marker);
   parent.append(root);
+  const paintText = (): void => setRich(text, t('hint.touch'));
+  paintText();
+  onLangChange(paintText);
 
   return {
     update(active, throwsDone) {

@@ -3,9 +3,11 @@ import type { AimPreview, LoftPicker, ThrowIntent } from '../input';
 import type { Audio } from '../audio';
 import type { PitchScene } from '../render';
 import type { ConfigStore, GameConfig } from '../tuning';
+import type { Fx } from './fx';
 import type { Haptics } from './haptics';
 import type { Hud } from './hud';
 import type { MatchHud } from './matchHud';
+import type { MeasureOverlay } from './measure';
 
 export interface AppContext {
   app: HTMLElement;
@@ -18,6 +20,9 @@ export interface AppContext {
   haptics: Haptics;
   audio: Audio;
   loftPicker: LoftPicker;
+  /** Screen effects (dust burst, camera nudge) and the measuring lines drawn over the scene. */
+  fx: Fx;
+  measure: MeasureOverlay;
   /** Re-evaluates whether throw gestures / the touch cue are active (call after any state change). */
   refreshInput(): void;
   /** True while the tuning panel, the menu or a dialog is up: nothing automatic (the computer's turn) may advance. */

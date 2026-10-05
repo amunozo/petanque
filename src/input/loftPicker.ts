@@ -1,4 +1,5 @@
 /** Segmented loft control (Roll / Half-lob / Lob / Shoot; see LOFT_OPTIONS), fixed at the bottom centre. Styles: src/style.css (lp-*). */
+import { onLangChange, t } from '../i18n';
 import type { LoftPreset } from '../tuning/config';
 
 export interface LoftPicker {
@@ -11,7 +12,8 @@ export interface LoftPicker {
 
 export interface LoftOption {
   id: LoftPreset;
-  label: string;
+  /** Catalogue key of the short name. */
+  label: 'loft.roll' | 'loft.half' | 'loft.lob' | 'loft.shoot';
   /** Inner SVG markup of the 32x20 icon (stroke = currentColor). */
   icon: string;
 }
@@ -31,13 +33,13 @@ const SHOOT_ICON = `${GROUND}${flight('M3 11Q11 8 19 11')}<circle cx="25" cy="14
 
 /** The presets offered, in display order (data, not code: add a row to add a preset). */
 export const LOFT_OPTIONS: readonly LoftOption[] = [
-  { id: 'roll', label: 'Roll', icon: ROLL_ICON },
-  { id: 'half', label: 'Half-lob', icon: HALF_ICON },
-  { id: 'lob', label: 'Lob', icon: LOB_ICON },
-  { id: 'shoot', label: 'Shoot', icon: SHOOT_ICON },
+  { id: 'roll', label: 'loft.roll', icon: ROLL_ICON },
+  { id: 'half', label: 'loft.half', icon: HALF_ICON },
+  { id: 'lob', label: 'loft.lob', icon: LOB_ICON },
+  { id: 'shoot', label: 'loft.shoot', icon: SHOOT_ICON },
 ];
 
-const iconSvg = (inner: string): string =>
+export const iconSvg = (inner: string): string =>
   `<svg class="lp-icon" viewBox="0 0 32 20" width="38" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${inner}</svg>`;
 
 const SHIELDED = [
@@ -52,14 +54,14 @@ export function createLoftPicker(initial: LoftPreset = 'half'): LoftPicker {
   const el = document.createElement('div');
   el.className = 'lp-root';
   el.setAttribute('role', 'radiogroup');
-  el.setAttribute('aria-label', 'Throw type');
+
   for (const type of SHIELDED) el.addEventListener(type, (e) => e.stopPropagation());
 
   const buttons = LOFT_OPTIONS.map((o) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'lp-btn';
-    b.innerHTML = `${iconSvg(o.icon)}<span class="lp-label">${o.label}</span>`;
+    b.innerHTML = `${iconSvg(o.icon)}<span class="lp-label"></span>`;
     b.setAttribute('role', 'radio');
     b.addEventListener('click', () => set(o.id));
     el.append(b);
@@ -67,7 +69,14 @@ export function createLoftPicker(initial: LoftPreset = 'half'): LoftPicker {
   });
 
   const render = (): void => {
-    LOFT_OPTIONS.forEach((o, i) => buttons[i]?.setAttribute('aria-checked', String(o.id === value)));
+    el.setAttribute('aria-label', t('loft.aria'));
+    LOFT_OPTIONS.forEach((o, i) => {
+      const b = buttons[i];
+      if (!b) return;
+      b.setAttribute('aria-checked', String(o.id === value));
+      const label = b.querySelector('.lp-label');
+      if (label) label.textContent = t(o.label);
+    });
   };
   function set(next: LoftPreset): void {
     if (next === value) return;
@@ -76,6 +85,7 @@ export function createLoftPicker(initial: LoftPreset = 'half'): LoftPicker {
     for (const fn of [...listeners]) fn(value);
   }
   render();
+  onLangChange(render);
 
   return {
     element: el,

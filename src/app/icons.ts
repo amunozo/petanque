@@ -12,7 +12,14 @@ const PATHS = {
   settings: '<path d="M4 7h8M18 7h2M4 17h2M12 17h8"/><circle cx="15" cy="7" r="2.5"/><circle cx="9" cy="17" r="2.5"/>',
   restart: '<path d="M4.5 12a7.5 7.5 0 1 0 2.3-5.4"/><path d="M4.5 4.5V9H9"/>',
   home: '<path d="M3.5 11.5L12 4l8.5 7.5"/><path d="M6 9.5V19a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1V9.5"/>',
+  install: '<path d="M12 4v10M7.5 10l4.5 4.5 4.5-4.5"/><path d="M5 18.5h14"/>',
+  privacy: '<path d="M12 3.5l7 2.8v5.4c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3z"/><path d="M9 12l2.2 2.2L15.2 10"/>',
   close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.5 3.5 5.3 3.5 8.5s-1.1 6-3.5 8.5c-2.4-2.5-3.5-5.3-3.5-8.5s1.1-6 3.5-8.5z"/>',
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.7a2.6 2.6 0 1 1 3.7 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r="0.7" fill="currentColor" stroke="none"/>',
+  check: '<path d="M5.5 12.5l4.2 4.2L18.5 7.5"/>',
+  chevronLeft: '<path d="M14.5 6l-6 6 6 6"/>',
+  chevronRight: '<path d="M9.5 6l6 6-6 6"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;
