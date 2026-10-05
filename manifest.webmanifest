@@ -1,14 +1,23 @@
 {
-  "name": "Pétanque",
+  "id": "/",
+  "name": "Pétanque — Village Square",
   "short_name": "Pétanque",
-  "start_url": "./",
+  "description": "Pétanque in a sunny village square: practice alone, play a friend on the same phone, or take on the computer.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
   "scope": "./",
-  "display": "fullscreen",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
   "orientation": "portrait",
   "background_color": "#2a3550",
   "theme_color": "#2a3550",
+  "categories": ["games", "sports"],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/monochrome-512.png", "sizes": "512x512", "type": "image/png", "purpose": "monochrome" }
   ]
 }
