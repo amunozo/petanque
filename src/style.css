@@ -457,7 +457,8 @@ a.hud-item {
   font-weight: 700;
   color: var(--ink-2);
 }
-#app.is-endover .lp-root {
+#app.is-endover .lp-root,
+#app.is-their-turn .lp-root {
   display: none;
 }
 
@@ -1349,6 +1350,20 @@ a.hud-item {
 .mh-over .mh-card-detail {
   margin-bottom: 16px;
 }
+/* Online: "<Name> wants a rematch" on the match-over card, above the buttons. */
+.mh-over-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: -6px 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.mh-over-hint[hidden] {
+  display: none;
+}
 .mh-btn-row {
   display: flex;
   gap: 10px;
@@ -1818,6 +1833,321 @@ body.is-dialog .tn-root {
 }
 
 /* ==========================================================================
+   Online (src/app/online/*): menu entries, the sheet (nickname, length, invite /
+   join with a code), the lobby (room code, share, waiting), connection notice,
+   "<Name> left" card. Same surfaces and buttons as the menu and the match HUD.
+   ========================================================================== */
+.mn-online .mn-btn-art {
+  background: #e7f2dc;
+}
+.mn-online .mn-btn-art .mn-jack {
+  margin: 0 1px 2px;
+}
+.mn-rejoin {
+  min-height: 60px;
+  box-shadow: var(--shadow-md), inset 0 0 0 2px var(--terracotta);
+}
+.mn-rejoin .mn-btn-art {
+  background: #fde7da;
+}
+.mn-rejoin .mn-btn-title {
+  color: var(--terracotta-ink);
+}
+.mn-btn[hidden] {
+  display: none;
+}
+/* A rejoin offer adds a row: tighten the menu on short phones. */
+@media (max-height: 680px) {
+  .mn-root.has-rejoin .mn-head,
+  .mn-root.has-rejoin .mn-length-label {
+    display: none;
+  }
+  .mn-root.has-rejoin .mn-buttons {
+    gap: 8px;
+  }
+  .mn-root.has-rejoin .mn-btn {
+    min-height: 56px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+}
+
+.ol-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 2050;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: calc(var(--safe-top) + 16px) 16px calc(var(--safe-bottom) + 16px);
+  background: rgba(38, 33, 48, 0.45);
+  font: 16px/1.3 var(--font-body);
+  color: var(--ink);
+  touch-action: manipulation;
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+.ol-screen[hidden] {
+  display: none;
+}
+.ol-box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(100%, 360px);
+  box-sizing: border-box;
+  padding: 20px 16px 16px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: pop-in var(--dur-2) var(--ease-spring) both;
+}
+.ol-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--ink-2);
+  touch-action: manipulation;
+}
+.ol-close:active {
+  background: var(--surface-2);
+}
+.ol-title {
+  padding-right: 36px;
+  font: 600 23px/1.15 var(--font-display);
+}
+.ol-sub {
+  margin-top: -6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.ol-sub:empty {
+  display: none;
+}
+.ol-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.ol-label {
+  padding-left: 4px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.ol-input {
+  width: 100%;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 700 17px var(--font-body);
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+.ol-input:focus {
+  outline: none;
+  border-color: var(--terracotta);
+  background: var(--surface);
+}
+.ol-code-input {
+  font: 600 20px var(--font-display);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+.ol-code-input::placeholder {
+  letter-spacing: 3px;
+  color: rgba(92, 86, 107, 0.45);
+}
+.ol-box .mn-length {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ol-box .mh-btn:disabled {
+  opacity: 0.45;
+  filter: grayscale(0.4);
+}
+.ol-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.ol-or::before,
+.ol-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.ol-join-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.ol-join-row .ol-field {
+  flex: 1;
+}
+.ol-join {
+  flex: none;
+  width: auto;
+  min-height: 48px;
+  font-size: 17px;
+}
+.ol-screen.is-guest .mn-length,
+.ol-screen.is-guest .ol-or,
+.ol-screen.is-guest .ol-join-row {
+  display: none;
+}
+
+/* Lobby: the code is the hero; everything else is quiet. */
+.ol-lobby .ol-box {
+  align-items: stretch;
+  text-align: center;
+}
+.ol-room {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ol-room[hidden] {
+  display: none;
+}
+.ol-code {
+  font: 600 46px/1 var(--font-display);
+  letter-spacing: 8px;
+  padding-left: 8px; /* balances the trailing letter-spacing */
+  color: var(--ink);
+  -webkit-user-select: all;
+  user-select: all;
+}
+.ol-lobby .ol-sub {
+  margin-top: 0;
+}
+.ol-hint {
+  margin: 2px 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ol-share {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.ol-waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 28px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink-2);
+}
+.ol-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--leaf-bright);
+  animation: think 1.2s ease-in-out infinite;
+}
+.ol-toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 24px);
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 16px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  color: #fff;
+  font: 700 14px/1.2 var(--font-body);
+  transform: translateX(-50%);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+.ol-toast[hidden] {
+  display: none;
+}
+
+/* Connection notice under the score bar: small, never over the court centre. */
+.mh-notice {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 5px 11px 5px 9px;
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  white-space: normal;
+}
+.mh-notice[hidden] {
+  display: none;
+}
+.mh-notice-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sun);
+  box-shadow: 0 0 0 1px rgba(38, 33, 48, 0.25);
+  animation: think 1.2s ease-in-out infinite;
+}
+.mh-btn:disabled {
+  opacity: 0.6;
+}
+/* The other player is aiming: their mark pulses, like the computer thinking. */
+#app[data-turn='remote'] .mh-chip .mh-mark {
+  animation: think 1.4s ease-in-out infinite;
+}
+.ol-left {
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ol-left[hidden] {
+  display: none;
+}
+.ol-left .mh-card-title {
+  font-size: 24px;
+}
+#app.is-opponent-left .mh-root .mh-card {
+  display: none;
+}
+
+/* ==========================================================================
    Language picker (src/app/langPicker.ts): EN FR ES IT PT chips. In the menu it
    is a frosted pill top left (mirrors the sound button); in the ⋯ sheet a full row.
    ========================================================================== */
@@ -2273,4 +2603,11 @@ body.is-dialog .tn-root {
 :root:not(.is-dev) .hud-build,
 :root:not(.is-dev) .mn-build {
   display: none;
+}
+
+/* Notice dialog's action (e.g. "Update"): the primary look, not the danger red. */
+.mn-small.mn-go {
+  border-color: transparent;
+  background: var(--terracotta);
+  color: #fff;
 }

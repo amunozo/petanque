@@ -20,6 +20,7 @@ const PATHS = {
   check: '<path d="M5.5 12.5l4.2 4.2L18.5 7.5"/>',
   chevronLeft: '<path d="M14.5 6l-6 6 6 6"/>',
   chevronRight: '<path d="M9.5 6l6 6-6 6"/>',
+  share: '<circle cx="17.5" cy="5.5" r="2.5"/><circle cx="6.5" cy="12" r="2.5"/><circle cx="17.5" cy="18.5" r="2.5"/><path d="M8.7 10.7l6.6-3.9M8.7 13.3l6.6 3.9"/>',
 } as const;
 
 export type IconName = keyof typeof PATHS;

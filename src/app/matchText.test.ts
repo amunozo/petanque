@@ -4,7 +4,7 @@ import { createMatch } from '../games/petanque';
 import type { MatchState } from '../games/petanque';
 import { defaultConfig } from '../tuning';
 import { setLang } from '../i18n';
-import { endCardView, formatLead, jackFault, matchOverTitle, scoreLine, settleMessage, turnView, voiceVs } from './matchText';
+import { celebrates, endCardView, formatLead, jackFault, matchOverTitle, scoreLine, settleMessage, turnView, voice2p, voiceOnline, voiceVs } from './matchText';
 
 const cfg = defaultConfig;
 const base = (): MatchState => createMatch(1, cfg);
@@ -115,5 +115,27 @@ describe('other languages', () => {
     expect(endCardView({ winner: 'B', points: 3, scoringIds: [], reason: 'normal' }).title).toBe('Rojo suma 3 puntos');
     expect(turnView({ ...base(), phase: 'boule', toThrow: 'B' }).banner).toBe('Rojo juega');
     setLang('en');
+  });
+});
+
+describe('online voice', () => {
+  const v = voiceOnline({ A: 'Ana', B: 'Bruno' }, 'B');
+  it('names both nicknames and speaks to the local seat', () => {
+    expect(scoreLine({ A: 2, B: 5 }, v)).toBe('Ana 2 – 5 Bruno');
+    expect(turnView({ ...base(), phase: 'boule', toThrow: 'B' }, v).chip).toBe('Your turn');
+    expect(matchOverTitle('B', { A: 8, B: 13 }, v)).toBe('You win 13 – 8');
+  });
+  it('shows a calm chip while the other player aims', () => {
+    const jack = turnView({ ...base(), phase: 'jack', toThrow: 'A' }, v);
+    expect(jack.chip).toBe('Ana is aiming…');
+    expect(jack.banner).toBe('Ana — throw the jack');
+    expect(turnView({ ...base(), phase: 'boule', toThrow: 'A' }, v).banner).toBe('Ana to play');
+  });
+  it('celebrates only your own win (always with two players on one phone)', () => {
+    expect(celebrates('B', v)).toBe(true);
+    expect(celebrates('A', v)).toBe(false);
+    expect(celebrates('B', voiceVs())).toBe(false);
+    expect(celebrates('A', voice2p())).toBe(true);
+    expect(celebrates('B', voice2p())).toBe(true);
   });
 });

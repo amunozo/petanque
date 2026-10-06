@@ -1,5 +1,6 @@
 /** Real-time playback of an engine World with a fixed-timestep accumulator (shared by the modes). */
 import { isSettled, step, type SimEvent, type World } from '../engine';
+import type { GameConfig } from '../tuning';
 import type { AppContext } from './context';
 
 /** Hard cap on physics steps per frame (avoids a spiral of death on slow devices). */
@@ -23,7 +24,11 @@ export function fastestRolling(w: World): number {
   return fastest;
 }
 
-export function createPlayback(ctx: AppContext): Playback {
+/**
+ * `config` decides the physics and the playback speed: the live tuning by default; online
+ * matches pass the defaults (the server's config) so tuning can never change a replay.
+ */
+export function createPlayback(ctx: AppContext, config: () => Pick<GameConfig, 'physics' | 'camera'> = () => ctx.cfg): Playback {
   let accumulator = 0;
   let collected: SimEvent[] = [];
   return {
@@ -34,7 +39,7 @@ export function createPlayback(ctx: AppContext): Playback {
     },
     events: () => collected,
     advance(w, dtReal) {
-      const { cfg } = ctx;
+      const cfg = config();
       accumulator += dtReal * cfg.camera.playbackSpeed;
       const dt = cfg.physics.fixedDt;
       const events: SimEvent[] = [];

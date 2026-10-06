@@ -9,6 +9,7 @@ export {
   DEV_SERVER_URL,
   NET_CLIENT_CONFIG,
   PROD_SERVER_URL,
+  configuredServerUrl,
   createNetClient,
   defaultServerUrl,
   loadClientToken,

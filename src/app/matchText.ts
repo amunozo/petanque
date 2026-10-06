@@ -15,15 +15,28 @@ export const teamName = (team: TeamId): string => (team === 'A' ? t('team.A') : 
 /**
  * How the UI refers to each team. Two players on one phone: "Blue" / "Red".
  * Against the computer: "You" (Blue) / "Computer" (Red), with second-person phrasing.
+ * Online: both nicknames; the local seat is addressed as "you", the other is remote.
  */
 export interface Voice {
   name: Record<TeamId, string>;
   /** Team addressed as "you" (the catalogue has a separate phrasing for it). */
   you: Record<TeamId, boolean>;
   computer: Record<TeamId, boolean>;
+  /** Team played by someone on another device (online): "<Name> is aiming…". */
+  remote: Record<TeamId, boolean>;
 }
-export const voice2p = (): Voice => ({ name: { A: teamName('A'), B: teamName('B') }, you: { A: false, B: false }, computer: { A: false, B: false } });
-export const voiceVs = (): Voice => ({ name: { A: t('team.you'), B: t('team.computer') }, you: { A: true, B: false }, computer: { A: false, B: true } });
+const NOBODY: Record<TeamId, boolean> = { A: false, B: false };
+export const voice2p = (): Voice => ({ name: { A: teamName('A'), B: teamName('B') }, you: NOBODY, computer: NOBODY, remote: NOBODY });
+export const voiceVs = (): Voice => ({ name: { A: t('team.you'), B: t('team.computer') }, you: { A: true, B: false }, computer: { A: false, B: true }, remote: NOBODY });
+/** Online: nicknames on the score bar (team colours stay by seat), "you" for the local seat. */
+export const voiceOnline = (names: Record<TeamId, string>, mine: TeamId): Voice => ({
+  name: names,
+  you: { A: mine === 'A', B: mine === 'B' },
+  computer: NOBODY,
+  remote: { A: mine !== 'A', B: mine !== 'B' },
+});
+/** Does the result deserve the festive card and the winning chime? Always with two players on one phone; otherwise only when "you" won. */
+export const celebrates = (winner: TeamId, voice: Voice): boolean => voice.you[winner] || (!voice.you.A && !voice.you.B);
 
 export const otherTeamId = (t: TeamId): TeamId => (t === 'A' ? 'B' : 'A');
 
@@ -53,6 +66,10 @@ export function turnView(state: MatchState, voice: Voice = voice2p()): TurnView 
       hint: state.phase === 'jack' ? t('turn.thinking.hint') : '',
       chip: t('turn.thinking.chip'),
     };
+  }
+  if (voice.remote[team]) {
+    const chip = t('turn.remote.chip', { name });
+    return { team, banner: state.phase === 'jack' ? t('turn.jack.banner', { name }) : t('turn.play', { name }), hint: '', chip };
   }
   if (state.phase === 'jack') {
     const { jackMinDist: lo, jackMaxDist: hi } = state.rules;

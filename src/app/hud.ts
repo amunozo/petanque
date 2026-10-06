@@ -37,6 +37,8 @@ export interface Hud {
   onMenu(fn: () => void): void;
   /** "Restart match" row (match mode; practice uses onNewEnd). */
   onRestart(fn: () => void): void;
+  /** Hides the "New end" / "Restart match" row (online: the server decides when a match restarts). */
+  setRestartAvailable(available: boolean): void;
   /** Fullscreen row: hidden while `available` is false (e.g. iOS Safari). */
   setFullscreen(available: boolean, active: boolean): void;
   onFullscreen(fn: () => void): void;
@@ -264,6 +266,9 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
     },
     onRestart(fn) {
       restartFn = fn;
+    },
+    setRestartAvailable(available) {
+      restart.btn.hidden = !available;
     },
     setFullscreen(available, active) {
       fullscreen.btn.hidden = !available;

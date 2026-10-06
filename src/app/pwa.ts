@@ -12,12 +12,14 @@ export interface UpdateWatcher {
   onUpdate(fn: () => void): void;
   /** Activates the waiting version, then reloads the page. */
   apply(): void;
+  /** Applies a waiting version, or asks the server for a new one right away (the "Update" toast follows when it is ready). */
+  applyOrCheck(): void;
 }
 
 /** Re-check for a new version at most this often while the app stays open (installed apps live for days). */
 const RECHECK_MS = 60 * 60 * 1000;
 
-const NOOP: UpdateWatcher = { onUpdate: () => undefined, apply: () => undefined };
+const NOOP: UpdateWatcher = { onUpdate: () => undefined, apply: () => undefined, applyOrCheck: () => location.reload() };
 
 export function registerServiceWorker(): UpdateWatcher {
   // Not in dev: the worker would cache stale modules and fight Vite's HMR.
@@ -27,6 +29,7 @@ export function registerServiceWorker(): UpdateWatcher {
   let waiting: ServiceWorker | null = null;
   let announced = false;
   let applying = false;
+  let registration: ServiceWorkerRegistration | null = null;
 
   const announce = (worker: ServiceWorker): void => {
     waiting = worker;
@@ -45,6 +48,7 @@ export function registerServiceWorker(): UpdateWatcher {
     navigator.serviceWorker
       .register(`${import.meta.env.BASE_URL}sw.js`)
       .then((reg) => {
+        registration = reg;
         // A previous visit may have left a version waiting.
         if (reg.waiting && navigator.serviceWorker.controller) announce(reg.waiting);
         reg.addEventListener('updatefound', () => {
@@ -67,15 +71,20 @@ export function registerServiceWorker(): UpdateWatcher {
       .catch(() => undefined); // no worker: the game still works online
   });
 
+  const apply = (): void => {
+    if (!waiting) return;
+    applying = true;
+    waiting.postMessage({ type: 'SKIP_WAITING' });
+  };
   return {
     onUpdate(fn) {
       updateFn = fn;
       if (waiting) fn(); // announced before anyone listened
     },
-    apply() {
-      if (!waiting) return;
-      applying = true;
-      waiting.postMessage({ type: 'SKIP_WAITING' });
+    apply,
+    applyOrCheck() {
+      if (waiting) apply();
+      else registration?.update().catch(() => undefined);
     },
   };
 }

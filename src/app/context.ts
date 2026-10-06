@@ -42,6 +42,10 @@ export interface Mode {
   canAim(): boolean;
   /** Leaving would lose progress, so the menu button asks first. */
   inProgress(): boolean;
+  /** Text of the "Leave the match?" dialog (default: the match will be lost). */
+  leaveText?(): string;
+  /** Leaving for the menu was confirmed (online: tell the server). */
+  leave?(): void;
   onPreview(p: AimPreview | null): void;
   onThrow(intent: ThrowIntent): void;
   /** Once per animation frame: advance the simulation and sync the view's bodies. */

@@ -52,6 +52,12 @@ export interface MatchHud {
   setMessage(text: string | null, team: TeamId | null): void;
   showEndCard(card: EndCardData | null): void;
   showMatchOver(card: MatchOverData | null): void;
+  /** Online: the rematch button waits for the other player (`label` replaces "Rematch" and disables it); null restores it. */
+  setRematchWaiting(label: string | null): void;
+  /** Online: a quiet line on the match-over card above the buttons (e.g. "<Name> wants a rematch"); null hides it. */
+  setRematchHint(text: string | null): void;
+  /** Persistent quiet line under the score bar (online connection news); null hides it. */
+  setNotice(text: string | null): void;
   /** Clears banner, turn line, message and cards. */
   reset(): void;
   onNextEnd(fn: () => void): void;
@@ -153,13 +159,16 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   const overFlags = bunting();
   const overTitle = el('div', 'mh-card-title');
   const overDetail = el('div', 'mh-card-detail');
+  const overHint = el('div', 'mh-over-hint');
+  overHint.setAttribute('role', 'status');
+  overHint.hidden = true;
   const overRow = el('div', 'mh-btn-row');
   const rematchBtn = button('mh-btn mh-primary', '');
   const menuBtn = button('mh-btn', '');
   overRow.append(menuBtn, rematchBtn);
   const overHead = el('div', 'mh-card-head');
   overHead.append(mark(), overTitle);
-  overCard.append(overFlags, overHead, overDetail, overRow);
+  overCard.append(overFlags, overHead, overDetail, overHint, overRow);
   endTitle.id = 'mh-end-title';
   overTitle.id = 'mh-over-title';
   endCard.setAttribute('role', 'dialog');
@@ -167,9 +176,13 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   overCard.setAttribute('role', 'dialog');
   overCard.setAttribute('aria-labelledby', overTitle.id);
 
+  const notice = el('div', 'mh-notice');
+  notice.setAttribute('role', 'status');
+  notice.hidden = true;
+
   // Bar and toast stack in the top-left corner, clear of the jack and the court centre.
   const topLeft = el('div', 'mh-top');
-  topLeft.append(bar, message);
+  topLeft.append(bar, notice, message);
   root.append(topLeft, banner, endCard, overCard);
   parent.append(root);
   for (const c of [endCard, overCard]) shieldPointer(c);
@@ -183,6 +196,7 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   menuBtn.addEventListener('click', () => menuFn());
 
   let names: Record<TeamId, string> = { A: teamName('A'), B: teamName('B') };
+  let rematchWaiting: string | null = null;
   let targetPoints = 0;
   let lastDots: Pick<TurnData, 'left' | 'total'> | null = null;
   const paintDots = (): void => {
@@ -197,7 +211,7 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
   };
   const paintStatic = (): void => {
     nextBtn.textContent = t('end.next');
-    rematchBtn.textContent = t('over.rematch');
+    rematchBtn.textContent = rematchWaiting ?? t('over.rematch');
     menuBtn.textContent = t('over.menu');
     paintTarget();
     paintDots();
@@ -286,6 +300,19 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
       overDetail.hidden = card.detail === '';
       replay(overCard, 'is-in');
     },
+    setRematchWaiting(label) {
+      rematchWaiting = label;
+      rematchBtn.disabled = label !== null;
+      rematchBtn.textContent = label ?? t('over.rematch');
+    },
+    setRematchHint(text) {
+      overHint.hidden = text === null;
+      overHint.replaceChildren(el('i', 'mh-notice-dot'), el('span', '', text ?? ''));
+    },
+    setNotice(text) {
+      notice.hidden = text === null;
+      notice.replaceChildren(el('i', 'mh-notice-dot'), el('span', '', text ?? ''));
+    },
     reset() {
       banner.classList.remove('is-on');
       chip.className = 'mh-chip';
@@ -296,6 +323,10 @@ export function createMatchHud(parent: HTMLElement): MatchHud {
       hideMessage();
       endCard.hidden = true;
       overCard.hidden = true;
+      rematchWaiting = null;
+      overHint.hidden = true;
+      rematchBtn.disabled = false;
+      rematchBtn.textContent = t('over.rematch');
       root.classList.remove('has-card');
       sideA.pts.textContent = '0';
       sideB.pts.textContent = '0';

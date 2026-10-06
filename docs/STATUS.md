@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-06 (identity verified; AAB ready to upload; multiplayer step 1 started). Read this first in a new session, together with
+Last updated: 2026-10-06 (online UI committed, waiting for Cloudflare account). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -142,8 +142,18 @@ tell the owner exactly what to change in Play Console *before* it goes live:
    live (not async) play. Subagent 1 builds protocol (`src/net/protocol.ts`), pure
    room logic, Cloudflare Worker + Durable Object (`server/`) and the browser
    client (`src/net/client.ts`) — DONE and committed (see `server/README.md`;
-   tested locally with `wrangler dev`, not deployed yet). Subagent 2 builds the
-   UI (menu entry, lobby/invite, online match mode, banners, i18n). Bump
+   tested locally with `wrangler dev`, not deployed yet). Online UI — DONE and committed
+   2026-10-06 (`src/app/online/*`, shared match logic in `src/app/matchCore.ts`;
+   verified with a two-browser e2e against local `wrangler dev`: create/join by
+   link, full match, end cards, rejoin after reload, reconnect, leave, rematch;
+   local modes regression-checked). Hidden in production until the repo
+   variable `VITE_SERVER_URL` is set (dev: `?dev=1&server=http://localhost:8787`).
+   NEXT: owner creates a free Cloudflare account + puts `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID` in GitHub Actions secrets → deploy server → set
+   `VITE_SERVER_URL` → test on phones → run the release checklist (privacy page,
+   data safety, content rating) BEFORE players see it. Known nits: dev-mode
+   invite links don't carry `?dev=1`; close-up camera can leave other boules at
+   the screen edge (same as local). Bump
    `PROTOCOL_VERSION` whenever engine/rules behaviour changes. Before online
    ships publicly: update privacy page + Play data safety (nickname and a random
    device token go to the server) AND redo the Play content rating questionnaire

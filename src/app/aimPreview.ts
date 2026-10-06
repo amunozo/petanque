@@ -7,7 +7,7 @@
 import type { ThrowParams, Vec3 } from '../engine';
 import { predictRestPoint, previewThrow } from '../games/petanque';
 import type { AimPreview, ThrowIntent } from '../input';
-import type { LoftPreset } from '../tuning';
+import type { GameConfig, LoftPreset } from '../tuning';
 import type { AppContext } from './context';
 
 export interface AimPreviewer {
@@ -20,30 +20,33 @@ export interface AimPreviewer {
   showIntent(intent: ThrowIntent, ball: 'boule' | 'jack'): void;
 }
 
-export function createAimPreviewer(ctx: AppContext): AimPreviewer {
-  const { cfg, scene, hud, loftPicker } = ctx;
+/** `config`: the live tuning by default; online matches pass the defaults (what the server plays with). */
+export function createAimPreviewer(ctx: AppContext, config: () => GameConfig = () => ctx.cfg): AimPreviewer {
+  const { scene, hud, loftPicker } = ctx;
   let restKey = '';
+  let restCfg: GameConfig | null = null;
   let restPoint: Vec3 | null = null;
   ctx.store.subscribe(() => {
     restKey = ''; // any tuning change invalidates the cache
   });
 
-  function restFor(p: AimPreview, loft: LoftPreset, ball: 'boule' | 'jack', params: ThrowParams): Vec3 | null {
+  function restFor(cfg: GameConfig, p: AimPreview, loft: LoftPreset, ball: 'boule' | 'jack', params: ThrowParams): Vec3 | null {
     if (cfg.controls.rollHintFrac <= 0) return null;
     const key = `${Math.round(p.aim * 1000)}|${Math.round(p.power * 200)}|${loft}|${ball}`;
-    if (key !== restKey) {
+    if (key !== restKey || cfg !== restCfg) {
       restKey = key;
-      restPoint = predictRestPoint(params, ballCfg(ball));
+      restCfg = cfg;
+      restPoint = predictRestPoint(params, ballCfg(cfg, ball));
     }
     return restPoint;
   }
-  const ballCfg = (ball: 'boule' | 'jack') => (ball === 'jack' ? { ...cfg, balls: { ...cfg.balls, boule: cfg.balls.jack } } : cfg);
+  const ballCfg = (cfg: GameConfig, ball: 'boule' | 'jack') => (ball === 'jack' ? { ...cfg, balls: { ...cfg.balls, boule: cfg.balls.jack } } : cfg);
 
   return {
     showIntent(intent, ball) {
       scene.setCameraMode('aim');
       hud.setPower(null);
-      const { params, flight } = previewThrow(intent, ballCfg(ball));
+      const { params, flight } = previewThrow(intent, ballCfg(config(), ball));
       scene.setAimPreview({ origin: params.origin, aim: intent.aim, landing: flight.landing, rest: null, points: flight.points });
     },
     update(p, ball) {
@@ -52,11 +55,12 @@ export function createAimPreviewer(ctx: AppContext): AimPreviewer {
         scene.setAimPreview(null);
         return;
       }
+      const cfg = config();
       scene.setCameraMode('aim');
       hud.setPower(cfg.controls.showPowerMeter ? p.power : null);
       const loft = loftPicker.get();
-      const { params, flight } = previewThrow({ aim: p.aim, power: p.power, loft }, ballCfg(ball));
-      scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, rest: restFor(p, loft, ball, params), points: flight.points });
+      const { params, flight } = previewThrow({ aim: p.aim, power: p.power, loft }, ballCfg(cfg, ball));
+      scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, rest: restFor(cfg, p, loft, ball, params), points: flight.points });
     },
   };
 }

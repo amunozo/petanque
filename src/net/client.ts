@@ -52,11 +52,14 @@ export const NET_CLIENT_CONFIG = {
   httpTimeoutMs: 10_000,
 };
 
+/** VITE_SERVER_URL baked into this build, or null when none was configured (online play is then hidden from players). */
+export function configuredServerUrl(): string | null {
+  const configured = (import.meta.env as Record<string, unknown>)['VITE_SERVER_URL'];
+  return typeof configured === 'string' && configured.trim() !== '' ? configured.trim().replace(/\/+$/, '') : null;
+}
+
 export function defaultServerUrl(): string {
-  const env = import.meta.env as Record<string, unknown>;
-  const configured = env['VITE_SERVER_URL'];
-  if (typeof configured === 'string' && configured.trim() !== '') return configured.trim().replace(/\/+$/, '');
-  return env['DEV'] === true ? DEV_SERVER_URL : PROD_SERVER_URL;
+  return configuredServerUrl() ?? ((import.meta.env as Record<string, unknown>)['DEV'] === true ? DEV_SERVER_URL : PROD_SERVER_URL);
 }
 
 export type NetStatus = 'idle' | 'connecting' | 'open' | 'reconnecting' | 'closed';

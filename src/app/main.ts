@@ -19,6 +19,7 @@ import { createHud } from './hud';
 import { createInstaller } from './install';
 import { createMatchHud } from './matchHud';
 import { pointsFor } from './matchLength';
+import { createMatchCore } from './matchCore';
 import { createMatchMode, setup2p, setupVsComputer } from './matchMode';
 import { createMeasureOverlay } from './measure';
 import { confirmDialog, createMenu } from './menu';
@@ -28,6 +29,10 @@ import { registerServiceWorker } from './pwa';
 import { createTouchHint } from './touchHint';
 import { playShotEffects } from './shotEffects';
 import { createUpdateToast } from './updateToast';
+import { configuredServerUrl, defaultServerUrl, INVITE_BASE_URL, ROOM_PARAM } from '../net';
+import { createOnlineFlow, type OnlineFlow } from './online/flow';
+import { stripRoomParam } from './online/rules';
+import { resolveServer } from './online/storage';
 
 /** Longest real-time gap one frame may simulate (after a tab switch etc.). */
 const MAX_FRAME_SECONDS = 0.25;
@@ -91,7 +96,7 @@ const ctx: AppContext = {
   fx,
   measure,
   refreshInput: () => refreshInput(),
-  uiBlocked: () => panel.isOpen() || menu.isOpen() || hud.isSheetOpen() || dialogOpen || howTo.isOpen(),
+  uiBlocked: () => panel.isOpen() || menu.isOpen() || hud.isSheetOpen() || dialogOpen || howTo.isOpen() || Boolean(online?.isOpen()),
   noteThrow: () => {
     throwsDone++;
   },
@@ -123,7 +128,24 @@ hud.onHowTo(openHowTo);
 
 const panel = createTuningPanel(store, tuningSchema, { onOpenChange: () => refreshInput() });
 const practice = createPracticeMode(ctx);
-const match = createMatchMode(ctx, () => goMenu());
+const core = createMatchCore(ctx);
+const match = createMatchMode(ctx, core, () => goMenu());
+// Online play shows only when this build has a server, or in developer mode (`?server=` overrides it there).
+const serverUrl = resolveServer(params, devMode, configuredServerUrl(), defaultServerUrl());
+const updates = registerServiceWorker();
+const online: OnlineFlow | null = serverUrl
+  ? createOnlineFlow({
+      ctx,
+      core,
+      menu,
+      points: () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }),
+      serverUrl,
+      inviteBase: devMode ? `${location.origin}${location.pathname}` : INVITE_BASE_URL,
+      enterMode: (m) => enterMode(m),
+      goMenu: () => goMenu(),
+      update: () => updates.applyOrCheck(),
+    })
+  : null;
 
 /** Can the player start a throw gesture right now? */
 const inputOpen = (): boolean => mode !== null && mode.canAim() && !ctx.uiBlocked();
@@ -149,6 +171,11 @@ function refreshInput(): void {
 }
 
 function enterMode(next: Mode): void {
+  const isOnline = next === online?.mode;
+  // Online matches play the server's config: no tuning panel, no local restart.
+  hud.setSettingsAvailable(devMode && !isOnline);
+  hud.setRestartAvailable(!isOnline);
+  if (isOnline) panel.close();
   mode = next;
   menu.hide();
   next.enter();
@@ -167,13 +194,13 @@ function goMenu(): void {
 }
 
 /** Asks before throwing away a match in progress; resolves true when it's fine to go on. */
-async function confirmLeave(title: string, confirmLabel: string): Promise<boolean> {
+async function confirmLeave(title: string, confirmLabel: string, text = t('confirm.text')): Promise<boolean> {
   if (!mode?.inProgress()) return true;
   dialogOpen = true;
   refreshInput();
   const ok = await confirmDialog(app, {
     title,
-    text: t('confirm.text'),
+    text,
     confirmLabel,
     cancelLabel: t('confirm.keep'),
   });
@@ -184,7 +211,9 @@ async function confirmLeave(title: string, confirmLabel: string): Promise<boolea
 
 async function requestMenu(): Promise<void> {
   if (!mode || dialogOpen) return;
-  if (await confirmLeave(t('confirm.leave.title'), t('confirm.leave.ok'))) goMenu();
+  if (!(await confirmLeave(t('confirm.leave.title'), t('confirm.leave.ok'), mode.leaveText?.()))) return;
+  mode?.leave?.();
+  goMenu();
 }
 
 async function requestRestart(): Promise<void> {
@@ -214,7 +243,6 @@ menu.onInstall(() => void installer.install());
 hud.onInstall(() => void installer.install());
 
 // A new version waits until the player taps "Update" (a match in progress asks first).
-const updates = registerServiceWorker();
 const updateToast = createUpdateToast(app);
 updates.onUpdate(() =>
   updateToast.show(() => {
@@ -312,9 +340,12 @@ else if (startMode === 'match') {
   match.setSetup(setupVsComputer(isDifficulty(levelParam) ? levelParam : loadDifficulty(), loadMatchLength()));
   enterMode(match);
 } else {
+  const invited = params.has(ROOM_PARAM);
   goMenu();
-  // First launch: offer "How to play" once (skippable). Not with the dev shortcuts above.
-  if (!hasSeenHowTo()) {
+  if (online) online.start();
+  else if (invited) history.replaceState(history.state, '', stripRoomParam(location.href));
+  // First launch: offer "How to play" once (skippable). Not with the dev shortcuts above, nor over an invite (offered next time).
+  if (!hasSeenHowTo() && !(online && invited)) {
     markHowToSeen();
     openHowTo();
   }
