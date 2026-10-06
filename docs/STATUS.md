@@ -131,7 +131,9 @@ push. A new session should be able to continue from this file alone.
    UI (menu entry, lobby/invite, online match mode, banners, i18n). Bump
    `PROTOCOL_VERSION` whenever engine/rules behaviour changes. Before online
    ships publicly: update privacy page + Play data safety (nickname and a random
-   device token go to the server). Owner will need a
+   device token go to the server) AND redo the Play content rating questionnaire
+   ("users can interact": answered No for the offline game; nicknames are shown
+   to the opponent online, so likely Yes). Owner will need a
    free Cloudflare account + API token to deploy.
    Store listing: English name/short/full description options + all Play form
    answers are in `store/LISTING.md` (also given to the owner as a zip with the
