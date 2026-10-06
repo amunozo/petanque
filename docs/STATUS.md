@@ -79,6 +79,12 @@ push. A new session should be able to continue from this file alone.
   `petanca.io` later — not yet.
 - Monetization: none at launch (no ads); later options are cosmetics, a
   supporter pack, and light opt-in ads with founders exempt — undecided.
+- Owner is moving to Switzerland (Oct 2026). Play identity is verified with the
+  Spanish DNI (padrón) address. Any monetization waits until Swiss residency is
+  settled: set up the merchant/payments profile then (likely a new profile for
+  the new country) and get tax advice. Free app until then.
+- Owner prefers to finish identity verification before uploading the AAB
+  (nothing is lost: the closed test can't start until verification passes).
 
 ## Owner's open tasks (as of 2026-10-06)
 1. ~~DNS at Porkbun~~ — done 2026-10-06 (CNAME `petanque` → `amunozo.github.io`).
