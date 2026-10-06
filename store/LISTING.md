@@ -4,44 +4,85 @@ Status (2026-10-06): English options drafted. The owner picks one of each; then
 they get translated into FR/ES/IT/PT and added here. Rule: never mention ads (see
 `store/README.md`).
 
-## App name (max 30)
-1. **Pétanque: Boules & Petanca** (recommended: "boules" and "petanca" are search words)
-2. Pétanque: Village Square
-3. Pétanque 3D: Boules Game
-4. Pétanque Provence
+## Chosen listing (2026-10-06) — paste per language in Play Console
+Default language: English (en-US). Add the others under "Manage translations".
+Rule: describe only what the app does today (no "coming soon"); never mention ads.
 
-## Short description (max 80)
-- A: Real pétanque physics in a sunny Provençal village square. Point or shoot!
-- B: Pull, aim, release: authentic pétanque against the computer or a friend. (recommended)
-- C: Point, shoot, measure: the real game of boules, in a Provençal village square.
+### English (en-US)
+Name: Pétanque: Boules & Petanca
+Short: Real pétanque on your phone. Play the computer or a friend.
+Full:
+Play pétanque in a sunny village square.
 
-## Full description
+Pull back to aim and let go to throw. Roll close to the jack, lob over other boules, or shoot your opponent's boule away.
 
-### Option 1: feature list (recommended)
-Step onto the gravel of a sunny Provençal village square and play real pétanque.
+• Play against the computer (easy, medium, hard)
+• Play with a friend on the same phone
+• Practice mode
+• Official rules: 3 boules each, first to 13
+• Works offline
+• English, French, Spanish, Italian and Portuguese
 
-Pull back, aim and release. Choose a gentle roll, a half-lob or a high lob to place your boule right next to the jack, or shoot to knock your rival's boule away. Every throw follows real physics: heavy steel boules, a light wooden jack, and gravel that is never perfectly flat.
+### Français (fr-FR)
+Name: Pétanque : Jeu de Boules
+Short: La vraie pétanque sur votre téléphone. Contre l'ordinateur ou un ami.
+Full:
+Jouez à la pétanque sur une place de village ensoleillée.
 
-• Play against the computer: easy, medium or hard
-• Two players on the same phone
-• Practice mode to perfect your pointing and shooting
-• Official tête-à-tête rules: 3 boules each, first to 13, or a quick game to 7
-• Roll, half-lob, lob and shoot
-• Careful measuring at the end of every end: every centimetre counts
-• Land a carreau and the square celebrates
-• Plays offline, no account needed
-• In English, French, Spanish, Italian and Portuguese
+Tirez vers le bas pour viser et relâchez pour lancer. Pointez près du cochonnet, portez par-dessus les autres boules ou tirez la boule de votre adversaire.
 
-Whether you grew up playing boules under the plane trees or you're discovering the game, Pétanque is quick to learn and hard to master.
+• Jouez contre l'ordinateur (facile, moyen, difficile)
+• Jouez avec un ami sur le même téléphone
+• Mode entraînement
+• Règles officielles : 3 boules chacun, premier à 13
+• Fonctionne hors ligne
+• Français, anglais, espagnol, italien et portugais
 
-### Option 2: story
-The sun is warm, the plane trees give a little shade, and the jack sits eight metres away. Your turn.
+### Español (es-ES, also es-419)
+Name: Petanca: Juego de Bolas
+Short: Petanca de verdad en tu móvil. Juega contra el ordenador o con un amigo.
+Full:
+Juega a la petanca en una plaza de pueblo soleada.
 
-Pétanque brings the classic game of boules to your phone with real physics and simple controls: pull down to aim, let go to throw. Roll it in close, loft it high over the others, or shoot your rival's boule straight off the court.
+Desliza hacia abajo para apuntar y suelta para lanzar. Arrima al boliche, haz una bombeada por encima de las otras bolas o tira la bola de tu rival.
 
-Play the computer at three difficulty levels, challenge a friend on the same phone, or practise on your own. Matches follow the official rules (three boules each, first to 13) with careful measuring when it's close.
+• Juega contra el ordenador (fácil, medio, difícil)
+• Juega con un amigo en el mismo móvil
+• Modo práctica
+• Reglas oficiales: 3 bolas cada uno, gana el primero en llegar a 13
+• Funciona sin conexión
+• Español, inglés, francés, italiano y portugués
 
-Plays offline, in five languages.
+### Italiano (it-IT)
+Name: Petanque: Gioco di Bocce
+Short: La vera petanque sul tuo telefono. Gioca contro il computer o un amico.
+Full:
+Gioca a petanque in una soleggiata piazza di paese.
+
+Trascina verso il basso per mirare e rilascia per lanciare. Accosta al pallino, lancia a parabola sopra le altre bocce o boccia la boccia dell'avversario.
+
+• Gioca contro il computer (facile, medio, difficile)
+• Gioca con un amico sullo stesso telefono
+• Modalità allenamento
+• Regole ufficiali: 3 bocce a testa, vince chi arriva prima a 13
+• Funziona offline
+• Italiano, inglese, francese, spagnolo e portoghese
+
+### Português (pt-PT and pt-BR)
+Name: Petanca: Jogo de Bolas
+Short: Petanca a sério no seu telemóvel. Jogue contra o computador ou um amigo.
+Short (pt-BR): Petanca de verdade no seu celular. Jogue contra o computador ou um amigo.
+Full:
+Jogue petanca numa praça de vila cheia de sol.
+
+Puxe para baixo para apontar e solte para lançar. Aproxime-se do bolim, lance por cima das outras bolas ou atire a bola do adversário para longe.
+
+• Jogue contra o computador (fácil, médio, difícil)
+• Jogue com um amigo no mesmo telefone
+• Modo treino
+• Regras oficiais: 3 bolas cada um, ganha quem chegar primeiro a 13
+• Funciona offline
+• Português, inglês, francês, espanhol e italiano
 
 ## Graphics (per listing language)
 | Slot | File |
