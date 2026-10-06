@@ -106,9 +106,8 @@ push. A new session should be able to continue from this file alone.
    owner (never in the repo; owner keeps the backup). **Still to do:** after the
    first AAB upload, add the Play App Signing SHA-256 (Play Console → Test and
    release → App integrity) as a second entry in `assetlinks.json` and deploy —
-   until then store installs show a URL bar. Cloud-env build quirks (JDK 17,
-   SDK in ~/tools, Maven Central 429 → Google mirror init script) are in
-   `android/README.md`/the build notes; the cloud tools are not persistent.
+   until then store installs show a URL bar. How to rebuild in the cloud env (tools are not persistent) is in
+   `android/README.md`.
 3. Walk the owner through Play Console: create app, store listing per language
    (assets in `store/`), privacy policy URL, data safety (no data collected),
    content rating, closed test track with the testers' emails.

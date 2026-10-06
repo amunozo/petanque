@@ -41,3 +41,14 @@ Upload `app-release-bundle.aab` to Play Console; sideload the `.apk` for testing
 Bump `appVersionCode` (integer, must increase for each upload) in `twa-manifest.json`,
 and `appVersionName` to match `package.json`, then run `bubblewrap update` and `build`.
 The site content itself updates without a new Android release.
+
+## Building from the Claude Code cloud environment
+The cloud container is wiped between sessions, so the tools must be reinstalled:
+Temurin JDK 17 and the Android SDK (`platforms;android-36`, `build-tools;36.1.0`,
+with a `<sdk>/bin` symlink to `cmdline-tools/latest/bin`) under `~/tools`, and
+`@bubblewrap/cli` via npm. Run Node with `NODE_USE_ENV_PROXY=1`, put the proxy
+from `$JAVA_TOOL_OPTIONS` in `~/.gradle/gradle.properties`, and if Maven Central
+answers HTTP 429, add a `~/.gradle/init.d/` script that puts Google's Maven Central
+mirror (`https://maven-central.storage-download.googleapis.com/maven2/`) first.
+Write `twa-manifest.json` by hand, then run `bubblewrap update --skipVersionUpgrade`
+and `bubblewrap build --skipPwaValidation`. The keystore comes from the owner.
