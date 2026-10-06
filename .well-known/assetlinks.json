@@ -4,7 +4,7 @@
     "target": {
       "namespace": "android_app",
       "package_name": "com.amunozo.petanque",
-      "sha256_cert_fingerprints": ["REPLACE_WITH_SHA256"]
+      "sha256_cert_fingerprints": ["35:F8:0B:12:81:66:C2:90:AA:FA:A0:18:7C:11:87:80:43:A8:AB:16:AD:3A:E0:18:88:F7:B2:14:E6:C7:72:FE"]
     }
   }
 ]
