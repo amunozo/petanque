@@ -4,12 +4,32 @@ Last updated: 2026-10-06. Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
+## Keep this document current
+**Every session must update this file** whenever something changes: a
+feature ships, a decision is taken, an owner task is done or added, a next
+step is finished or re-planned, or a new owner preference is learned. Update
+"Last updated", commit it with the work it describes (or right after), and
+push. A new session should be able to continue from this file alone.
+
 ## How we work
 - The owner (Alberto, Spanish, plays on an Android phone) gives feedback from
-  the phone; Claude acts as **orchestrator**: plans, delegates coding to
-  subagents (Sonnet for well-specified building, Opus for art/visual direction,
-  game feel, AI and tricky design), reviews screenshots/diffs, then commits and
-  pushes. Small fixes can be done directly.
+  the phone. Claude is the **orchestrator**, not the main coder:
+  - **Plan** each piece of work. Present a short phased plan and wait for the
+    owner's OK before big phases. Move in small steps.
+  - **Delegate** each task to its **own individual subagent**: one focused task
+    per subagent, with a self-contained brief (goal, files, constraints from
+    CLAUDE.md, acceptance checks: typecheck/tests/screenshots). Independent
+    tasks can run in parallel subagents. Use Sonnet for well-specified
+    building and Opus for art/visual direction, game feel, AI and tricky
+    design. Choose the effort level to fit the task.
+  - **Review** what each subagent returns: read the diff, run
+    `npm run typecheck`, `npm test` and `npm run build`, and check screenshots
+    for visual work. Send it back if it is not right.
+  - **Decide** architecture and technology yourself, and keep CLAUDE.md's rules intact.
+  - **Commit and push** (explicit paths, never `git add -A` blindly). Then give
+    the owner the link, the build id, and a short "what to test" list.
+  - Only trivial edits (a constant, a typo, docs) are done directly without a
+    subagent.
 - Every push deploys automatically (see CLAUDE.md → Deploy). After pushing,
   give the owner the build id (short sha) to check on the phone.
 - Show visual work as screenshots (Playwright + Chromium at

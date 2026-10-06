@@ -1,7 +1,8 @@
 # Pétanque (mobile web game)
 
 **Start here:** read `docs/STATUS.md` (current state, decisions, owner's open
-tasks, next steps) before doing anything.
+tasks, next steps, and how Claude works here: orchestrator, one subagent per
+task) before doing anything. Keep `docs/STATUS.md` updated with every change.
 
 Prototype phase: game feel first, placeholder graphics (Three.js primitives only).
 Target: mobile browsers in portrait, touch-only. Later: Google Play (PWA/TWA or
