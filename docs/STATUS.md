@@ -133,9 +133,9 @@ push. A new session should be able to continue from this file alone.
    ships publicly: update privacy page + Play data safety (nickname and a random
    device token go to the server). Owner will need a
    free Cloudflare account + API token to deploy.
-   Store listing: English name/short/full description options were given to the
-   owner (in chat, 2026-10-06); once chosen, translate to FR/ES/IT/PT and put
-   them in `store/LISTING.md`.
+   Store listing: English name/short/full description options + all Play form
+   answers are in `store/LISTING.md` (also given to the owner as a zip with the
+   AAB, key and graphics). Once the owner picks, translate to FR/ES/IT/PT there.
    Original plan: online multiplayer step 1 (friend invites via link,
    guest accounts, Cloudflare Workers + Durable Objects, server re-simulates
    throws with the engine). Then quick match (practice while waiting, AI
