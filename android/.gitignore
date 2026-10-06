@@ -1,0 +1,11 @@
+# Build outputs and local state
+build/
+app/build/
+.gradle/
+local.properties
+*.apk
+*.aab
+*.idsig
+# Signing material must never be committed
+*.keystore
+*.jks

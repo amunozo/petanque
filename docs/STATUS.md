@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-06 (domain live, Play account done, TWA build started). Read this first in a new session, together with
+Last updated: 2026-10-06 (Android package built; owner verifying identity). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -85,7 +85,9 @@ push. A new session should be able to continue from this file alone.
    Remaining: in repo Settings → Pages, confirm the custom domain shows
    `petanque.amunozo.com` and tick **Enforce HTTPS** once the certificate is issued.
 2. ~~Google Play developer account~~ — done 2026-10-06 (personal account,
-   developer name "amunozo"). Personal accounts created after Nov 2023 must run
+   developer name "amunozo"). Identity verification in progress: DNI address
+   differed from the account address; owner is switching the payments-profile
+   address to the DNI one (fallback: proof of address). Personal accounts created after Nov 2023 must run
    the 12-tester / 14-day closed test before production.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
    tester services ($15–35) are an acceptable fallback.
@@ -96,11 +98,17 @@ push. A new session should be able to continue from this file alone.
    `/.well-known/assetlinks.json` load over HTTPS at https://petanque.amunozo.com/
    (`public/CNAME`, `public/.nojekyll`). Owner still has to tick Enforce HTTPS
    (plain http was not redirecting yet).
-2. Build the Android package with Bubblewrap (Java + Android SDK can be
-   downloaded in the cloud env): app name/short name, start URL, theme
-   `#a95f3a`, icons from `store/`. Generate an **upload keystore** and hand it to
-   the owner securely (never commit it); use Play App Signing; put the app
-   signing SHA-256 from Play Console into `assetlinks.json`.
+2. ~~Android package~~ — built 2026-10-06 with Bubblewrap; project in `android/`
+   (see `android/README.md` to rebuild; bump `appVersionCode` per upload).
+   Upload key: alias `upload`, SHA-256
+   `35:F8:0B:12:81:66:C2:90:AA:FA:A0:18:7C:11:87:80:43:A8:AB:16:AD:3A:E0:18:88:F7:B2:14:E6:C7:72:FE`
+   (already in `assetlinks.json`). The keystore + passwords were handed to the
+   owner (never in the repo; owner keeps the backup). **Still to do:** after the
+   first AAB upload, add the Play App Signing SHA-256 (Play Console → Test and
+   release → App integrity) as a second entry in `assetlinks.json` and deploy —
+   until then store installs show a URL bar. Cloud-env build quirks (JDK 17,
+   SDK in ~/tools, Maven Central 429 → Google mirror init script) are in
+   `android/README.md`/the build notes; the cloud tools are not persistent.
 3. Walk the owner through Play Console: create app, store listing per language
    (assets in `store/`), privacy policy URL, data safety (no data collected),
    content rating, closed test track with the testers' emails.
