@@ -52,6 +52,10 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   asked to restart interrupted work at 3:30 AM Spain time if limits hit at night.
 - Owner preferences learned so far: natural/realistic look (not candy, not
   cream), straight camera down the court, small half-transparent white aim dots,
+  **never put the owner's personal email
+  (amunozortiz1996@gmail.com) in anything public** (store listing, privacy page,
+  in-game text) — use the game's own contact address (owner is creating one;
+  then replace it in `public/privacy.html`, `store/LISTING.md` and here),
   minimal HUD that never covers the court/jack, vivid-but-natural UI, no text
   for celebrations, no ads at launch and **no promises about ads either way**.
 
