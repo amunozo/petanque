@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-06 (Android package built; owner verifying identity). Read this first in a new session, together with
+Last updated: 2026-10-06 (identity verified; AAB ready to upload; multiplayer step 1 started). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -91,9 +91,7 @@ push. A new session should be able to continue from this file alone.
    Remaining: in repo Settings → Pages, confirm the custom domain shows
    `petanque.amunozo.com` and tick **Enforce HTTPS** once the certificate is issued.
 2. ~~Google Play developer account~~ — done 2026-10-06 (personal account,
-   developer name "amunozo"). Identity verification in progress: DNI address
-   differed from the account address; owner is switching the payments-profile
-   address to the DNI one (fallback: proof of address). Personal accounts created after Nov 2023 must run
+   developer name "amunozo"). Identity verified (with the DNI address). Personal accounts created after Nov 2023 must run
    the 12-tester / 14-day closed test before production.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
    tester services ($15–35) are an acceptable fallback.
@@ -117,7 +115,17 @@ push. A new session should be able to continue from this file alone.
 3. Walk the owner through Play Console: create app, store listing per language
    (assets in `store/`), privacy policy URL, data safety (no data collected),
    content rating, closed test track with the testers' emails.
-4. During the 14-day test: online multiplayer step 1 (friend invites via link,
+4. **In progress (started 2026-10-06):** online multiplayer step 1 = live 1v1
+   "play a friend by link" (room code + link, nickname only, rejoin after drop,
+   server referee re-simulates every throw with the default config). Owner OK'd
+   live (not async) play. Subagent 1 builds protocol (`src/net/protocol.ts`), pure
+   room logic, Cloudflare Worker + Durable Object (`server/`) and the browser
+   client (`src/net/client.ts`); subagent 2 will build the UI. Owner will need a
+   free Cloudflare account + API token to deploy.
+   Store listing: English name/short/full description options were given to the
+   owner (in chat, 2026-10-06); once chosen, translate to FR/ES/IT/PT and put
+   them in `store/LISTING.md`.
+   Original plan: online multiplayer step 1 (friend invites via link,
    guest accounts, Cloudflare Workers + Durable Objects, server re-simulates
    throws with the engine). Then quick match (practice while waiting, AI
    fallback), ratings; then polish. Privacy policy + data safety must be updated
