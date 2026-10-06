@@ -52,7 +52,7 @@ Plays offline, in five languages.
 
 ## Store settings
 - Category: Game → Sports. Tags (from Google's list): Sports, Simulation, Casual, Offline, Single player.
-- Email: amunozo.games@proton.me
+- Email: amunozo.gamedev@proton.me
 - Website: https://petanque.amunozo.com
 - Privacy policy: https://petanque.amunozo.com/privacy.html
 
