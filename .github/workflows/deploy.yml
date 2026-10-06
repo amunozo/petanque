@@ -28,6 +28,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      # Typechecks the site and the online server (tsc -p server).
       - run: npm run typecheck
       - run: npm test
 
@@ -45,6 +46,8 @@ jobs:
       - run: npm run build
         env:
           BUILD_ID: ${{ steps.build.outputs.id }}
+          # Online server base URL (repo variable; empty = the default in src/net/client.ts).
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
 
       - name: Deploy branch build to site root
         if: github.ref_type != 'tag'

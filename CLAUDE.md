@@ -31,6 +31,12 @@ src/
   i18n/          Typed string catalogues (en/fr/es/it/pt); all player-facing
                  text goes through t(); missing keys fail typecheck.
   audio/         Procedural WebAudio sounds driven by engine events.
+  net/           Online play. protocol.ts, room.ts (server referee state
+                 machine), replay.ts, fingerprint.ts are pure TS (no DOM, no
+                 Math.random/Date: randomness is passed in). client.ts is the
+                 browser WebSocket transport (no UI, no three.js).
+server/          Cloudflare Worker + Durable Object (one per room) running
+                 src/net/room.ts with the DEFAULT config. Own package.json.
 ```
 - Every game-feel number lives in a tunable config object, never as a magic
   constant inside engine/render code.

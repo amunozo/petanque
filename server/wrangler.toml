@@ -1,0 +1,21 @@
+# Cloudflare Worker + Durable Object for online "play a friend" rooms.
+# See README.md. The shared game code is imported from ../src (bundled by wrangler/esbuild).
+name = "petanque-server"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# SQLite-backed Durable Objects (required on the Workers Free plan).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+[vars]
+# Extra allowed browser origins, comma-separated (production + localhost are built in).
+ALLOWED_ORIGINS = ""
+
+[observability]
+enabled = true

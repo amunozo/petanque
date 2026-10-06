@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p server --noEmit",
     "test": "vitest run",
     "art": "sh -c 'if [ -x art/.venv/bin/python ]; then art/.venv/bin/python art/build.py \"$@\"; else python3 art/build.py \"$@\"; fi' --"
   },
@@ -15,6 +15,7 @@
     "three": "^0.186.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261006.1",
     "@types/node": "^22.20.5",
     "@types/three": "^0.186.0",
     "typescript": "^7.0.2",

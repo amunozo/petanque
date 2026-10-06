@@ -65,6 +65,12 @@ push. A new session should be able to continue from this file alone.
   tuning and build chips; `?dev=0` turns it off. Players never see tuning.
 - Store assets in `store/` (see `store/README.md`): icons, adaptive icon,
   splash, feature graphics per language, captioned screenshots per language.
+- Online "play a friend" foundation (no UI yet, server not deployed): wire
+  protocol `src/net/protocol.ts`, pure room referee `src/net/room.ts`, browser
+  transport `src/net/client.ts`, replay helper `src/net/replay.ts`, invite links
+  `src/net/invite.ts`; Cloudflare Worker + Durable Object in `server/` (see
+  `server/README.md`), deployed by `.github/workflows/deploy-server.yml` once the
+  `CLOUDFLARE_API_TOKEN` secret exists. `npm run typecheck` also checks `server/`.
 - Research: `docs/research/competitor-reviews.md` (Bochas 3D/Giraffe, La
   Pétanque/Royer, Paradise Roll, etc.).
 
@@ -120,7 +126,12 @@ push. A new session should be able to continue from this file alone.
    server referee re-simulates every throw with the default config). Owner OK'd
    live (not async) play. Subagent 1 builds protocol (`src/net/protocol.ts`), pure
    room logic, Cloudflare Worker + Durable Object (`server/`) and the browser
-   client (`src/net/client.ts`); subagent 2 will build the UI. Owner will need a
+   client (`src/net/client.ts`) — DONE and committed (see `server/README.md`;
+   tested locally with `wrangler dev`, not deployed yet). Subagent 2 builds the
+   UI (menu entry, lobby/invite, online match mode, banners, i18n). Bump
+   `PROTOCOL_VERSION` whenever engine/rules behaviour changes. Before online
+   ships publicly: update privacy page + Play data safety (nickname and a random
+   device token go to the server). Owner will need a
    free Cloudflare account + API token to deploy.
    Store listing: English name/short/full description options were given to the
    owner (in chat, 2026-10-06); once chosen, translate to FR/ES/IT/PT and put

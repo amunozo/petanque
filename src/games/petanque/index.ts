@@ -24,6 +24,8 @@ export type {
 } from './practice';
 
 // Full match rules (Phase 2)
+export { DEFAULT_MATCH_LENGTH, MATCH_LENGTHS, QUICK_POINTS, isMatchLength, matchConfig, pointsFor } from './matchLength';
+export type { MatchLength } from './matchLength';
 export { applyAction, beginThrow as beginMatchThrow, canThrow, createMatch, nextEnd, settle } from './match';
 export {
   AUTO_JACK_HALF_WIDTH,
