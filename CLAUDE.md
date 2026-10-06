@@ -3,6 +3,8 @@
 **Start here:** read `docs/STATUS.md` (current state, decisions, owner's open
 tasks, next steps, and how Claude works here: orchestrator, one subagent per
 task) before doing anything. Keep `docs/STATUS.md` updated with every change.
+Before every player-facing update, run the **Release checklist** in
+`docs/STATUS.md` (Play declarations + privacy page must stay true).
 
 Prototype phase: game feel first, placeholder graphics (Three.js primitives only).
 Target: mobile browsers in portrait, touch-only. Later: Google Play (PWA/TWA or

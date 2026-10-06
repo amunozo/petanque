@@ -11,6 +11,18 @@ step is finished or re-planned, or a new owner preference is learned. Update
 "Last updated", commit it with the work it describes (or right after), and
 push. A new session should be able to continue from this file alone.
 
+## Release checklist (every update, owner's standing rule)
+Before shipping any change that players get (site deploy or new AAB), check
+whether it makes a Google Play declaration or the privacy page untrue, and if so
+tell the owner exactly what to change in Play Console *before* it goes live:
+- **Data safety** (any new data sent anywhere: nicknames, tokens, analytics, crash logs)
+- **Content rating** (user interaction/chat/nicknames, gambling-like features, violence)
+- **Ads** declaration and **in-app purchases**
+- **App access / sign-in details** (accounts, logins, codes)
+- **Target audience**, **privacy policy** (`public/privacy.html`, 5 languages)
+- Store listing text/screenshots if features changed (never mention ads)
+- New AAB only if the Android wrapper changed: bump `appVersionCode`
+
 ## How we work
 - The owner (Alberto, Spanish, plays on an Android phone) gives feedback from
   the phone. Claude is the **orchestrator**, not the main coder:
