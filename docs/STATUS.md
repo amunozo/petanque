@@ -113,10 +113,10 @@ push. A new session should be able to continue from this file alone.
    Upload key: alias `upload`, SHA-256
    `35:F8:0B:12:81:66:C2:90:AA:FA:A0:18:7C:11:87:80:43:A8:AB:16:AD:3A:E0:18:88:F7:B2:14:E6:C7:72:FE`
    (already in `assetlinks.json`). The keystore + passwords were handed to the
-   owner (never in the repo; owner keeps the backup). **Still to do:** after the
-   first AAB upload, add the Play App Signing SHA-256 (Play Console → Test and
-   release → App integrity) as a second entry in `assetlinks.json` and deploy —
-   until then store installs show a URL bar. How to rebuild in the cloud env (tools are not persistent) is in
+   owner (never in the repo; owner keeps the backup). Play App Signing key SHA-256
+   `2D:D1:99:6F:5D:C9:73:6E:44:A8:5F:56:34:62:4C:0B:1F:B0:2A:89:71:9C:4F:16:07:DA:42:99:97:01:FC:50`
+   added to `assetlinks.json` too (2026-10-06), so Play installs run full-screen.
+   First AAB (versionCode 1) is uploaded and live on the internal testing track. How to rebuild in the cloud env (tools are not persistent) is in
    `android/README.md`.
 3. Walk the owner through Play Console: create app, store listing per language
    (assets in `store/`), privacy policy URL, data safety (no data collected),
