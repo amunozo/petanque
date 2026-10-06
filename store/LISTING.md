@@ -38,7 +38,7 @@ Tirez vers le bas pour viser et relâchez pour lancer. Pointez près du cochonne
 • Fonctionne hors ligne
 • Français, anglais, espagnol, italien et portugais
 
-### Español (es-ES, also es-419)
+### Español (es-ES)
 Name: Petanca: Juego de Bolas
 Short: Petanca de verdad en tu móvil. Juega contra el ordenador o con un amigo.
 Full:
@@ -48,6 +48,21 @@ Desliza hacia abajo para apuntar y suelta para lanzar. Arrima al boliche, haz un
 
 • Juega contra el ordenador (fácil, medio, difícil)
 • Juega con un amigo en el mismo móvil
+• Modo práctica
+• Reglas oficiales: 3 bolas cada uno, gana el primero en llegar a 13
+• Funciona sin conexión
+• Español, inglés, francés, italiano y portugués
+
+### Español latinoamericano (es-419)
+Name: Petanca: Bochas y Bolas
+Short: Petanca de verdad en tu celular. Juega contra la computadora o con un amigo.
+Full:
+Juega a la petanca en una plaza de pueblo soleada.
+
+Desliza hacia abajo para apuntar y suelta para lanzar. Arrima al bochín, lanza por encima de las otras bolas o saca la bola de tu rival.
+
+• Juega contra la computadora (fácil, medio, difícil)
+• Juega con un amigo en el mismo celular
 • Modo práctica
 • Reglas oficiales: 3 bolas cada uno, gana el primero en llegar a 13
 • Funciona sin conexión
