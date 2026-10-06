@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-06. Read this first in a new session, together with
+Last updated: 2026-10-06 (domain switch). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -43,7 +43,7 @@ push. A new session should be able to continue from this file alone.
   minimal HUD that never covers the court/jack, vivid-but-natural UI, no text
   for celebrations, no ads at launch and **no promises about ads either way**.
 
-## What exists (v0.5.0, live at https://www.amunozo.com/petanque/)
+## What exists (v0.5.0, live at https://petanque.amunozo.com/)
 - Modes: Practice, 1 player vs computer (Easy/Medium/Hard AI in a Web Worker),
   2 players same phone. Match length Quick 7 / Standard 13.
 - Rules: FIPJP-style; jack 6–10 m; boards are dead on contact (art. 18);
@@ -81,20 +81,21 @@ push. A new session should be able to continue from this file alone.
   supporter pack, and light opt-in ads with founders exempt — undecided.
 
 ## Owner's open tasks (as of 2026-10-06)
-1. **DNS at Porkbun**: CNAME `petanque` → `amunozo.github.io` on amunozo.com.
-   (Was NOT live yet on 2026-10-06; `petanque.amunozo.com` resolved to Porkbun's
-   wildcard parking `uixie.porkbun.com`.)
-2. **Google Play developer account** (personal, $25, ID verification).
+1. ~~DNS at Porkbun~~ — done 2026-10-06 (CNAME `petanque` → `amunozo.github.io`).
+   Remaining: in repo Settings → Pages, confirm the custom domain shows
+   `petanque.amunozo.com` and tick **Enforce HTTPS** once the certificate is issued.
+2. **Google Play developer account** — in progress. Account type **"Yourself"**
+   (personal; no company needed), $25, ID verification, Android-device
+   verification via the Play Console app. Personal accounts created after Nov 2023
+   must run the 12-tester / 14-day closed test before production.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
    tester services ($15–35) are an acceptable fallback.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
 
 ## Next steps for Claude
-1. When DNS resolves to GitHub (185.199.108–111.153): add `public/CNAME` with
-   `petanque.amunozo.com`, have the owner (or settings) set the custom domain +
-   Enforce HTTPS in repo Settings → Pages, verify the site and
-   `/.well-known/assetlinks.json` load at the root, update links in CLAUDE.md /
-   README. (Old `www.amunozo.com/petanque/` URLs will redirect.)
+1. Domain switch: `public/CNAME` added and links updated (2026-10-06). Still to
+   verify after deploy + HTTPS cert: the site and `/.well-known/assetlinks.json`
+   load at https://petanque.amunozo.com/ (`public/.nojekyll` keeps `.well-known`).
 2. Build the Android package with Bubblewrap (Java + Android SDK can be
    downloaded in the cloud env): app name/short name, start URL, theme
    `#a95f3a`, icons from `store/`. Generate an **upload keystore** and hand it to

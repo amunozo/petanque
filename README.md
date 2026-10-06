@@ -21,10 +21,10 @@ Set `BUILD_ID=...` when building to change the id shown on screen (defaults to `
 
 ## Live versions
 
-- Latest (`main` and `ccr-*` branch pushes): https://www.amunozo.com/petanque/
+- Latest (`main` and `ccr-*` branch pushes): https://petanque.amunozo.com/
 - Frozen versions, one per `package.json` version (bump it to freeze a phase):
-  https://www.amunozo.com/petanque/v/v<version>/, e.g. https://www.amunozo.com/petanque/v/v0.0.0/
+  https://petanque.amunozo.com/v/v<version>/, e.g. https://petanque.amunozo.com/v/v0.5.0/
 
 The build id (tag, or `<branch>@<short sha>`) is shown in the top-left corner so you
-can confirm which version is loaded. There is deliberately no service worker, so a
-reload always fetches the newest build.
+can confirm which version is loaded (developer mode, `?dev=1`). The app is a PWA:
+when a new build is deployed it shows an update prompt.

@@ -43,7 +43,8 @@ src/
   `gh-pages` branch: branch pushes -> site root (latest) AND
   `v/v<package.json version>/` (frozen per phase: bump the version to start a
   new one). Git tags can't be pushed from the cloud dev env.
-  Live at https://www.amunozo.com/petanque/
+  Live at https://petanque.amunozo.com/ (custom domain via `public/CNAME`;
+  old `www.amunozo.com/petanque/` URLs redirect).
 - The build id (commit sha or tag) is shown on screen so testers can confirm
   they have the latest version.
 
