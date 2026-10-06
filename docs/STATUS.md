@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-06 (domain switch). Read this first in a new session, together with
+Last updated: 2026-10-06 (domain live, Play account done, TWA build started). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -84,18 +84,18 @@ push. A new session should be able to continue from this file alone.
 1. ~~DNS at Porkbun~~ — done 2026-10-06 (CNAME `petanque` → `amunozo.github.io`).
    Remaining: in repo Settings → Pages, confirm the custom domain shows
    `petanque.amunozo.com` and tick **Enforce HTTPS** once the certificate is issued.
-2. **Google Play developer account** — in progress. Account type **"Yourself"**
-   (personal; no company needed), $25, ID verification, Android-device
-   verification via the Play Console app. Personal accounts created after Nov 2023
-   must run the 12-tester / 14-day closed test before production.
+2. ~~Google Play developer account~~ — done 2026-10-06 (personal account,
+   developer name "amunozo"). Personal accounts created after Nov 2023 must run
+   the 12-tester / 14-day closed test before production.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
    tester services ($15–35) are an acceptable fallback.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
 
 ## Next steps for Claude
-1. Domain switch: `public/CNAME` added and links updated (2026-10-06). Still to
-   verify after deploy + HTTPS cert: the site and `/.well-known/assetlinks.json`
-   load at https://petanque.amunozo.com/ (`public/.nojekyll` keeps `.well-known`).
+1. ~~Domain switch~~ — done 2026-10-06: site, manifest and
+   `/.well-known/assetlinks.json` load over HTTPS at https://petanque.amunozo.com/
+   (`public/CNAME`, `public/.nojekyll`). Owner still has to tick Enforce HTTPS
+   (plain http was not redirecting yet).
 2. Build the Android package with Bubblewrap (Java + Android SDK can be
    downloaded in the cloud env): app name/short name, start URL, theme
    `#a95f3a`, icons from `store/`. Generate an **upload keystore** and hand it to
