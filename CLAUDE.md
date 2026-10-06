@@ -1,5 +1,8 @@
 # Pétanque (mobile web game)
 
+**Start here:** read `docs/STATUS.md` (current state, decisions, owner's open
+tasks, next steps) before doing anything.
+
 Prototype phase: game feel first, placeholder graphics (Three.js primitives only).
 Target: mobile browsers in portrait, touch-only. Later: Google Play (PWA/TWA or
 Capacitor) and turn-based online multiplayer — not implemented yet, but the
