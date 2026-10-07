@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-06 (online UI committed, waiting for Cloudflare account). Read this first in a new session, together with
+Last updated: 2026-10-07 (closed test submitted for review; waiting for Cloudflare account). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -114,6 +114,14 @@ tell the owner exactly what to change in Play Console *before* it goes live:
 2. ~~Google Play developer account~~ — done 2026-10-06 (personal account,
    developer name "amunozo"). Identity verified (with the DNI address). Personal accounts created after Nov 2023 must run
    the 12-tester / 14-day closed test before production.
+2b. **Play setup** — done 2026-10-07: all App content forms, store listing
+   (EN + translations from `store/LISTING.md`), app switched to Free (a leftover
+   "Create a merchant account" dashboard item stays; do NOT create one — it
+   would publish the owner's legal name/address), advertising ID = No,
+   closed testing track "Alpha" (all countries, Google Group testers, release
+   0.5.0 (1)). **Submitted for review 2026-10-07** — waiting for approval.
+   On approval: share the Google Group link + opt-in link (Reddit post text in
+   chat; r/petanque mods messaged first), 14-day clock starts at 12 testers.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
    tester services ($15–35) are an acceptable fallback.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
