@@ -119,7 +119,7 @@ tell the owner exactly what to change in Play Console *before* it goes live:
    "Create a merchant account" dashboard item stays; do NOT create one — it
    would publish the owner's legal name/address), advertising ID = No,
    closed testing track "Alpha" (all countries, Google Group testers, release
-   0.5.0 (1)). **Submitted for review 2026-10-07** — waiting for approval.
+   0.5.0 (1)). **Submitted 2026-10-07 and APPROVED** — closed testing Active, 0 testers so far. Opt-in: https://play.google.com/apps/testing/com.amunozo.petanque
    On approval: share the Google Group link + opt-in link (Reddit post text in
    chat; r/petanque mods messaged first), 14-day clock starts at 12 testers.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
