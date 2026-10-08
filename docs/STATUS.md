@@ -137,7 +137,9 @@ lob-as-shot 7/6/3 %. Owner approved → MERGED into the main branch and live
 /home/user/petanque-exp-landing): tap/drag the landing spot, pick the loft,
 then a quick swipe whose quality sets the error; same ThrowIntent so
 engine/rules/AI/online are unchanged; "Controls: Classic / Landing spot"
-setting. Preview: https://petanque.amunozo.com/exp/exp-landing/
+setting. Preview: https://petanque.amunozo.com/exp/exp-landing/ — built
+(0b2d526), waiting for the owner's verdict. Swipe pace/tolerances are
+guesses: tune `landing.*` in the dev panel.
 Online play is on the main
 branch but hidden (no server deployed, no `VITE_SERVER_URL`).
 
