@@ -19,7 +19,7 @@ import type { Body, Loft, ThrowIntent } from '../engine';
 import type { MatchState, TeamId, ThrowRecord } from '../games/petanque/matchTypes';
 import type { MatchLength } from '../games/petanque/matchLength';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** Room codes: 5 chars from an alphabet without 0/O, 1/I/L (31^5 ≈ 28.6 M codes). */
 export const ROOM_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';

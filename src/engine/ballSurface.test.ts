@@ -211,6 +211,26 @@ describe('landing scatter', () => {
     expect(soft).toBeLessThan(1.2);
   });
 
+  it('min/full impact: no kick below the min, full kick from the full speed, default ramp unchanged', () => {
+    const steel: BallSpec = { ...boule, landingScatter: 20, landingScatterSpeed: 0.1, landingScatterMinImpact: 5, landingScatterFullImpact: 7 };
+    const plain: BallSpec = { ...boule };
+    let below = 0;
+    let above = 0;
+    for (let i = 0; i < 60; i++) {
+      const x = i * 0.0211;
+      const soft = land(steel, x, -4.5);
+      expect(soft).toEqual(land(plain, x, -4.5));
+      below = Math.max(below, Math.abs(angleDeg(soft)));
+      above = Math.max(above, Math.abs(angleDeg(land(steel, x, -8))));
+    }
+    expect(below).toBe(0);
+    expect(above).toBeGreaterThan(10);
+    expect(above).toBeLessThanOrEqual(20 + 1e-9);
+    // explicit defaults (0 and 3 m/s) reproduce the original jack kick exactly
+    const explicit: BallSpec = { ...woodenJack, landingScatterMinImpact: 0, landingScatterFullImpact: 3 };
+    for (const vy of [-0.5, -2, -5]) expect(land(explicit, 0.37, vy)).toEqual(land(woodenJack, 0.37, vy));
+  });
+
   it('absent / zero fields leave the landing untouched, and scattered throws keep distinct rest points', () => {
     expect(land({ ...jack, landingScatter: 0, landingScatterSpeed: 0 }, 0.3)).toEqual(land(jack, 0.3));
     const noisy = (n: number): World =>

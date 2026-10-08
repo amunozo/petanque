@@ -26,16 +26,36 @@ export interface LandingKick {
 }
 
 /**
+ * Strength (0..1) of the kick for a vertical impact speed: 0 up to `minImpact`,
+ * ramping linearly to 1 at `fullImpact` (defaults reproduce the original
+ * min(1, impact / SCATTER_FULL_IMPACT)).
+ */
+export function kickStrength(impact: number, minImpact = 0, fullImpact = SCATTER_FULL_IMPACT): number {
+  if (impact <= minImpact) return 0;
+  const span = fullImpact - minImpact;
+  if (span <= 0) return 1;
+  return Math.min(1, (impact - minImpact) / span);
+}
+
+/**
  * Kick for a ground impact at (x, z) with vertical speed `impact`.
  * `maxDeg` / `maxSpeedFrac` are the BallSpec fields; both scale with
- * min(1, impact / SCATTER_FULL_IMPACT). Two independent hash values drive the
- * angle and the speed.
+ * kickStrength(impact, minImpact, fullImpact). Two independent hash values
+ * drive the angle and the speed.
  */
-export function landingKick(x: number, z: number, impact: number, maxDeg: number, maxSpeedFrac: number): LandingKick {
+export function landingKick(
+  x: number,
+  z: number,
+  impact: number,
+  maxDeg: number,
+  maxSpeedFrac: number,
+  minImpact = 0,
+  fullImpact = SCATTER_FULL_IMPACT,
+): LandingKick {
   const ix = Math.floor(x / SCATTER_CELL);
   const iz = Math.floor(z / SCATTER_CELL);
   const iy = Math.round(impact * 20);
-  const strength = Math.min(1, impact / SCATTER_FULL_IMPACT);
+  const strength = kickStrength(impact, minImpact, fullImpact);
   const angle = ((hashUnit(ix, iz, iy) * maxDeg * strength) * Math.PI) / 180;
   const speedMul = 1 + hashUnit(iz + 7919, ix - 104729, iy + 1) * maxSpeedFrac * strength;
   return { angle, speedMul };

@@ -5,7 +5,7 @@
  * them. Pure and deterministic for a given request (own seeded rng, never the
  * match rng); safe to run in a Web Worker.
  */
-import { createRng, type ThrowIntent } from '../../engine';
+import { createRng, noiseMuls, type ThrowIntent } from '../../engine';
 import type { GameConfig } from '../../tuning/config';
 import { planBoule } from './aiBoule';
 import { planJack } from './aiJack';
@@ -17,14 +17,18 @@ const DEG = Math.PI / 180;
 const JACK_ERROR_SCALE = 0.5;
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
-/** Adds the level's human-like execution error to an intent (consumes 2 normals). */
+/**
+ * Adds the level's human-like execution error to an intent (consumes 2 normals),
+ * scaled by the loft's error multipliers like a human's (a lob is harder, a shot straighter).
+ */
 function withExecutionError(intent: ThrowIntent, level: AiLevel, cfg: GameConfig, rng: { normal(): number }): ThrowIntent {
   const maxAim = cfg.controls.maxAimDeg * DEG;
   const aimNoise = rng.normal();
   const powerNoise = rng.normal();
+  const [aimMul, powerMul] = noiseMuls(intent.loft, cfg.throw);
   return {
-    aim: clamp(intent.aim + aimNoise * level.aimErrorDeg * DEG, -maxAim, maxAim),
-    power: clamp(intent.power * (1 + (powerNoise * level.powerErrorPct) / 100), 0, 1),
+    aim: clamp(intent.aim + aimNoise * level.aimErrorDeg * aimMul * DEG, -maxAim, maxAim),
+    power: clamp(intent.power * (1 + (powerNoise * level.powerErrorPct * powerMul) / 100), 0, 1),
     loft: intent.loft,
   };
 }

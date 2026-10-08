@@ -64,6 +64,20 @@ describe('intentToThrow', () => {
     expect(intentToThrow({ aim: 0, power: 1, loft: 'shoot' }, cfg, { aim: 0, power: -1 }).speed).toBeCloseTo(16.5 * 0.98, 12);
   });
 
+  it('per-loft noise multipliers scale only that loft\'s error (absent = 1, zero noise unaffected)', () => {
+    const muls: ThrowModelConfig = { ...cfg, aimNoiseMulLob: 2, powerNoiseMulLob: 1.5, aimNoiseMulShoot: 0.5, powerNoiseMulShoot: 0.25 };
+    const noise = { aim: 1, power: 1 };
+    const lob = intentToThrow({ aim: 0, power: 1, loft: 'lob' }, muls, noise);
+    expect(lob.yaw).toBeCloseTo((2 * Math.PI) / 180, 12);
+    expect(lob.speed).toBeCloseTo(11 * 1.03, 12);
+    const shoot = intentToThrow({ aim: 0, power: 1, loft: 'shoot' }, muls, noise);
+    expect(shoot.yaw).toBeCloseTo((0.5 * Math.PI) / 180, 12);
+    expect(shoot.speed).toBeCloseTo(16.5 * 1.005, 12);
+    // lofts without a multiplier keep the plain error, bit for bit
+    expect(intentToThrow({ aim: 0.1, power: 0.7, loft: 'half' }, muls, noise)).toEqual(intentToThrow({ aim: 0.1, power: 0.7, loft: 'half' }, cfg, noise));
+    expect(intentToThrow({ aim: 0.1, power: 0.7, loft: 'lob' }, muls, none)).toEqual(intentToThrow({ aim: 0.1, power: 0.7, loft: 'lob' }, cfg, none));
+  });
+
   it('never returns a negative speed', () => {
     expect(intentToThrow({ aim: 0, power: 0, loft: 'roll' }, cfg, { aim: 0, power: -1000 }).speed).toBe(0);
   });

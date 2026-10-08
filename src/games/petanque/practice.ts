@@ -202,14 +202,27 @@ export function closestBoule(state: PracticeState): BouleDistance | null {
   return first && first.distance !== null ? first : null;
 }
 
-/** Aim preview: the throw WITHOUT noise and its predicted airborne arc. */
+/**
+ * Where the aim preview draws its ring for a noise-free throw. Every loft: the
+ * first ground contact, except 'shoot', whose ring sits `throw.shootRingAhead`
+ * metres further along the line: a boule lying under the ring is struck
+ * squarely (in the air or on the first hop) rather than on its top.
+ */
+export function aimRing(landing: Vec3, yaw: number, loft: ThrowIntent['loft'], cfg: Pick<PracticeConfig, 'throw'>): Vec3 {
+  if (loft !== 'shoot' || cfg.throw.shootRingAhead === 0) return { ...landing };
+  const d = cfg.throw.shootRingAhead;
+  return { x: landing.x - Math.sin(yaw) * d, y: landing.y, z: landing.z - Math.cos(yaw) * d };
+}
+
+/** Aim preview: the throw WITHOUT noise, its predicted airborne arc and the ring point (see aimRing). */
 export function previewThrow(
   intent: ThrowIntent,
   cfg: PracticeConfig,
   sampleInterval = 1 / 30,
-): { params: ThrowParams; flight: FlightPrediction } {
+): { params: ThrowParams; flight: FlightPrediction; ring: Vec3 } {
   const params = intentToThrow(intent, cfg.throw, { aim: 0, power: 0 });
-  return { params, flight: predictFlight(params, cfg.physics, cfg.balls.boule.radius, sampleInterval) };
+  const flight = predictFlight(params, cfg.physics, cfg.balls.boule.radius, sampleInterval);
+  return { params, flight, ring: aimRing(flight.landing, params.yaw, intent.loft, cfg) };
 }
 
 /**

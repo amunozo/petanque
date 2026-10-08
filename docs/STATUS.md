@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-07 (closed test submitted for review; waiting for Cloudflare account). Read this first in a new session, together with
+Last updated: 2026-10-08 (exp-feel branch: lob/shoot rebalance for tester feedback, preview only). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -144,6 +144,26 @@ branch but hidden (no server deployed, no `VITE_SERVER_URL`).
   (aimNoiseDeg 0.8, powerNoisePct 1.5) and boules have no landing scatter, so
   a 52° lob lands exactly and stops; shoot is a 20° / 1.35× speed throw that
   lands short of the target and skips, so small errors are amplified.
+- 2026-10-08 branch `exp-feel` (preview https://petanque.amunozo.com/exp/exp-feel/
+  once pushed; NOT on main): lob/shoot rebalance, measured with
+  `src/games/petanque/feelBench.ts` (report:
+  `FEEL_REPORT=1 npx vitest run src/games/petanque/feelBench.report.test.ts --silent=false`;
+  guards in `feelBench.test.ts`). Bench before: every loft pointed equally
+  well (8 m: ~22 cm mean error), shot with the ring on the boule hit only
+  41/32/26 % at 6/8/10 m. Changes (all tunable, Throw + Balls panels):
+  per-loft execution-error multipliers (`throw.aimNoiseMul*`/`powerNoiseMul*`:
+  lob ×1.3 aim / ×1.4 power, shoot ×0.6 / ×0.5), boule landing kick on hard
+  landings only (`balls.boule.landingScatter` 20°, speed ±10 %, ramps from
+  5.2 to 9 m/s vertical impact: lobs only), shoot 26° with backspin 100 and
+  the shoot aim ring drawn `throw.shootRingAhead` 0.1 m past the first ground
+  contact (a boule under the ring is struck squarely). After: lob pointing
+  error 23/33/48 cm vs half-lob 16/22/29; shot hits 80/66/54 % (carreau
+  10/5/4 %); lob onto a boule hits 3–7 %. AI: level error scaled by the same
+  per-loft multipliers, candidates planned without the landing kick (no
+  "lucky lob" exploits), shoots when pointing holds the point < 50 % of error
+  samples (was 25 %). Self-play (20 matches/pairing): hard > medium > easy
+  still 20/20, 19/20, 20/20. `PROTOCOL_VERSION` → 2. Owner to try on the
+  preview before it goes to main.
 
 ## Next steps for Claude
 1. ~~Domain switch~~ — done 2026-10-06: site, manifest and

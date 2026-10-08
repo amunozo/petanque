@@ -34,6 +34,19 @@ export interface ThrowModelConfig {
   /** Random error, 1 standard deviation. */
   aimNoiseDeg: number;
   powerNoisePct: number;
+  /**
+   * Per-loft multipliers on the random error above (absent = 1): some throws are
+   * harder to execute than others (a high lob is harder to judge than a roll,
+   * a practised shot is thrown along a very straight line).
+   */
+  aimNoiseMulRoll?: number;
+  aimNoiseMulHalf?: number;
+  aimNoiseMulLob?: number;
+  aimNoiseMulShoot?: number;
+  powerNoiseMulRoll?: number;
+  powerNoiseMulHalf?: number;
+  powerNoiseMulLob?: number;
+  powerNoiseMulShoot?: number;
 }
 
 export interface ThrowIntent {
@@ -54,12 +67,27 @@ const DEG_TO_RAD = Math.PI / 180;
 
 const clamp01 = (v: number): number => (v < 0 ? 0 : v > 1 ? 1 : v);
 
+/** Execution-error multipliers [aim, power] for a loft (1 when not configured). */
+export function noiseMuls(loft: Loft, cfg: ThrowModelConfig): [number, number] {
+  switch (loft) {
+    case 'roll':
+      return [cfg.aimNoiseMulRoll ?? 1, cfg.powerNoiseMulRoll ?? 1];
+    case 'half':
+      return [cfg.aimNoiseMulHalf ?? 1, cfg.powerNoiseMulHalf ?? 1];
+    case 'lob':
+      return [cfg.aimNoiseMulLob ?? 1, cfg.powerNoiseMulLob ?? 1];
+    case 'shoot':
+      return [cfg.aimNoiseMulShoot ?? 1, cfg.powerNoiseMulShoot ?? 1];
+  }
+}
+
 export function intentToThrow(intent: ThrowIntent, cfg: ThrowModelConfig, noise: ThrowNoise): ThrowParams {
   const power = clamp01(Number.isFinite(intent.power) ? intent.power : 0);
   const speedMul = intent.loft === 'shoot' ? cfg.shootSpeedMul : 1;
+  const [aimMul, powerMul] = noiseMuls(intent.loft, cfg);
   const baseSpeed = (cfg.minSpeed + (cfg.maxSpeed - cfg.minSpeed) * Math.pow(power, cfg.powerCurve)) * speedMul;
-  const speed = Math.max(0, baseSpeed * (1 + (noise.power * cfg.powerNoisePct) / 100));
-  const yaw = intent.aim + noise.aim * cfg.aimNoiseDeg * DEG_TO_RAD;
+  const speed = Math.max(0, baseSpeed * (1 + (noise.power * cfg.powerNoisePct * powerMul) / 100));
+  const yaw = intent.aim + noise.aim * cfg.aimNoiseDeg * aimMul * DEG_TO_RAD;
 
   let pitchDeg: number;
   let backspin: number;
