@@ -96,6 +96,10 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   changes). Brand/logo stays "Pétanque" for now; store titles localized with the
   local sport word (e.g. "Pétanque: Petanca 3D"). The owner may buy
   `petanca.io` later — not yet.
+- Paid promotion: Google Ads App-campaign offers (e.g. "spend €400, get €400",
+  seen 2026-10-08) — ignored for now (closed test can't be promoted). Revisit
+  ~1 month after public launch, once quick match is live and Play retention is
+  known; target FR/ES.
 - Monetization: none at launch (no ads); later options are cosmetics, a
   supporter pack, and light opt-in ads with founders exempt — undecided.
 - Owner is moving to Switzerland (Oct 2026). Play identity is verified with the
