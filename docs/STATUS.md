@@ -132,8 +132,8 @@ the owner wants to try before testers get them. Current experiment: **`exp-feel`
 tester feedback (per-loft noise multipliers, boule landing kick on hard
 landings, shoot flies onto the target; PROTOCOL_VERSION 2). Measured: lob
 pointing error ~1.5× half-lob; shot hit 80/66/54 % at 6/8/10 m (was 41/32/26);
-lob-as-shot 7/6/3 %. Waiting for the owner's verdict before merging into the
-main branch. Next experiment: `exp-landing` (pick landing spot, then height).
+lob-as-shot 7/6/3 %. Owner approved → MERGED into the main branch and live
+2026-10-08. Next experiment: `exp-landing` (pick landing spot, then height).
 Online play is on the main
 branch but hidden (no server deployed, no `VITE_SERVER_URL`).
 
