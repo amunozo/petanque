@@ -33,7 +33,7 @@ import type { TeamId } from '../games/petanque/matchTypes';
 import type { Vec3 } from '../engine/vec3';
 import type { GameConfig } from '../tuning/config';
 import { bakedDynamicMaterial, setContactOccluders } from './bakedLight';
-import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
+import { aimPose, createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
 import { createDevStats } from './devStats';
 import { createLighting } from './lighting';
 import { loadScenery } from './scenery';
@@ -87,6 +87,10 @@ export interface AimPreviewView {
   landing: Vec3;
   /** Where a lone boule would come to rest after landing (for the roll hint); null = unknown. */
   rest: Vec3 | null;
+  /** Where the ring marker goes (default: `landing`), e.g. the stop point when the player marks where a roll should stop. */
+  ring?: Vec3;
+  /** Overrides controls.rollHintFrac (fraction of the roll-out drawn). */
+  hintFrac?: number;
   /** Flight arc, ball-centre positions. */
   points: readonly Vec3[];
 }
@@ -111,6 +115,7 @@ export interface PitchScene {
   /** One mesh per body id; `currentId` is highlighted and followed by the camera; `teamOf` tints boules per team. */
   syncBodies(bodies: readonly Body[], currentId: string | null, teamOf?: TeamResolver): void;
   setCameraMode(mode: CameraMode): void;
+  cameraMode(): CameraMode;
   /** null hides the flight arc / landing marker / roll hint. Marker and roll hint obey the live controls config. */
   setAimPreview(p: AimPreviewView | null): void;
   /** Thin line on the ground between two points (jack -> closest boule); null hides it. */
@@ -121,6 +126,13 @@ export interface PitchScene {
   setJackZone(zone: JackZoneView | null): void;
   /** Screen position (CSS px from the canvas's top-left) of a world point with the current camera; null when behind the camera. For DOM overlays (measuring lines, effects). */
   project(p: Vec3): { x: number; y: number } | null;
+  /**
+   * The aim view (where the camera settles while aiming, even if it is still
+   * moving there): ground point (y = 0) under a screen point (CSS px), null above
+   * the horizon; and the screen position of a world point. For placing a marker on the court.
+   */
+  pickAim(x: number, y: number): { x: number; z: number } | null;
+  projectAim(p: Vec3): { x: number; y: number } | null;
 }
 
 /** Grey metal with two dark grooves and two dark patches, so rolling spin is visible. */
@@ -406,7 +418,8 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     }
     const { controls } = getConfig();
     landingMarker.visible = controls.showLandingMarker;
-    landingMarker.position.set(p.landing.x, 0.008, p.landing.z);
+    const ring = p.ring ?? p.landing;
+    landingMarker.position.set(ring.x, 0.008, ring.z);
 
     // The dotted flight arc is the aim indicator. The first dots near the hand fade in to keep the bottom of the screen clear.
     fillDots(arcDots, p.points, Infinity, (d) => STYLE.dotAlpha * Math.min(1, d / STYLE.dotFadeInM));
@@ -414,7 +427,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     // Roll hint: the same dots continuing along the ground from the landing point, fading out.
     const rest = p.rest;
     const full = rest ? Math.hypot(rest.x - p.landing.x, rest.z - p.landing.z) : 0;
-    const len = full * Math.min(1, Math.max(0, controls.rollHintFrac));
+    const len = full * Math.min(1, Math.max(0, p.hintFrac ?? controls.rollHintFrac));
     if (rest && len >= STYLE.dotSpacing / 2) {
       const from = { x: p.landing.x, y: STYLE.dotGroundY, z: p.landing.z };
       const to = { x: p.landing.x + ((rest.x - p.landing.x) * len) / full, y: STYLE.dotGroundY, z: p.landing.z + ((rest.z - p.landing.z) * len) / full };
@@ -530,6 +543,22 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   rig.snap(focus);
   const projected = new Vector3();
 
+  // A copy of the camera parked at the aim pose, for pickAim / projectAim.
+  const aimCam = new PerspectiveCamera();
+  const ray = new Vector3();
+  function syncAimCam(): void {
+    const cfg = getConfig();
+    const pose = aimPose(cfg);
+    aimCam.fov = cfg.camera.fovDeg;
+    aimCam.aspect = camera.aspect;
+    aimCam.near = camera.near;
+    aimCam.far = camera.far;
+    aimCam.position.copy(pose.pos);
+    aimCam.lookAt(pose.look);
+    aimCam.updateProjectionMatrix();
+    aimCam.updateMatrixWorld(true);
+  }
+
   return {
     resize,
     render(dt) {
@@ -551,12 +580,28 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
     },
     syncBodies,
     setCameraMode: (mode) => rig.setMode(mode),
+    cameraMode: () => rig.getMode(),
     setAimPreview,
     setResultLine,
     setScoringHighlight,
     setJackZone,
     project(p) {
       projected.set(p.x, p.y, p.z).project(camera);
+      if (projected.z > 1) return null;
+      return { x: (projected.x * 0.5 + 0.5) * canvas.clientWidth, y: (-projected.y * 0.5 + 0.5) * canvas.clientHeight };
+    },
+    pickAim(x, y) {
+      syncAimCam();
+      const w = Math.max(1, canvas.clientWidth);
+      const h = Math.max(1, canvas.clientHeight);
+      ray.set((x / w) * 2 - 1, -(y / h) * 2 + 1, 0.5).unproject(aimCam).sub(aimCam.position);
+      if (ray.y >= -1e-6) return null; // at or above the horizon
+      const k = -aimCam.position.y / ray.y;
+      return { x: aimCam.position.x + ray.x * k, z: aimCam.position.z + ray.z * k };
+    },
+    projectAim(p) {
+      syncAimCam();
+      projected.set(p.x, p.y, p.z).project(aimCam);
       if (projected.z > 1) return null;
       return { x: (projected.x * 0.5 + 0.5) * canvas.clientWidth, y: (-projected.y * 0.5 + 0.5) * canvas.clientHeight };
     },

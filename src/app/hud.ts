@@ -52,6 +52,9 @@ export interface Hud {
   onInstall(fn: () => void): void;
   /** "How to play" row. */
   onHowTo(fn: () => void): void;
+  /** "Controls" row: shows the current choice; tapping it asks to switch (the sheet stays open). */
+  setControls(choice: 'classic' | 'landing'): void;
+  onControls(fn: () => void): void;
   isSheetOpen(): boolean;
   closeSheet(): void;
   onSheetChange(fn: (open: boolean) => void): void;
@@ -126,6 +129,11 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   const install = sheetItem('install', '');
   install.btn.hidden = true; // main.ts reveals it where the browser offers installing
   const howto = sheetItem('help', '');
+  // Two lines: "Controls" and, under it, the current choice (long names in some languages).
+  const controls = sheetItem('target', '');
+  const controlsTitle = el('span', '');
+  const controlsState = el('span', 'hud-item-sub');
+  controls.label.append(controlsTitle, controlsState);
   // Language: label row, then the chips (tapping a chip keeps the sheet open: the whole sheet re-labels).
   const lang = el('div', 'hud-lang');
   const langHead = el('div', 'hud-lang-head');
@@ -143,7 +151,7 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   privacyLink.rel = 'noopener';
   privacyLink.append(privacy.ic, privacy.label);
   const sheetBuild = el('div', 'hud-sheet-build');
-  sheet.append(sound.btn, fullscreen.btn, restart.btn, howto.btn, lang, settings.btn, install.btn, el('div', 'hud-sep'), home.btn, privacyLink, sheetBuild);
+  sheet.append(sound.btn, controls.btn, fullscreen.btn, restart.btn, howto.btn, lang, settings.btn, install.btn, el('div', 'hud-sep'), home.btn, privacyLink, sheetBuild);
 
   // ---- power meter + practice end card -------------------------------------------
   const power = el('div', 'hud-power');
@@ -174,6 +182,8 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   let settingsFn: () => void = () => undefined;
   let installFn: () => void = () => undefined;
   let howtoFn: () => void = () => undefined;
+  let controlsFn: () => void = () => undefined;
+  let controlsChoice: 'classic' | 'landing' = 'classic';
   let sheetFn: (open: boolean) => void = () => undefined;
 
   let sheetOpen = false;
@@ -206,6 +216,7 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
   home.btn.addEventListener('click', act(() => menuFn()));
   install.btn.addEventListener('click', act(() => installFn()));
   howto.btn.addEventListener('click', act(() => howtoFn()));
+  controls.btn.addEventListener('click', () => controlsFn()); // stays open: the row shows the new state
   privacyLink.addEventListener('click', () => setSheet(false));
   nextButton.addEventListener('click', () => nextFn());
 
@@ -225,6 +236,8 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
     fullscreen.label.textContent = fullscreenActive ? t('hud.fullscreenExit') : t('hud.fullscreen');
     restart.label.textContent = mode === 'practice' ? t('hud.newEnd') : t('hud.restart');
     howto.label.textContent = t('hud.howto');
+    controlsTitle.textContent = t('hud.controls');
+    controlsState.textContent = controlsChoice === 'landing' ? t('hud.controls.landing') : t('hud.controls.classic');
     langLabel.textContent = t('lang.label');
     settings.label.textContent = t('hud.tuning');
     settingsBadge.textContent = t('hud.changed');
@@ -297,6 +310,13 @@ export function createHud(root: HTMLElement, buildId: string): Hud {
     },
     onHowTo(fn) {
       howtoFn = fn;
+    },
+    setControls(choice) {
+      controlsChoice = choice;
+      controlsState.textContent = choice === 'landing' ? t('hud.controls.landing') : t('hud.controls.classic');
+    },
+    onControls(fn) {
+      controlsFn = fn;
     },
     isSheetOpen: () => sheetOpen,
     closeSheet: () => setSheet(false),

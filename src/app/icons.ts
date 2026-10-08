@@ -17,6 +17,7 @@ const PATHS = {
   close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.5 3.5 5.3 3.5 8.5s-1.1 6-3.5 8.5c-2.4-2.5-3.5-5.3-3.5-8.5s1.1-6 3.5-8.5z"/>',
   help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.5 9.7a2.6 2.6 0 1 1 3.7 2.3c-.8.4-1.2 1-1.2 1.9"/><circle cx="12" cy="17" r="0.7" fill="currentColor" stroke="none"/>',
+  target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.2"/><path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3"/>',
   check: '<path d="M5.5 12.5l4.2 4.2L18.5 7.5"/>',
   chevronLeft: '<path d="M14.5 6l-6 6 6 6"/>',
   chevronRight: '<path d="M9.5 6l6 6-6 6"/>',

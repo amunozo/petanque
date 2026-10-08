@@ -20,4 +20,10 @@ export interface AimPreview {
   /** Raw finger positions in CSS px, for drawing the gesture itself. */
   start: { x: number; y: number };
   current: { x: number; y: number };
+  /**
+   * "Landing spot" controls: the marked spot on the court and what it means
+   * ('landing' = first ground contact / shot ring, 'rest' = where a roll stops).
+   * The preview puts its ring there and, for 'rest', draws the whole roll-out.
+   */
+  target?: { x: number; z: number; meaning: 'landing' | 'rest' };
 }

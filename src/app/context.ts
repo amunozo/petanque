@@ -33,6 +33,11 @@ export interface AppContext {
   newSeed(): number;
 }
 
+export interface ThrowSetup {
+  ball: 'boule' | 'jack';
+  cfg: GameConfig;
+}
+
 export interface Mode {
   /** Show this mode's UI and start a fresh session. */
   enter(): void;
@@ -48,6 +53,8 @@ export interface Mode {
   leave?(): void;
   onPreview(p: AimPreview | null): void;
   onThrow(intent: ThrowIntent): void;
+  /** What the next throw is (the jack or a boule) and the config it is played with (online: the server's defaults). For the landing-spot controls. */
+  throwSetup(): ThrowSetup;
   /** Once per animation frame: advance the simulation and sync the view's bodies. */
   frame(dtReal: number): void;
 }

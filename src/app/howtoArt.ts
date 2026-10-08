@@ -59,6 +59,22 @@ export function throwArt(): string {
   );
 }
 
+/** 2 (landing-spot controls). A finger marks the spot (ring just above it), the boule is swiped up and flies there. */
+export function landingArt(): string {
+  return frame(
+    `<path d="M60 104Q112 -12 160 40" fill="none" stroke="var(--ink)" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="0.1 7" opacity=".55"/>` +
+      `<ellipse cx="160" cy="44" rx="15" ry="8" fill="none" stroke="#fff" stroke-width="3" opacity=".95"/>` +
+      jack(178, 34) +
+      // finger holding the marker from just below it
+      `<path d="M160 56V64" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-dasharray="1 4" opacity=".9"/>` +
+      `<g transform="translate(160 80)"><circle r="17" fill="#fff" opacity=".5"/><circle r="11" fill="#fff" opacity=".95"/><circle r="11" fill="none" stroke="var(--terracotta)" stroke-width="3"/></g>` +
+      // the swipe up
+      `<path d="M30 120V80" stroke="var(--terracotta)" stroke-width="4.5" stroke-linecap="round"/>` +
+      `<path d="M19 90l11-12 11 12" fill="none" stroke="var(--terracotta)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+      boule(60, 110, 'a'),
+  );
+}
+
 /** 4. Turn order: blue holds the point (green ring), so red plays (arc towards the jack). */
 export function turnArt(): string {
   return frame(

@@ -23,7 +23,8 @@ import { createMatchCore } from './matchCore';
 import { createMatchMode, setup2p, setupVsComputer } from './matchMode';
 import { createMeasureOverlay } from './measure';
 import { confirmDialog, createMenu } from './menu';
-import { hasSeenHowTo, isDifficulty, loadDifficulty, loadLang, loadMatchLength, markHowToSeen } from './prefs';
+import { hasSeenHowTo, isDifficulty, loadControls, loadDifficulty, loadLang, loadMatchLength, markHowToSeen, saveControls, type ControlsChoice } from './prefs';
+import { createLandingControls } from './landingControls';
 import { createPracticeMode } from './practiceMode';
 import { registerServiceWorker } from './pwa';
 import { createTouchHint } from './touchHint';
@@ -79,6 +80,8 @@ const seedParam = Number(params.get('seed'));
 let seedPending = Number.isFinite(seedParam) && seedParam !== 0 ? seedParam : null;
 
 let mode: Mode | null = null;
+/** Throw controls (⋯ sheet): classic slingshot or landing spot + swipe. */
+let controls: ControlsChoice = loadControls();
 let throwsDone = 0;
 let dragging = false;
 let dialogOpen = false;
@@ -112,6 +115,7 @@ const howTo = createHowTo(app, () => ({
   standard: pointsFor('standard', cfg),
   jackMin: cfg.match.jackMinDist,
   jackMax: cfg.match.jackMaxDist,
+  controls,
 }));
 howTo.onClose(() => {
   markHowToSeen();
@@ -163,12 +167,38 @@ const controller = createThrowController(canvas, () => store.config, () => loftP
   },
 });
 
+// "Landing spot" controls: mark the spot on the court, pick the loft, swipe the boule up.
+const landing = createLandingControls({
+  ctx,
+  surface: canvas,
+  pick: (x, y) => scene.pickAim(x, y),
+  project: (s) => scene.projectAim({ x: s.x, y: 0, z: s.z }),
+  canPlace: () => scene.cameraMode() === 'aim',
+  mode: () => mode,
+  throwIntent: (intent: ThrowIntent) => {
+    if (inputOpen()) mode?.onThrow(intent);
+  },
+});
+landing.setActive(controls === 'landing');
+
 function refreshInput(): void {
   const open = inputOpen();
-  controller.setEnabled(open);
-  // "Touch here" cue: full (with text) before the first throw, faint for the next few.
-  touchHint.update(open && !dragging, throwsDone);
+  const classic = controls === 'classic';
+  controller.setEnabled(open && classic);
+  landing.setOpen(open);
+  // "Touch here" cue (classic): full (with text) before the first throw, faint for the next few.
+  touchHint.update(open && !dragging && classic, throwsDone);
 }
+
+hud.setControls(controls);
+hud.onControls(() => {
+  controls = controls === 'landing' ? 'classic' : 'landing';
+  saveControls(controls);
+  hud.setControls(controls);
+  mode?.onPreview(null);
+  landing.setActive(controls === 'landing');
+  refreshInput();
+});
 
 function enterMode(next: Mode): void {
   const isOnline = next === online?.mode;
@@ -177,12 +207,14 @@ function enterMode(next: Mode): void {
   hud.setRestartAvailable(!isOnline);
   if (isOnline) panel.close();
   mode = next;
+  landing.clear();
   menu.hide();
   next.enter();
   refreshInput();
 }
 
 function goMenu(): void {
+  landing.clear();
   mode?.exit();
   audio.setRolling(0);
   mode = null;

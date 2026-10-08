@@ -130,6 +130,7 @@ export function createMatchMode(ctx: AppContext, core: MatchCore, goMenu: () => 
       core.detach();
     },
     canAim: isHumanTurn,
+    throwSetup: () => core.throwSetup(),
     inProgress: () => core.inProgress(),
     onPreview(p: AimPreview | null) {
       core.onPreview(p, isHumanTurn());

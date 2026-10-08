@@ -5,7 +5,7 @@
  * only reruns when the preview meaningfully changes.
  */
 import type { ThrowParams, Vec3 } from '../engine';
-import { predictRestPoint, previewThrow } from '../games/petanque';
+import { ballConfig, predictRestPoint, previewThrow } from '../games/petanque';
 import type { AimPreview, ThrowIntent } from '../input';
 import type { GameConfig, LoftPreset } from '../tuning';
 import type { AppContext } from './context';
@@ -40,7 +40,7 @@ export function createAimPreviewer(ctx: AppContext, config: () => GameConfig = (
     }
     return restPoint;
   }
-  const ballCfg = (cfg: GameConfig, ball: 'boule' | 'jack') => (ball === 'jack' ? { ...cfg, balls: { ...cfg.balls, boule: cfg.balls.jack } } : cfg);
+  const ballCfg = ballConfig<GameConfig>;
 
   return {
     showIntent(intent, ball) {
@@ -61,6 +61,13 @@ export function createAimPreviewer(ctx: AppContext, config: () => GameConfig = (
       const loft = loftPicker.get();
       const { params, flight, ring } = previewThrow({ aim: p.aim, power: p.power, loft }, ballCfg(cfg, ball));
       // The ring is the first ground contact (for 'shoot': the spot a boule is struck squarely, see aimRing).
+      const target = p.target;
+      if (target?.meaning === 'rest') {
+        // Landing-spot controls, roll: the ring marks where it stops (the solved spot); the whole roll-out is drawn.
+        const stop = { x: target.x, y: 0, z: target.z };
+        scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, rest: stop, ring: stop, hintFrac: 1, points: flight.points });
+        return;
+      }
       scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: ring, rest: restFor(cfg, p, loft, ball, params), points: flight.points });
     },
   };

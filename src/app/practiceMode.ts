@@ -123,6 +123,7 @@ export function createPracticeMode(ctx: AppContext): Mode {
       hud.setStatus('');
     },
     canAim: () => state.phase === 'aiming',
+    throwSetup: () => ({ ball: 'boule', cfg }),
     inProgress: () => false,
     onPreview(p: AimPreview | null) {
       preview.update(p, state.phase === 'aiming' ? 'boule' : null);

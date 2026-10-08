@@ -77,6 +77,43 @@ export interface GameConfig {
     /** Vibrate on landings and ball hits (where the browser supports it). */
     haptics: boolean;
   };
+  /**
+   * "Landing spot" controls (the player picks where the boule lands, then the
+   * height, then swipes to throw; see src/input/landingGesture.ts and
+   * src/games/petanque/landingAim.ts). Not part of the throw model: the swipe only
+   * perturbs the ThrowIntent, so the online config fingerprint is unaffected.
+   */
+  landing: {
+    /** While placing, the marker sits this far (CSS px) above the finger so the finger doesn't hide it. */
+    markerOffsetPx: number;
+    /** While dragging, the marker moves this fraction of the finger's movement (sideways / up-down): < 1 = finer. */
+    dragGainX: number;
+    dragGainY: number;
+    /** A touch this close (px) to the marker (or to where the finger was holding it) fine-adjusts it instead of jumping. */
+    grabRadiusPx: number;
+    /** Roll: the marker is where the boule should STOP (its landing spot is at the player's feet). Off = first landing like the other throws. */
+    rollMarksRest: boolean;
+    /** Shortest upward swipe that throws, as a fraction of the screen height. */
+    minSwipeFrac: number;
+    /** Release speed below this (screen heights / s) cancels instead of throwing. */
+    minSwipeSpeed: number;
+    /** The ideal (clean) release speed of the swipe, in screen heights / s. */
+    idealSwipeSpeed: number;
+    /** Swipe speed within this fraction of the ideal is clean (no power error). */
+    speedTolerance: number;
+    /** Launch-speed error (%) per unit of speed ratio beyond the tolerance (too fast = long, too slow = short). */
+    speedErrPct: number;
+    /** Cap on that launch-speed error (%). */
+    maxSpeedErrPct: number;
+    /** Swipe direction within this many degrees of straight up is clean (no aim error). */
+    angleToleranceDeg: number;
+    /** Aim error (degrees) per degree the swipe leans beyond the tolerance (lean left = ball goes left). */
+    aimErrPerDeg: number;
+    /** Cap on that aim error (degrees). */
+    maxAimErrDeg: number;
+    /** How long the swipe feedback ("Clean", "Too strong"...) stays (ms). */
+    feedbackMs: number;
+  };
   camera: {
     fovDeg: number;
     height: number;
@@ -225,6 +262,23 @@ export const defaultConfig: GameConfig = {
     showPowerMeter: false,
     haptics: true,
   },
+  landing: {
+    markerOffsetPx: 48,
+    dragGainX: 0.6,
+    dragGainY: 0.45,
+    grabRadiusPx: 64,
+    rollMarksRest: true,
+    minSwipeFrac: 0.06,
+    minSwipeSpeed: 0.5,
+    idealSwipeSpeed: 2.2,
+    speedTolerance: 0.15,
+    speedErrPct: 16,
+    maxSpeedErrPct: 8,
+    angleToleranceDeg: 3,
+    aimErrPerDeg: 0.25,
+    maxAimErrDeg: 4,
+    feedbackMs: 1600,
+  },
   camera: {
     fovDeg: 58,
     height: 2.3,
@@ -352,6 +406,26 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'controls.rollHintFrac', label: 'roll hint', min: 0, max: 1, step: 0.05 },
       { path: 'controls.showPowerMeter', label: 'power meter', toggle: true },
       { path: 'controls.haptics', label: 'haptics', toggle: true },
+    ],
+  },
+  {
+    title: 'Landing controls',
+    fields: [
+      { path: 'landing.markerOffsetPx', label: 'marker above finger px', min: 0, max: 120, step: 1 },
+      { path: 'landing.dragGainX', label: 'drag gain sideways', min: 0.1, max: 1.5, step: 0.05 },
+      { path: 'landing.dragGainY', label: 'drag gain depth', min: 0.1, max: 1.5, step: 0.05 },
+      { path: 'landing.grabRadiusPx', label: 'grab radius px', min: 0, max: 160, step: 2 },
+      { path: 'landing.rollMarksRest', label: 'roll marks stop point', toggle: true },
+      { path: 'landing.minSwipeFrac', label: 'min swipe (screen)', min: 0.02, max: 0.3, step: 0.01 },
+      { path: 'landing.minSwipeSpeed', label: 'min swipe speed h/s', min: 0, max: 2, step: 0.05 },
+      { path: 'landing.idealSwipeSpeed', label: 'ideal swipe speed h/s', min: 0.5, max: 6, step: 0.05 },
+      { path: 'landing.speedTolerance', label: 'speed tolerance ±', min: 0, max: 0.6, step: 0.01 },
+      { path: 'landing.speedErrPct', label: 'speed error % per ratio', min: 0, max: 60, step: 0.5 },
+      { path: 'landing.maxSpeedErrPct', label: 'max speed error %', min: 0, max: 30, step: 0.5 },
+      { path: 'landing.angleToleranceDeg', label: 'swipe angle tolerance°', min: 0, max: 20, step: 0.5 },
+      { path: 'landing.aimErrPerDeg', label: 'aim error per swipe°', min: 0, max: 1, step: 0.01 },
+      { path: 'landing.maxAimErrDeg', label: 'max aim error°', min: 0, max: 15, step: 0.1 },
+      { path: 'landing.feedbackMs', label: 'feedback ms', min: 0, max: 5000, step: 100 },
     ],
   },
   {

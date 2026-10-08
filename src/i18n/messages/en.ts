@@ -59,6 +59,9 @@ export const en = {
   'hud.install': 'Install app',
   'hud.privacy': 'Privacy policy',
   'hud.howto': 'How to play',
+  'hud.controls': 'Controls',
+  'hud.controls.classic': 'Classic',
+  'hud.controls.landing': 'Landing spot',
   'hud.build': 'build {id}',
 
   // ---- practice ----
@@ -186,6 +189,14 @@ export const en = {
   'loft.half': 'Half-lob',
   'loft.lob': 'Lob',
   'loft.shoot': 'Shoot',
+  'hint.landing.place': '**Touch the court** to choose\nwhere to throw',
+  'hint.landing.swipe': '**Swipe up** to throw',
+  'landing.handle.aria': 'Throw: swipe up',
+  'swipe.clean': 'Clean',
+  'swipe.strong': 'Too strong',
+  'swipe.soft': 'Too soft',
+  'swipe.left': 'Pulled left',
+  'swipe.right': 'Pulled right',
 
   // ---- how to play ----
   'howto.title': 'How to play',
@@ -199,6 +210,8 @@ export const en = {
   'howto.goal.text': 'Throw your boules and try to stop them nearer to the little yellow jack than your opponent does.',
   'howto.throw.title': 'Pull down and let go',
   'howto.throw.text': 'Put your finger anywhere and pull down: the further, the stronger. Slide sideways to aim, then let go.',
+  'howto.landing.title': 'Mark the spot, then swipe',
+  'howto.landing.text': 'Touch the court where the boule should land and drag to adjust (for a roll: where it should stop). Pick the throw type, then swipe the boule at the bottom straight up at a smooth pace. Leaning sideways pulls it off line; too fast goes long, too slow falls short.',
   'howto.types.title': 'Choose your throw',
   'howto.types.roll': 'Rolls along the ground. Good on smooth, open ground.',
   'howto.types.half': 'The all-rounder: lands, then rolls on.',

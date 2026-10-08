@@ -82,3 +82,30 @@ export function markHowToSeen(): void {
     /* storage blocked */
   }
 }
+
+const CONTROLS_KEY = 'petanque.controls';
+
+/** Throw controls: 'classic' = pick the loft, pull down and let go; 'landing' = mark the landing spot, pick the loft, swipe up. */
+export type ControlsChoice = 'classic' | 'landing';
+export const CONTROLS_CHOICES: readonly ControlsChoice[] = ['classic', 'landing'];
+/** This experiment build (exp-landing) starts on the new controls so testers see them first. */
+export const DEFAULT_CONTROLS: ControlsChoice = 'landing';
+
+export const isControlsChoice = (v: unknown): v is ControlsChoice => typeof v === 'string' && (CONTROLS_CHOICES as readonly string[]).includes(v);
+
+export function loadControls(): ControlsChoice {
+  try {
+    const v = localStorage.getItem(CONTROLS_KEY);
+    return isControlsChoice(v) ? v : DEFAULT_CONTROLS;
+  } catch {
+    return DEFAULT_CONTROLS;
+  }
+}
+
+export function saveControls(c: ControlsChoice): void {
+  try {
+    localStorage.setItem(CONTROLS_KEY, c);
+  } catch {
+    /* storage blocked */
+  }
+}

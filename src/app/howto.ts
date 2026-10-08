@@ -6,7 +6,7 @@
 import { loftIconSvg, LOFT_OPTIONS } from '../input';
 import { onLangChange, t } from '../i18n';
 import { button, el, shieldPointer } from './dom';
-import { goalArt, rulesArt, scoreArt, throwArt, turnArt } from './howtoArt';
+import { goalArt, landingArt, rulesArt, scoreArt, throwArt, turnArt } from './howtoArt';
 import { icon } from './icons';
 
 export interface HowToFacts {
@@ -16,6 +16,8 @@ export interface HowToFacts {
   /** Legal jack distance range (m). */
   jackMin: number;
   jackMax: number;
+  /** Which throw controls are on (the throw page explains those). */
+  controls: 'classic' | 'landing';
 }
 
 export interface HowTo {
@@ -98,7 +100,9 @@ export function createHowTo(parent: HTMLElement, facts: () => HowToFacts): HowTo
     };
     return [
       { art: goalArt(), title: t('howto.goal.title'), body: () => para(t('howto.goal.text')) },
-      { art: throwArt(), title: t('howto.throw.title'), body: () => para(t('howto.throw.text')) },
+      f.controls === 'landing'
+        ? { art: landingArt(), title: t('howto.landing.title'), body: () => para(t('howto.landing.text')) }
+        : { art: throwArt(), title: t('howto.throw.title'), body: () => para(t('howto.throw.text')) },
       { art: null, title: t('howto.types.title'), body: types },
       { art: turnArt(), title: t('howto.turn.title'), body: () => para(t('howto.turn.text')) },
       { art: scoreArt(), title: t('howto.score.title'), body: () => para(t('howto.score.text', { quick: f.quick, standard: f.standard })) },

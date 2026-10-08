@@ -16,3 +16,7 @@ export { createThrowController } from './throwController';
 export type { ThrowController, ThrowHandlers } from './throwController';
 export { createLoftPicker, iconSvg as loftIconSvg, LOFT_OPTIONS } from './loftPicker';
 export type { LoftOption, LoftPicker } from './loftPicker';
+export { createLandingInput } from './landingController';
+export type { CourtSpot, LandingInput, LandingInputDeps, LandingInputHandlers } from './landingController';
+export { swipeMetrics, swipeSkill, SWIPE_WINDOW_MS } from './landingGesture';
+export type { LandingControlsConfig, SwipeDirection, SwipeMetrics, SwipePace, SwipeSkill } from './landingGesture';

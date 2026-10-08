@@ -246,6 +246,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       core.detach();
     },
     canAim,
+    throwSetup: () => core.throwSetup(),
     inProgress: () => client.room?.phase === 'playing' && !opponentLeft(),
     leaveText: () => t('confirm.online.text', { name: opponentName() }),
     leave: () => hooks.leave(),

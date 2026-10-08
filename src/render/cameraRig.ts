@@ -37,6 +37,15 @@ const FRAME_FILL_X = 0.8;
 /** Same for depth (foreshortened by the downward viewing angle). */
 const FRAME_FILL_Z = 0.5;
 
+/** The aim view's camera position and look-at point (behind the throwing circle, looking down the pitch). */
+export function aimPose(cfg: Pick<GameConfig, 'camera' | 'throw'>): { pos: Vector3; look: Vector3 } {
+  const { camera: c, throw: t } = cfg;
+  return {
+    pos: new Vector3(t.originX + c.aimSideOffset, c.height, t.originZ + c.back),
+    look: new Vector3(t.originX, 0, t.originZ - c.aimLookAhead),
+  };
+}
+
 export function createCameraRig(camera: PerspectiveCamera, getConfig: () => GameConfig): CameraRig {
   let mode: CameraMode = 'aim';
   const pos = new Vector3();
@@ -46,7 +55,7 @@ export function createCameraRig(camera: PerspectiveCamera, getConfig: () => Game
   let fov = -1;
 
   function target(focus: CameraFocus): void {
-    const { camera: c, throw: t } = getConfig();
+    const { camera: c } = getConfig();
     if (mode === 'flight' && c.follow && focus.ball) {
       const b = focus.ball;
       wantPos.set(b.x, c.followHeight + b.y * 0.5, b.z + c.followBack);
@@ -74,8 +83,9 @@ export function createCameraRig(camera: PerspectiveCamera, getConfig: () => Game
       wantPos.set(mx, c.closeUpHeight * zoom, mz + c.closeUpBack * zoom);
       wantLook.set(mx, 0, mz + REST_LOOK_TOWARD_CAMERA * zoom);
     } else {
-      wantPos.set(t.originX + c.aimSideOffset, c.height, t.originZ + c.back);
-      wantLook.set(t.originX, 0, t.originZ - c.aimLookAhead);
+      const aim = aimPose(getConfig());
+      wantPos.copy(aim.pos);
+      wantLook.copy(aim.look);
     }
   }
 

@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-08 (exp-feel branch: lob/shoot rebalance for tester feedback, preview only). Read this first in a new session, together with
+Last updated: 2026-10-08 (exp-landing branch: "landing spot" throw controls experiment, preview only). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -133,7 +133,41 @@ tester feedback (per-loft noise multipliers, boule landing kick on hard
 landings, shoot flies onto the target; PROTOCOL_VERSION 2). Measured: lob
 pointing error ~1.5× half-lob; shot hit 80/66/54 % at 6/8/10 m (was 41/32/26);
 lob-as-shot 7/6/3 %. Owner approved → MERGED into the main branch and live
-2026-10-08. Next experiment: `exp-landing` (pick landing spot, then height).
+2026-10-08. Current experiment: **`exp-landing`** (2026-10-08, branch
+committed, not pushed yet) — tester suggestion "choose where the ball lands,
+then the height". New controls, switchable in the ⋯ sheet ("Controls:
+Classic / Landing spot", `localStorage` `petanque.controls`; this branch
+defaults to Landing spot via `DEFAULT_CONTROLS` in `src/app/prefs.ts`; Classic
+is unchanged, verified identical outcomes on scripted throws):
+1. touch the court to place the marker (it rides `landing.markerOffsetPx` above
+   the finger; dragging moves it at `dragGainX/Y` < 1 for precision; a touch
+   near the marker picks it up); the usual arc + ring preview shows live. The
+   marker is clamped to the court, the aim limit and the loft's reach. Roll:
+   the marker is where the boule STOPS (`landing.rollMarksRest`), because a
+   roll's landing spot is at the player's feet (1 px there ≈ 10 cm at rest);
+2. the loft bar picks the height; the marker keeps its spot (Shoot: target
+   point per `aimRing`);
+3. swipe the boule handle (above the loft bar; a small yellow jack for the
+   jack throw) up: lean of the swipe from vertical → aim error, release speed
+   vs one ideal pace (`landing.idealSwipeSpeed`, screen heights/s) → launch
+   speed error; zero inside the tolerances, linear beyond, capped. Feedback:
+   swipe trail (white clean / yellow off) + a small fading chip ("Clean",
+   "Too strong · Pulled left"). Slow/short/downward swipe = cancel.
+The spot+loft is converted to a plain ThrowIntent by inverting the preview
+(`src/games/petanque/landingAim.ts`: bisection on power, re-aim for rolls),
+then the swipe error perturbs the intent (`perturbIntent`), and the rules add
+the usual human noise: engine, rules, AI, online protocol and replays are
+untouched (new `landing` config section is not in the online fingerprint).
+Code: `src/input/landingGesture.ts` (pure swipe math), `src/input/landingController.ts`
+(pointer glue), `src/app/landingControls.ts` (handle/trail/chip/hints + glue),
+`scene.pickAim/projectAim` (aim-view picking even mid camera move), Tuning folder
+"Landing controls". How-to page 2 explains whichever controls are on.
+Bench (`LANDING_REPORT=1 npx vitest run src/games/petanque/landingBench.report.test.ts --silent=false`):
+with a perfect swipe the error equals the classic perfect-aim baseline (half
+8 m: 23 vs 22 cm mean; shot 66 % vs 66 % at 8 m); typical swipes (±6°, ±25 %
+pace) 38 cm / 33 %; sloppy (±10°, ±40 %) 58 cm / 21 %. Untested on a real
+phone: the ideal swipe pace (2.2 screen heights/s) and tolerances are guesses
+to tune from the owner's feel.
 Online play is on the main
 branch but hidden (no server deployed, no `VITE_SERVER_URL`).
 

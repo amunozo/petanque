@@ -14,7 +14,7 @@ import { onLangChange } from '../i18n';
 import type { JackZoneView, TeamResolver } from '../render';
 import type { GameConfig } from '../tuning';
 import { createAimPreviewer, type AimPreviewer } from './aimPreview';
-import type { AppContext } from './context';
+import type { AppContext, ThrowSetup } from './context';
 import { effectsConfig } from './effectsConfig';
 import type { TurnData } from './matchHud';
 import { celebrates, endCardView, jackFault, matchOverDetail, matchOverTitle, scoreLine, settleMessage, turnView, voice2p, type JackFault, type Voice } from './matchText';
@@ -67,6 +67,8 @@ export interface MatchCore {
   /** Gesture preview: shown only when `canAim`. */
   onPreview(p: AimPreview | null, canAim: boolean): void;
   inProgress(): boolean;
+  /** The next throw (jack or boule) and the config it is played with. */
+  throwSetup(): ThrowSetup;
   frame(dtReal: number): void;
 }
 
@@ -376,6 +378,7 @@ export function createMatchCore(ctx: AppContext): MatchCore {
       if (p) clearMeasure(); // never leave measuring labels over the aim view
       preview.update(p, canAim ? (state.phase === 'jack' ? 'jack' : 'boule') : null);
     },
+    throwSetup: () => ({ ball: state.phase === 'jack' ? 'jack' : 'boule', cfg: cfg() }),
     inProgress: () => state.phase !== 'matchOver' && (state.endNumber > 1 || state.throws.length > 0 || state.score.A + state.score.B > 0),
     frame(dtReal) {
       if (world && state.phase === 'inFlight' && playback.advance(world, dtReal)) onSettled(world);

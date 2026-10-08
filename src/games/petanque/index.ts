@@ -53,3 +53,7 @@ export type {
 // Shot analysis for the celebrations (tir réussi / carreau)
 export { analyseShot, DEFAULT_CARREAU } from './carreau';
 export type { CarreauConfig, ShotInput, ShotKind, ShotOutcome } from './carreau';
+
+// "Landing spot" controls: spot + loft -> intent, swipe error -> perturbed intent
+export { ballConfig, clampToCourt, constrainSpot, perturbIntent, reachedPoint, reachRange, solveSpot, spotMeaning } from './landingAim';
+export type { ExecutionError, LandingAimConfig, SolvedSpot, Spot, SpotMeaning } from './landingAim';
