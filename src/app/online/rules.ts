@@ -91,6 +91,20 @@ export function rejoinDecision(active: ActiveRoom | null, info: RoomInfo | null 
   return 'offer';
 }
 
+/**
+ * What the menu's "Rejoin" card does after a check of the saved room: show it (the room is waiting),
+ * hide it (nothing saved, or the server says the room is gone or the match is finished), or leave it
+ * as it is (server unreachable: we don't know).
+ */
+export function rejoinCard(active: ActiveRoom | null, info: RoomInfo | null | 'unreachable'): 'show' | 'hide' | 'keep' {
+  if (!active) return 'hide';
+  const d = rejoinDecision(active, info);
+  return d === 'offer' ? 'show' : d === 'forget' ? 'hide' : 'keep';
+}
+
+/** The rejoin card should be re-checked: the page is visible again with the menu up and no online screen open. */
+export const shouldRecheckRejoin = (visible: boolean, menuOpen: boolean, stageIdle: boolean): boolean => visible && menuOpen && stageIdle;
+
 /** `href` without the invite's `?room=` (other params and the hash kept), for history.replaceState. */
 export function stripRoomParam(href: string): string {
   const u = new URL(href);

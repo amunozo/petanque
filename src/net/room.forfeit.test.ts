@@ -3,6 +3,7 @@ import { CONFIG_HASH } from './fingerprint';
 import { CLOSE_CODES, PROTOCOL_VERSION, type HelloMsg, type ServerMessage } from './protocol';
 import {
   createRoomState,
+  isAbandoned,
   joinRoom,
   restoreRoom,
   roomAlarm,
@@ -100,7 +101,7 @@ describe('room forfeit: reconnect grace', () => {
     expect(roomDeadline(away.room)).toBeNull();
   });
 
-  it('with both players gone nobody wins; whoever returns first gives the other a fresh countdown', () => {
+  it('with both players gone nobody wins by forfeit; whoever returns in time gives the other a fresh countdown', () => {
     const both = seatDisconnected(anaDropped().room, 'B', at(T0 + 10_000));
     expect(msgs(both)).toEqual([{ type: 'opponentConnection', seat: 'B', connected: false, left: false, graceMs: null }]); // to Ana's (closed) seat
     expect(both.room.seats.B?.graceUntil).toBeNull();
@@ -110,11 +111,14 @@ describe('room forfeit: reconnect grace', () => {
     expect(expired.out).toEqual([]);
     expect(expired.room.phase).toBe('playing');
     expect(expired.room.outcome).toBeNull();
-    expect(roomDeadline(expired.room)).toBeNull(); // only the idle expiry is left
+    expect(expired.room.seats.A?.graceUntil).toBeNull();
+    expect(expired.abandoned).toBeUndefined();
+    expect(roomDeadline(expired.room)).toBe(T0 + 10_000 + GRACE); // the abandon deadline is what is left
 
-    const bob = joinRoom(expired.room, hello(TOKENS.b, 'Bob'), ENTROPY, at(T0 + 100_000));
+    const bob = joinRoom(expired.room, hello(TOKENS.b, 'Bob'), ENTROPY, at(T0 + 65_000));
     expect(bob.room.phase).toBe('playing');
-    expect(bob.room.seats.A?.graceUntil).toBe(T0 + 100_000 + GRACE);
+    expect(bob.room.abandonAt).toBeNull();
+    expect(bob.room.seats.A?.graceUntil).toBe(T0 + 65_000 + GRACE);
     const welcome = msgs(bob, 'self')[0];
     expect(welcome?.type === 'welcome' && welcome.room.players.A?.graceMs).toBe(GRACE);
   });
@@ -181,7 +185,16 @@ describe('room forfeit: restore after a restart', () => {
     expect(r.out).toEqual([]);
     expect(r.room.seats.A).toMatchObject({ connected: false, graceUntil: null });
     expect(r.room.seats.B).toMatchObject({ connected: false, graceUntil: null });
-    expect(roomDeadline(r.room)).toBeNull();
+    expect(r.room.abandonAt).toBe(T0 + GRACE); // but the abandon countdown starts
+    expect(roomDeadline(r.room)).toBe(T0 + GRACE);
+  });
+
+  it('a room stored by an older server with both seats away gets the abandon countdown', () => {
+    const room = playing();
+    const gone = JSON.parse(JSON.stringify({ ...room, seats: { A: { ...room.seats.A, connected: false }, B: { ...room.seats.B, connected: false } } })) as Record<string, unknown>;
+    delete gone['abandonAt'];
+    const r = restoreRoom(gone as unknown as RoomState, [], at(T0 + 500));
+    expect(r.room.abandonAt).toBe(T0 + 500 + GRACE);
   });
 
   it('fills in fields a room stored by the previous protocol lacks', () => {
@@ -191,5 +204,85 @@ describe('room forfeit: restore after a restart', () => {
     delete old.seats['A']?.['graceUntil'];
     delete old.seats['B']?.['graceUntil'];
     expect(restoreRoom(old as unknown as RoomState, ['A', 'B'], at(T0)).room).toEqual(room);
+  });
+});
+
+describe('room abandonment: both players away', () => {
+  /** Ana dropped at T0, Bob at T0 + 10 s: abandoned at T0 + 70 s. */
+  const bothAway = (): RoomState => seatDisconnected(anaDropped().room, 'B', at(T0 + 10_000)).room;
+  const DEADLINE = T0 + 10_000 + GRACE;
+
+  it('starts when the second player is gone and is the room deadline', () => {
+    const room = bothAway();
+    expect(room.abandonAt).toBe(DEADLINE);
+    expect(roomDeadline(room)).toBe(T0 + GRACE); // Ana's own (moot) countdown is earlier
+    expect(isAbandoned(room, DEADLINE - 1)).toBe(false);
+    expect(isAbandoned(room, DEADLINE)).toBe(true);
+    const settled = roomAlarm(room, at(T0 + GRACE)).room;
+    expect(roomDeadline(settled)).toBe(DEADLINE);
+    expect(roomAlarm(settled, at(DEADLINE - 1))).toEqual({ room: settled, out: [] });
+  });
+
+  it('at the deadline the alarm reports the match abandoned (nobody wins, no forfeit message)', () => {
+    const r = roomAlarm(bothAway(), at(DEADLINE));
+    expect(r.abandoned).toBe(true);
+    expect(r.out).toEqual([]);
+    expect(r.room.outcome).toBeNull();
+  });
+
+  it('a rejoin after abandonment gets roomExpired and the room is flagged for deletion', () => {
+    for (const token of [TOKENS.a, TOKENS.b, 'token-cccccccccccccccc']) {
+      const r = joinRoom(bothAway(), hello(token, 'X'), ENTROPY, at(DEADLINE + 1000));
+      expect(r.abandoned).toBe(true);
+      expect(r.seat).toBeUndefined();
+      expect(r.close).toBe(CLOSE_CODES.roomExpired);
+      expect(msgs(r)[0]).toMatchObject({ type: 'error', code: 'roomExpired', fatal: true });
+    }
+    // A late message or disconnect settles it too.
+    expect(roomMessage(bothAway(), 'A', { type: 'ping' }, ENTROPY, at(DEADLINE)).abandoned).toBe(true);
+    expect(seatDisconnected(bothAway(), 'A', at(DEADLINE)).abandoned).toBe(true);
+  });
+
+  it('a rejoin in time cancels it and the other player gets a fresh forfeit countdown', () => {
+    const back = joinRoom(bothAway(), hello(TOKENS.b, 'Bob'), ENTROPY, at(DEADLINE - 1));
+    expect(back.abandoned).toBeUndefined();
+    expect(back.room.phase).toBe('playing');
+    expect(back.room.abandonAt).toBeNull();
+    expect(back.room.seats.A?.graceUntil).toBe(DEADLINE - 1 + GRACE);
+    expect(roomDeadline(back.room)).toBe(DEADLINE - 1 + GRACE);
+  });
+
+  it('with one player staying it is the forfeit, never an abandonment', () => {
+    const room = anaDropped().room;
+    expect(room.abandonAt).toBeNull();
+    const r = roomAlarm(room, at(T0 + 10 * GRACE));
+    expect(r.abandoned).toBeUndefined();
+    expect(r.room.outcome).toEqual({ winner: 'B', reason: 'forfeit' });
+  });
+
+  it('Leave while the other is away ends the match for good (forfeit) and stops the abandon countdown', () => {
+    const away = anaDropped().room;
+    const left = roomMessage(away, 'B', { type: 'leave' }, ENTROPY, at(T0 + 1000));
+    expect(left.room.abandonAt).toBeNull();
+    expect(roomDeadline(left.room)).toBeNull();
+  });
+
+  it('never applies in the lobby or after the match', () => {
+    const lobby = joinRoom(createRoomState(CODE, 'quick'), hello(TOKENS.a, 'Ana'), ENTROPY, at(T0)).room;
+    const gone = seatDisconnected(lobby, 'A', at(T0)).room;
+    expect(gone.abandonAt).toBeNull();
+    expect(roomDeadline(gone)).toBeNull();
+    const over: RoomState = { ...playing(), phase: 'matchOver', outcome: { winner: 'A', reason: 'score' } };
+    const both = seatDisconnected(seatDisconnected(over, 'A', at(T0)).room, 'B', at(T0)).room;
+    expect(both.abandonAt).toBeNull();
+    expect(roomAlarm(both, at(T0 + 10 * GRACE))).toEqual({ room: both, out: [] });
+  });
+
+  it('never mutates the input room', () => {
+    const room = bothAway();
+    const frozen = JSON.stringify(room);
+    roomAlarm(room, at(DEADLINE));
+    joinRoom(room, hello(TOKENS.a, 'Ana'), ENTROPY, at(DEADLINE + 1));
+    expect(JSON.stringify(room)).toBe(frozen);
   });
 });

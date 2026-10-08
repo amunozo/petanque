@@ -32,6 +32,8 @@ type Step =
   | { kind: 'sync'; room: RoomSnapshot };
 
 export interface OnlineMatchHooks {
+  /** This device saw the match finish (on the score, or a forfeit won or lost): forget the saved room. */
+  finished(): void;
   /** Tell the server we leave and forget the room (stays on screen; the caller goes to the menu). */
   leave(): void;
   /** Leave and go back to the menu (match-over / opponent-left "Menu" buttons). */
@@ -58,6 +60,8 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
   /** Last connection notice painted (the countdown repaints only when its text changes). */
   let noticeText: string | null = null;
   let active = false;
+  /** `hooks.finished()` was called for the match on screen (reset when a rematch starts). */
+  let finishedNoted = false;
 
   const mine = (): Seat => client.seat ?? 'A';
   const theirs = (): Seat => otherSeat(mine());
@@ -105,6 +109,12 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
   /** Connection notice, the forfeit card, the rematch button. */
   function paint(): void {
     if (!active) return;
+    if (client.room?.phase === 'matchOver') {
+      if (!finishedNoted) {
+        finishedNoted = true;
+        hooks.finished();
+      }
+    } else finishedNoted = false;
     const name = opponentName();
     paintNotice(true);
     const f = forfeit();
@@ -256,6 +266,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       rematchVoted = false;
       chipSaysLeft = false;
       noticeText = null;
+      finishedNoted = false;
       core.attach(driver);
       subscribe();
       const room = client.room;

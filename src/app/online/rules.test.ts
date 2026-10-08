@@ -9,8 +9,10 @@ import {
   formatCountdown,
   opponentsTurn,
   otherSeat,
+  rejoinCard,
   rejoinDecision,
   seatNames,
+  shouldRecheckRejoin,
   stripRoomParam,
   throwAction,
   type AimCheck,
@@ -127,6 +129,29 @@ describe('rejoinDecision', () => {
     expect(rejoinDecision(active, null)).toBe('forget');
     expect(rejoinDecision(active, 'unreachable')).toBe('none');
     expect(rejoinDecision(null, info('playing'))).toBe('none');
+  });
+});
+
+describe('rejoinCard', () => {
+  const active = { code: 'K7M9P', nickname: 'Ana', opponent: 'Bo' };
+  const info = (phase: 'lobby' | 'playing' | 'matchOver') => ({ code: 'K7M9P', phase, length: 'quick' as const, players: 2 });
+  it('shows a live room, hides a finished, expired or unsaved one, leaves it alone when the server is unreachable', () => {
+    expect(rejoinCard(active, info('playing'))).toBe('show');
+    expect(rejoinCard(active, info('lobby'))).toBe('show');
+    expect(rejoinCard(active, info('matchOver'))).toBe('hide');
+    expect(rejoinCard(active, null)).toBe('hide');
+    expect(rejoinCard(null, info('playing'))).toBe('hide');
+    expect(rejoinCard(null, 'unreachable')).toBe('hide');
+    expect(rejoinCard(active, 'unreachable')).toBe('keep');
+  });
+});
+
+describe('shouldRecheckRejoin', () => {
+  it('only when the page is visible, the menu is up and no online screen is open', () => {
+    expect(shouldRecheckRejoin(true, true, true)).toBe(true);
+    expect(shouldRecheckRejoin(false, true, true)).toBe(false);
+    expect(shouldRecheckRejoin(true, false, true)).toBe(false);
+    expect(shouldRecheckRejoin(true, true, false)).toBe(false);
   });
 });
 

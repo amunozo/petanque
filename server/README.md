@@ -39,12 +39,21 @@ mid-match has `SERVER_CONFIG.reconnectGraceMs` (60 s) to come back. The
 opponent gets the time left once (`opponentConnection.graceMs`) and counts
 down locally. Back in time: the match goes on. Otherwise the player who stayed
 wins by forfeit (`forfeit` message, `room.outcome = {winner, reason:
-'forfeit'}`); `leave` mid-match forfeits at once. If both players are gone
-nobody wins and the room just expires. `src/net/room.ts` has no clock: the
-Durable Object passes `now` in, asks `roomDeadline(room)` for the next
-reconnect deadline and keeps ONE alarm at the earlier of that and the idle
-expiry (`idleUntil` in storage); when it fires it calls `roomAlarm(room, now)`
-or expires the room.
+'forfeit'}`); `leave` mid-match forfeits at once. If BOTH players are
+away mid-match nobody can win by forfeit; instead the room-level
+`room.abandonAt` runs for the same `reconnectGraceMs`. If neither is back by
+then the match is **abandoned**: `roomAlarm` returns `abandoned: true` and the
+Durable Object deletes the room (like an idle expiry), so `GET /rooms/:code`
+is 404 (also in the moment before the alarm runs: `isAbandoned`) and a later
+`hello` gets the fatal `roomExpired`, never a match or a fresh forfeit
+countdown. A player back in time cancels it (and the other gets a fresh
+forfeit countdown). Not in the lobby (a host who backgrounds the app to
+share the invite keeps it for the lobby idle time) and not after the match.
+`src/net/room.ts` has no clock: the Durable Object passes `now` in, asks
+`roomDeadline(room)` for the next deadline (reconnect or abandon) and keeps ONE
+alarm at the earlier of that and the idle expiry (`idleUntil` in storage);
+when it fires it calls `roomAlarm(room, now)` or expires the room. Every event
+settles passed deadlines first, so the outcome never depends on alarm lateness.
 
 ## Local development
 

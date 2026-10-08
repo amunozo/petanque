@@ -10,8 +10,12 @@
  * reconnect deadline (`graceUntil`). Back in time: the match goes on. When it
  * passes (`roomAlarm`), or on `leave` mid-match, the room goes to 'matchOver'
  * with outcome { winner: the player who stayed, reason: 'forfeit' }. If both
- * are gone at the deadline nobody wins (the countdown is dropped; the room
- * expires when idle), and whoever comes back first gives the other a fresh one.
+ * are gone at the deadline nobody wins (the countdown is dropped), and whoever
+ * comes back in time gives the other a fresh one.
+ * Abandonment: when BOTH seats are away mid-match, `abandonAt` (room level) runs
+ * for the same grace; if nobody is back by then the match is abandoned: the
+ * result carries `abandoned: true` and the Durable Object deletes the room (like
+ * an idle expiry), so GET /rooms/:code is 404 and a later hello gets roomExpired.
  *
  * Reducer style: every function takes the RoomState (never mutated) and
  * returns the next one plus the messages to send. No I/O, no clock, no
@@ -84,6 +88,8 @@ export interface RoomState {
   rematch: Record<Seat, boolean>;
   /** Set in 'matchOver': who won and how. */
   outcome: MatchOutcome | null;
+  /** Mid-match with BOTH seats away: when the room is abandoned (RoomClock time); null while someone is connected. */
+  abandonAt: number | null;
 }
 
 /** Time as the Durable Object sees it (the room has no clock of its own). */
@@ -115,6 +121,8 @@ export interface RoomResult {
   seat?: Seat;
   /** Close the sending socket with this code after sending `out`. */
   close?: number;
+  /** The match was abandoned (both players away past the grace): the Durable Object deletes the room. */
+  abandoned?: true;
 }
 
 const other = (s: Seat): Seat => (s === 'A' ? 'B' : 'A');
@@ -130,6 +138,7 @@ export function createRoomState(code: string, length: MatchLength): RoomState {
     match: null,
     rematch: { A: false, B: false },
     outcome: null,
+    abandonAt: null,
   };
 }
 
@@ -171,6 +180,7 @@ const chain = (first: RoomResult, then: RoomResult): RoomResult => (first.out.le
  * is connected has a deadline (a running one is kept, otherwise a fresh one
  * starts); a running deadline is also kept while both are away (roomAlarm
  * drops it if nobody is back by then). Connected seats and other phases: none.
+ * With both seats away, `abandonAt` runs (kept once started); otherwise null.
  */
 function syncGrace(room: RoomState, clock: RoomClock): RoomState {
   const seat = (s: Seat): SeatState | null => {
@@ -185,7 +195,14 @@ function syncGrace(room: RoomState, clock: RoomClock): RoomState {
   };
   const A = seat('A');
   const B = seat('B');
-  return A === room.seats.A && B === room.seats.B ? room : { ...room, seats: { A, B } };
+  const bothAway = room.phase === 'playing' && A !== null && B !== null && !A.connected && !B.connected;
+  const abandonAt = bothAway ? (room.abandonAt ?? clock.now + clock.reconnectGraceMs) : null;
+  return A === room.seats.A && B === room.seats.B && abandonAt === room.abandonAt ? room : { ...room, seats: { A, B }, abandonAt };
+}
+
+/** Mid-match, both players away and the abandon deadline has passed: the room is dead (the Durable Object deletes it). */
+export function isAbandoned(room: RoomState, now: number): boolean {
+  return room.phase === 'playing' && room.abandonAt != null && room.abandonAt <= now && SEATS.every((s) => room.seats[s]?.connected !== true);
 }
 
 /** `loser` forfeits: the other seat wins, the match is over (no rematch after a forfeit). */
@@ -195,7 +212,7 @@ function forfeit(room: RoomState, loser: Seat, clock: RoomClock): RoomResult {
   return { room: next, out: [{ to: 'all', msg: { type: 'forfeit', room: roomSnapshot(next, clock.now) } }] };
 }
 
-/** The earliest reconnect deadline (RoomClock time), or null: the Durable Object calls roomAlarm then. */
+/** The earliest reconnect or abandon deadline (RoomClock time), or null: the Durable Object calls roomAlarm then. */
 export function roomDeadline(room: RoomState): number | null {
   if (room.phase !== 'playing') return null;
   let at: number | null = null;
@@ -203,16 +220,19 @@ export function roomDeadline(room: RoomState): number | null {
     const g = room.seats[s]?.graceUntil ?? null;
     if (g !== null && (at === null || g < at)) at = g;
   }
+  if (room.abandonAt != null && (at === null || room.abandonAt < at)) at = room.abandonAt;
   return at;
 }
 
 /**
  * Resolves the reconnect deadlines that have passed: the player who stayed
- * wins by forfeit; with nobody there to claim it the deadline is dropped.
- * Also run first by every other event, so the outcome never depends on
+ * wins by forfeit; with nobody there to claim it the deadline is dropped, and
+ * when both stayed away past `abandonAt` the result is `abandoned` (the room
+ * must be deleted; `room` is unchanged). Also run first by every other event, so the outcome never depends on
  * how late the alarm fires.
  */
 export function roomAlarm(room: RoomState, clock: RoomClock): RoomResult {
+  if (isAbandoned(room, clock.now)) return { room, out: [], abandoned: true };
   let next = room;
   for (const s of SEATS) {
     const st = next.seats[s];
@@ -233,14 +253,15 @@ export function roomAlarm(room: RoomState, clock: RoomClock): RoomResult {
 export function restoreRoom(stored: RoomState, liveSeats: readonly (Seat | null)[], clock: RoomClock): RoomResult {
   const fill = (st: SeatState | null): SeatState | null => (st && st.graceUntil === undefined ? { ...st, graceUntil: null } : st);
   let room: RoomState = stored;
-  if (stored.outcome === undefined || fill(stored.seats.A) !== stored.seats.A || fill(stored.seats.B) !== stored.seats.B) {
-    room = { ...stored, outcome: stored.outcome ?? null, seats: { A: fill(stored.seats.A), B: fill(stored.seats.B) } };
+  if (stored.outcome === undefined || stored.abandonAt === undefined || fill(stored.seats.A) !== stored.seats.A || fill(stored.seats.B) !== stored.seats.B) {
+    room = { ...stored, outcome: stored.outcome ?? null, abandonAt: stored.abandonAt ?? null, seats: { A: fill(stored.seats.A), B: fill(stored.seats.B) } };
   }
   const stale = SEATS.filter((s) => room.seats[s]?.connected === true && !liveSeats.includes(s));
-  if (stale.length === 0) return { room, out: [] };
   const seats = { ...room.seats };
   for (const s of stale) seats[s] = { ...(seats[s] as SeatState), connected: false };
-  room = syncGrace({ ...room, seats }, clock);
+  // Also for rooms stored with both seats already away (a countdown that an older server never started).
+  room = syncGrace(stale.length === 0 ? room : { ...room, seats }, clock);
+  if (stale.length === 0) return { room, out: [] };
   const out = stale.filter((s) => room.seats[other(s)]?.connected).map((s) => connectionMsg(room, s, clock.now));
   return { room, out };
 }
@@ -283,6 +304,7 @@ export function joinRoom(room: RoomState, hello: HelloMsg, entropy: Entropy, clo
 
   // A deadline that passed is settled first (a late rejoin finds the forfeit).
   const due = roomAlarm(room, clock);
+  if (due.abandoned) return { ...fatal(room, 'roomExpired', CLOSE_CODES.roomExpired), abandoned: true };
   const cur = due.room;
   const known = SEATS.find((s) => cur.seats[s]?.token === hello.clientToken);
   const seat = known ?? SEATS.find((s) => cur.seats[s] === null);
@@ -314,7 +336,7 @@ export function joinRoom(room: RoomState, hello: HelloMsg, entropy: Entropy, clo
 export function seatDisconnected(room: RoomState, seat: Seat, clock: RoomClock): RoomResult {
   const due = roomAlarm(room, clock);
   const s = due.room.seats[seat];
-  if (!s || !s.connected) return due;
+  if (due.abandoned || !s || !s.connected) return due;
   const next = syncGrace({ ...due.room, seats: { ...due.room.seats, [seat]: { ...s, connected: false } } }, clock);
   return chain(due, { room: next, out: [connectionMsg(next, seat, clock.now)] });
 }
@@ -389,6 +411,7 @@ function handleLeave(room: RoomState, seat: Seat, clock: RoomClock): RoomResult 
 /** Any message from a socket already seated as `seat` (hello goes through joinRoom). */
 export function roomMessage(room: RoomState, seat: Seat, msg: ClientMessage, entropy: Entropy, clock: RoomClock): RoomResult {
   const due = roomAlarm(room, clock);
+  if (due.abandoned) return { ...fatal(room, 'roomExpired', CLOSE_CODES.roomExpired), abandoned: true };
   return chain(due, seatMessage(due.room, seat, msg, entropy, clock));
 }
 

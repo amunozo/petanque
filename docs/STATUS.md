@@ -179,6 +179,16 @@ the entry by default) and redeploy.
   (start-up forgets finished rooms; only a reconnecting socket shows it);
   the winner card always says "<Name> left the match". **Owner to test**
   phone + PC: close the app on one, watch the countdown on the other.
+- **Stale "Rejoin your match" card** — fixed 2026-10-08 (no protocol change,
+  still v3). Cause: the card was only checked at start-up, and a match
+  abandoned by BOTH players stayed 'playing' on the server for 2 h (every
+  rejoin reset the idle clock; with the forfeit rule the returner even got a
+  fresh countdown against nobody). Now: room.ts `abandonAt` (both away for
+  `reconnectGraceMs` mid-match) -> `roomAlarm` returns `abandoned` -> the DO
+  deletes the room (GET 404, hello -> roomExpired); the menu re-checks the
+  saved room every time it is shown and on `visibilitychange`; the saved room
+  is cleared when the local player sees the match finish (score/forfeit) and
+  saved again if a rematch starts. Tests: room.forfeit.test.ts, rules.test.ts.
 - **Play forms** submitted for review 2026-10-08: Data safety (Name, Device
   or other IDs, App interactions; collected, not shared, optional, app
   functionality, encrypted in transit, no accounts) and new content rating

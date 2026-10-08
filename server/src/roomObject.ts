@@ -4,13 +4,16 @@
  * the RoomState in storage after every change (so an evicted/hibernated
  * object resumes exactly), supplies crypto entropy and the clock, rate-limits
  * sockets, and runs ONE alarm at the earliest of: the idle expiry and the
- * room's reconnect deadline (roomDeadline -> roomAlarm decides a forfeit).
+ * room's reconnect deadline (roomDeadline -> roomAlarm decides a forfeit, or an
+ * abandonment: both players away for the grace period -> the room is deleted
+ * like an idle expiry).
  */
 import { DurableObject } from 'cloudflare:workers';
 import type { MatchLength } from '../../src/games/petanque/matchLength';
 import { CLOSE_CODES, PING_TEXT, PONG_TEXT, encode, parseClientMessage, type ErrorCode, type Seat, type ServerMessage } from '../../src/net/protocol';
 import {
   createRoomState,
+  isAbandoned,
   joinRoom,
   restoreRoom,
   roomAlarm,
@@ -114,7 +117,7 @@ export class Room extends DurableObject<Env> {
 
   async info(): Promise<RoomInfo | null> {
     const r = this.room;
-    if (!r) return null;
+    if (!r || isAbandoned(r, Date.now())) return null; // abandoned: gone, even if the alarm has not run yet
     return { code: r.code, phase: r.phase, length: r.length, players: (r.seats.A ? 1 : 0) + (r.seats.B ? 1 : 0) };
   }
 
@@ -130,7 +133,7 @@ export class Room extends DurableObject<Env> {
     const [client, server] = [pair[0], pair[1]];
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ seat: null } satisfies Attachment);
-    if (!this.room) {
+    if (!this.room || isAbandoned(this.room, Date.now())) {
       sendTo(server, errorMsg('roomNotFound', true));
       closeWs(server, CLOSE_CODES.roomNotFound, 'roomNotFound');
     }
@@ -168,6 +171,10 @@ export class Room extends DurableObject<Env> {
     if (msg.type === 'hello') {
       if (seat) return sendTo(ws, errorMsg('badMessage', false, 'already joined'));
       const result = joinRoom(room, msg, entropy(), clock());
+      if (result.abandoned) {
+        this.deliver(ws, result.out);
+        return this.expire();
+      }
       if (result.seat) {
         // Another socket with this seat (old tab, half-dead connection) is replaced by this one.
         for (const other of this.ctx.getWebSockets()) {
@@ -183,6 +190,10 @@ export class Room extends DurableObject<Env> {
 
     if (!seat) return sendTo(ws, errorMsg('notJoined', false));
     const result = roomMessage(room, seat, msg, entropy(), clock());
+    if (result.abandoned) {
+      this.deliver(ws, result.out);
+      return this.expire();
+    }
     await this.commit(result.room);
     this.deliver(ws, result.out);
     if (result.close !== undefined) await this.kick(ws, result.close, 'closed');
@@ -196,13 +207,14 @@ export class Room extends DurableObject<Env> {
     await this.socketGone(ws, 1011);
   }
 
-  /** Either a reconnect deadline passed (forfeit, or nobody to claim it) or the room went quiet (expiry). */
+  /** A deadline passed (forfeit, nobody to claim it, or the match was abandoned) or the room went quiet (expiry). */
   override async alarm(): Promise<void> {
     const room = this.room;
     const now = Date.now();
     const deadline = room ? roomDeadline(room) : null;
     if (room && deadline !== null && deadline <= now) {
       const result = roomAlarm(room, clock());
+      if (result.abandoned) return this.expire();
       // A forfeit ends the match (new idle period); a dropped countdown (both away) leaves the idle expiry as it was.
       if (result.room.phase !== room.phase) await this.commit(result.room);
       else await this.save(result.room);
@@ -210,11 +222,17 @@ export class Room extends DurableObject<Env> {
       return;
     }
     if (room && now < this.idleUntil) return this.scheduleAlarm(); // woke early
+    await this.expire();
+  }
+
+  /** The room is over for good (idle expiry or abandoned match): tell and close every socket, delete everything. */
+  private async expire(): Promise<void> {
     for (const ws of this.ctx.getWebSockets()) {
       sendTo(ws, errorMsg('roomExpired', true));
       this.closeSocket(ws, CLOSE_CODES.roomExpired, 'roomExpired');
     }
     this.room = null;
+    await this.ctx.storage.deleteAlarm();
     await this.ctx.storage.deleteAll();
   }
 
@@ -234,6 +252,7 @@ export class Room extends DurableObject<Env> {
     const stillThere = this.ctx.getWebSockets().some((o) => o !== gone && o.readyState === OPEN && seatOf(o) === seat);
     if (stillThere) return;
     const result = seatDisconnected(this.room, seat, clock());
+    if (result.abandoned) return this.expire();
     await this.commit(result.room);
     this.deliver(null, result.out);
   }

@@ -199,6 +199,7 @@ function goMenu(): void {
   scene.setCameraMode('aim');
   fx.clear();
   menu.show();
+  online?.refresh(); // is the saved online match still there?
   refreshInput();
 }
 

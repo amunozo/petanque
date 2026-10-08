@@ -15,7 +15,7 @@ import { track } from '../analytics';
 import type { MatchLength } from '../matchLength';
 import { noticeDialog, type LengthPoints, type Menu } from '../menu';
 import { createOnlineMatch, type OnlineMatch } from './match';
-import { otherSeat, rejoinDecision, stripRoomParam } from './rules';
+import { otherSeat, rejoinCard, rejoinDecision, shouldRecheckRejoin, stripRoomParam } from './rules';
 import { createLobby, createOnlineSheet } from './screens';
 import { clearActiveRoom, loadActiveRoom, saveActiveRoom, saveNickname } from './storage';
 
@@ -41,6 +41,8 @@ export interface OnlineFlow {
   isOpen(): boolean;
   /** Start-up: an invite link (`?room=`) opens the join sheet; otherwise maybe offer "Rejoin". */
   start(): void;
+  /** The menu was (re)shown: ask the server again whether the saved room is still worth rejoining. */
+  refresh(): void;
 }
 
 type NoticeKind = 'offline' | 'server' | 'notFound' | 'full' | 'version' | 'replaced' | 'error';
@@ -67,8 +69,18 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   const lobby = createLobby(app);
   let stage: 'idle' | 'connecting' | 'lobby' | 'match' = 'idle';
   let noticeUp = false;
+  let started = false;
+  /** The nickname this device is using in the current room (to save the room again after a rematch starts). */
+  let roomNickname = '';
+  /** Only the newest rejoin check may touch the menu. */
+  let checkId = 0;
 
   const mode = createOnlineMatch(d.ctx, d.core, client, {
+    finished() {
+      // A finished match (score, forfeit won or lost) is never something to rejoin.
+      clearActiveRoom();
+      d.menu.setRejoin(null);
+    },
     leave,
     quit() {
       leave();
@@ -97,12 +109,12 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     stage = 'idle';
     lobby.hide();
     d.goMenu();
-    void notice(kind);
-    void checkRejoin();
+    void notice(kind); // goMenu() above re-checks the saved room
   }
 
   function leave(): void {
     client.leave();
+    checkId++;
     clearActiveRoom();
     stage = 'idle';
     lobby.hide();
@@ -124,7 +136,15 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     if (active && active.code === room.code && opponent && opponent !== active.opponent) saveActiveRoom({ ...active, opponent });
   }
 
+  /** A rematch (or a reconnect into a running match) after the room was forgotten: remember it again. */
+  function keepRoom(room: RoomSnapshot): void {
+    const code = client.code;
+    if (stage === 'idle' || !code || room.phase === 'matchOver' || !roomNickname || loadActiveRoom()?.code === code) return;
+    saveActiveRoom({ code, nickname: roomNickname, opponent: null });
+  }
+
   function join(code: string, nickname: string): void {
+    roomNickname = nickname;
     saveNickname(nickname);
     const active = loadActiveRoom();
     saveActiveRoom({ code, nickname, opponent: active?.code === code ? active.opponent : null });
@@ -147,6 +167,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     }
     if (stage !== 'connecting') return; // cancelled meanwhile
     track('online-room-created');
+    roomNickname = nickname;
     saveActiveRoom({ code, nickname, opponent: null });
     client.connect(code, nickname);
   }
@@ -186,7 +207,9 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     else await openInvite(r.code, r.nickname);
   }
 
+  /** Asks the server about the saved room: shows, hides or forgets the menu's "Rejoin" card (unreachable: left as is). */
   async function checkRejoin(): Promise<void> {
+    const id = ++checkId;
     const active = loadActiveRoom();
     if (!active) return d.menu.setRejoin(null);
     let info: Awaited<ReturnType<typeof client.roomInfo>> | 'unreachable';
@@ -195,10 +218,11 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     } catch {
       info = 'unreachable';
     }
-    const decision = rejoinDecision(active, info);
-    if (decision === 'forget') clearActiveRoom();
-    if (decision !== 'offer' || stage !== 'idle' || info === 'unreachable' || !info) return;
-    d.menu.setRejoin({ code: active.code, opponent: info.phase === 'lobby' ? null : active.opponent });
+    if (id !== checkId || stage !== 'idle') return; // a newer check, or an online screen took over meanwhile
+    if (rejoinDecision(active, info) === 'forget' && loadActiveRoom()?.code === active.code) clearActiveRoom();
+    const card = rejoinCard(active, info);
+    if (card === 'hide') d.menu.setRejoin(null);
+    else if (card === 'show' && info && info !== 'unreachable') d.menu.setRejoin({ code: active.code, opponent: info.phase === 'lobby' ? null : active.opponent });
   }
 
   async function share(): Promise<void> {
@@ -224,6 +248,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
 
   // ---- server events (the match itself is handled by online/match.ts) --------------------
   client.on('welcome', (ev) => {
+    keepRoom(ev.room);
     rememberOpponent(ev.room);
     if (stage === 'match' || stage === 'idle') return;
     if (ev.room.phase === 'lobby') {
@@ -232,6 +257,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     } else enterMatch();
   });
   client.on('matchStarted', (ev) => {
+    keepRoom(ev.room);
     rememberOpponent(ev.room);
     if (stage === 'connecting' || stage === 'lobby') enterMatch();
   });
@@ -248,7 +274,10 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
 
   // Phones drop sockets when the app sleeps: retry right away when it is back.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') client.reconnectNow();
+    if (document.visibilityState !== 'visible') return;
+    client.reconnectNow();
+    // An app left in memory for hours: the saved room may have finished or expired meanwhile.
+    if (started && shouldRecheckRejoin(true, d.menu.isOpen(), stage === 'idle' && !noticeUp)) void checkRejoin();
   });
   window.addEventListener('online', () => client.reconnectNow());
 
@@ -267,7 +296,11 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   return {
     mode,
     isOpen: () => sheet.isOpen() || lobby.isOpen() || noticeUp,
+    refresh() {
+      if (started && stage === 'idle') void checkRejoin();
+    },
     start() {
+      started = true;
       const code = roomCodeFromSearch(location.search);
       if (new URLSearchParams(location.search).has(ROOM_PARAM)) history.replaceState(history.state, '', stripRoomParam(location.href));
       if (code) void openInvite(code);
