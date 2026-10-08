@@ -31,9 +31,7 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   - **Delegate** each task to its **own individual subagent**: one focused task
     per subagent, with a self-contained brief (goal, files, constraints from
     CLAUDE.md, acceptance checks: typecheck/tests/screenshots). Independent
-    tasks can run in parallel subagents. Use Sonnet for well-specified
-    building and Opus for art/visual direction, game feel, AI and tricky
-    design. Choose the effort level to fit the task.
+    tasks can run in parallel subagents. Use **Haiku** only for easy, mechanical, low-risk tasks (text/translation tweaks, renames, small doc or config edits, simple scripted checks); **Sonnet** for well-specified building; **Opus** for art/visual direction, game feel, AI and tricky design. Choose the effort level to fit the task.
   - **Review** what each subagent returns: read the diff, run
     `npm run typecheck`, `npm test` and `npm run build`, and check screenshots
     for visual work. Send it back if it is not right.
