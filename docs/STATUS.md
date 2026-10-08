@@ -164,6 +164,33 @@ functionality) and content rating ("users interact" = Yes) are the owner's
 to submit. To open for everyone: set repo variable VITE_SERVER_URL (or show
 the entry by default) and redeploy.
 
+## In flight (2026-10-08, update when done)
+- **Online forfeit rule** — subagent implementing (uncommitted in the main
+  worktree until reviewed): disconnected player has **60 s**
+  (SERVER_CONFIG.reconnectGraceMs) to rejoin; the player who stays sees a
+  server-driven countdown; after 60 s the stayer wins by forfeit; explicit
+  Leave mid-match = immediate forfeit; both gone = no winner (idle expiry);
+  late rejoin sees "You left the match". PROTOCOL_VERSION 2 → 3. No turn
+  timer for now. On completion: review, run checks, commit, push (deploys
+  site + server), owner tests phone+PC.
+- **Play forms** submitted for review 2026-10-08: Data safety (Name, Device
+  or other IDs, App interactions; collected, not shared, optional, app
+  functionality, encrypted in transit, no accounts) and new content rating
+  (see Release checklist note). Owner waits for approval email.
+- **Open online play to everyone** after that approval: set repo variable
+  `VITE_SERVER_URL=https://petanque-server.amunozo-gamedev.workers.dev` (or
+  show the entry by default), redeploy, announce to testers (Reddit + Google
+  Group; draft the message).
+- **GoatCounter analytics** — owner asked; waiting for their choice: separate
+  GoatCounter site (recommended, e.g. code `amunozo-petanque`) vs the
+  existing `amunozo` site with `petanque.amunozo.com/…` path labels. Plan:
+  script + a few anonymous events (practice/vs-computer/online room/match
+  finished), privacy page update (5 languages), Data safety: App interactions
+  gets purpose Analytics and becomes required. Push only after the owner
+  updates the form.
+- Testers: ~7+ opted in via r/petanque (as of 2026-10-08); need 12 for 14
+  days.
+
 ## Next Android package (AAB) — not urgent, bundle with the next wrapper change
 Play pre-launch "for your next release" notes on 0.5.0 (1), none blocking:
 - Edge-to-edge (Android 15+, targetSdk 35+): check the game draws correctly
