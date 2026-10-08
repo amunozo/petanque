@@ -30,8 +30,9 @@ export default defineConfig({
         // `?source=pwa`, `?mode=ai&seed=…` etc. still hit the precached page.
         ignoreURLParametersMatching: [/.*/],
         navigateFallback: 'index.html',
-        // A frozen build under /v/<version>/ or the assetlinks file must never fall back to this app's shell.
-        navigateFallbackDenylist: [/\/v\/[^/]+\/./, /\.well-known\//],
+        // A frozen build under /v/<version>/, an experiment under /exp/<name>/ or the assetlinks
+        // file must never fall back to this app's shell.
+        navigateFallbackDenylist: [/\/v\/[^/]+\//, /\/exp\//, /\.well-known\//],
       },
     }),
   ],

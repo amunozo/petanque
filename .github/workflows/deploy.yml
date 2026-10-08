@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - 'ccr-*'
+      # Experiments: published ONLY to /exp/<name>/ (never the site root).
+      - 'exp-*'
     tags:
       - 'v*'
   workflow_dispatch:
@@ -50,23 +52,32 @@ jobs:
           VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
 
       - name: Deploy branch build to site root
-        if: github.ref_type != 'tag'
+        if: github.ref_type != 'tag' && !startsWith(github.ref_name, 'exp-')
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
           folder: dist
           clean-exclude: |
             v/**
+            exp/**
 
       # Also keep a frozen copy per package.json version (git tags can't be
       # pushed from the dev environment). Bump the version to freeze a phase.
       - name: Deploy branch build to v/<package version>/
-        if: github.ref_type != 'tag'
+        if: github.ref_type != 'tag' && !startsWith(github.ref_name, 'exp-')
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
           folder: dist
           target-folder: v/${{ steps.build.outputs.version }}
+
+      - name: Deploy experiment branch to exp/<name>/
+        if: github.ref_type != 'tag' && startsWith(github.ref_name, 'exp-')
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: dist
+          target-folder: exp/${{ github.ref_name }}
 
       - name: Deploy tagged build to v/<tag>/
         if: github.ref_type == 'tag'

@@ -126,6 +126,13 @@ tell the owner exactly what to change in Play Console *before* it goes live:
    tester services ($15–35) are an acceptable fallback.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
 
+## Experiments (preview without touching the live game)
+Push a branch named `exp-<name>` → the deploy workflow publishes it ONLY to
+`https://petanque.amunozo.com/exp/exp-<name>/` (root and `v/` untouched; the
+root service worker never serves its shell there). Use for game-feel changes
+the owner wants to try before testers get them. Online play is on the main
+branch but hidden (no server deployed, no `VITE_SERVER_URL`).
+
 ## Tester feedback log (closed test, from r/petanque)
 - 2026-10-08 (7 testers so far): works well on iPhone in the browser. High lob
   is by far the easiest/most precise way to point, and even to shoot. Real
