@@ -151,8 +151,13 @@ https://petanque-server.amunozo-gamedev.workers.dev (GitHub secrets
 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID; deploy-server.yml deploys on
 push or manual run). The online menu entry is hidden; `?online=1` (persisted
 per device, `?online=0` to clear) shows it, and invite links from such a host
-carry `online=1`. Plan: owner tests phone+PC → friends → then open to testers
-after the release checklist (privacy page, data safety, content rating).
+carry `online=1`. Plan: owner tests phone+PC (DONE 2026-10-08: "works flawlessly", in
+sync, fast) → friends on other networks → then open to testers after the
+release checklist: privacy page DONE (22779a8); Play Data safety (Name,
+Device or other IDs, App interactions; collected, not shared, optional, app
+functionality) and content rating ("users interact" = Yes) are the owner's
+to submit. To open for everyone: set repo variable VITE_SERVER_URL (or show
+the entry by default) and redeploy.
 
 ## Tester feedback log (closed test, from r/petanque)
 - 2026-10-08 (7 testers so far): works well on iPhone in the browser. High lob
