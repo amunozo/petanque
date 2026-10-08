@@ -43,9 +43,10 @@ const snapshot = (over: Partial<RoomSnapshot> = {}): RoomSnapshot => ({
   length: 'standard',
   seq: 0,
   matchNumber: 0,
-  players: { A: { nickname: 'Ana', connected: true, left: false }, B: null },
+  players: { A: { nickname: 'Ana', connected: true, left: false, graceMs: null }, B: null },
   match: null,
   rematch: { A: false, B: false },
+  outcome: null,
   ...over,
 });
 
@@ -99,8 +100,35 @@ describe('net client', () => {
     expect(c.seat).toBe('A');
     expect(c.status).toBe('open');
     expect(c.sendThrow({ aim: 0, power: 0.5, loft: 'roll' })).toBe(false); // no match yet
-    s.recv({ type: 'opponentConnection', seat: 'A', connected: false, left: false });
+    s.recv({ type: 'opponentConnection', seat: 'A', connected: false, left: false, graceMs: null });
     expect(c.room?.players.A?.connected).toBe(false);
+  });
+
+  it('turns the reconnect countdown into a local deadline and mirrors a forfeit', () => {
+    vi.setSystemTime(1_000_000);
+    const c = make();
+    c.connect('K7M9P', 'Ana');
+    const s = sockets[0]!;
+    s.open();
+    const bob = { nickname: 'Bob', connected: true, left: false, graceMs: null };
+    s.recv({ type: 'welcome', protocolVersion: PROTOCOL_VERSION, configHash: CONFIG_HASH, seat: 'A', room: snapshot({ phase: 'playing', players: { A: bob, B: bob } }) });
+    expect(c.graceDeadline('B')).toBeNull();
+    s.recv({ type: 'opponentConnection', seat: 'B', connected: false, left: false, graceMs: 60_000 });
+    expect(c.graceDeadline('B')).toBe(1_060_000);
+    expect(c.room?.players.B?.graceMs).toBe(60_000);
+    s.recv({ type: 'opponentConnection', seat: 'B', connected: true, left: false, graceMs: null });
+    expect(c.graceDeadline('B')).toBeNull();
+
+    const forfeits = vi.fn();
+    c.on('forfeit', forfeits);
+    const over = snapshot({ phase: 'matchOver', players: { A: bob, B: { ...bob, connected: false } }, outcome: { winner: 'A', reason: 'forfeit' } });
+    s.recv({ type: 'forfeit', room: over });
+    expect(forfeits).toHaveBeenCalledOnce();
+    expect(c.room).toEqual(over);
+    // A (re)joining snapshot carries the time left then.
+    vi.setSystemTime(2_000_000);
+    s.recv({ type: 'roomState', room: snapshot({ phase: 'playing', players: { A: bob, B: { ...bob, connected: false, graceMs: 27_000 } } }) });
+    expect(c.graceDeadline('B')).toBe(2_027_000);
   });
 
   it('keeps the connection alive with the exact ping text', () => {

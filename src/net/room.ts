@@ -6,11 +6,19 @@
  *     |                                +------(both rematch)----+
  *   (a seat leaves in the lobby frees it)
  *
+ * Forfeit: a seat that drops mid-match while its opponent is connected gets a
+ * reconnect deadline (`graceUntil`). Back in time: the match goes on. When it
+ * passes (`roomAlarm`), or on `leave` mid-match, the room goes to 'matchOver'
+ * with outcome { winner: the player who stayed, reason: 'forfeit' }. If both
+ * are gone at the deadline nobody wins (the countdown is dropped; the room
+ * expires when idle), and whoever comes back first gives the other a fresh one.
+ *
  * Reducer style: every function takes the RoomState (never mutated) and
  * returns the next one plus the messages to send. No I/O, no clock, no
- * Math.random: randomness (match seed, who throws the first jack) comes IN as
- * `Entropy`, supplied by the Durable Object from crypto. Same inputs -> same
- * outputs, so it is unit-tested directly.
+ * Math.random: time comes IN as `RoomClock` and randomness (match seed, who
+ * throws the first jack) as `Entropy`, both supplied by the Durable Object,
+ * which also wakes the room at `roomDeadline()`. Same inputs -> same outputs,
+ * so it is unit-tested directly.
  *
  * Throws are refereed exactly like the local match (app/matchMode.ts +
  * app/playback.ts): beginThrow -> simulate to rest (fixed step, time cap) ->
@@ -27,9 +35,11 @@ import { CONFIG_HASH } from './fingerprint';
 import {
   CLOSE_CODES,
   PROTOCOL_VERSION,
+  SEATS,
   type ClientMessage,
   type ErrorCode,
   type HelloMsg,
+  type MatchOutcome,
   type PublicMatchState,
   type RoomPhase,
   type RoomSnapshot,
@@ -58,6 +68,8 @@ export interface SeatState {
   nickname: string;
   connected: boolean;
   left: boolean;
+  /** Disconnected mid-match: when the forfeit falls (RoomClock time); null when no countdown runs. */
+  graceUntil: number | null;
 }
 
 export interface RoomState {
@@ -70,6 +82,16 @@ export interface RoomState {
   /** Full state INCLUDING seed/rng (server only; clients get publicMatch()). */
   match: MatchState | null;
   rematch: Record<Seat, boolean>;
+  /** Set in 'matchOver': who won and how. */
+  outcome: MatchOutcome | null;
+}
+
+/** Time as the Durable Object sees it (the room has no clock of its own). */
+export interface RoomClock {
+  /** Current time, ms (any epoch, the same on every call; deadlines use it). */
+  now: number;
+  /** How long a player who dropped mid-match has to come back. */
+  reconnectGraceMs: number;
 }
 
 /** Server randomness for a new match. */
@@ -107,14 +129,18 @@ export function createRoomState(code: string, length: MatchLength): RoomState {
     seats: { A: null, B: null },
     match: null,
     rematch: { A: false, B: false },
+    outcome: null,
   };
 }
 
 /** Match state for clients: seed and rng zeroed (they would reveal the next throws' noise). */
 export const publicMatch = (m: MatchState): PublicMatchState => ({ ...m, seed: 0, rng: 0 });
 
-export function roomSnapshot(room: RoomState): RoomSnapshot {
-  const player = (s: SeatState | null) => (s ? { nickname: s.nickname, connected: s.connected, left: s.left } : null);
+const graceLeft = (s: SeatState, now: number): number | null => (s.graceUntil === null ? null : Math.max(0, s.graceUntil - now));
+
+/** The room as clients see it at time `now` (no tokens, no seed). */
+export function roomSnapshot(room: RoomState, now: number): RoomSnapshot {
+  const player = (s: SeatState | null) => (s ? { nickname: s.nickname, connected: s.connected, left: s.left, graceMs: graceLeft(s, now) } : null);
   return {
     code: room.code,
     phase: room.phase,
@@ -124,7 +150,99 @@ export function roomSnapshot(room: RoomState): RoomSnapshot {
     players: { A: player(room.seats.A), B: player(room.seats.B) },
     match: room.match ? publicMatch(room.match) : null,
     rematch: { ...room.rematch },
+    outcome: room.outcome,
   };
+}
+
+/** Tells the other seat how `seat` is connected now. */
+function connectionMsg(room: RoomState, seat: Seat, now: number): Outgoing {
+  const s = room.seats[seat];
+  return {
+    to: other(seat),
+    msg: { type: 'opponentConnection', seat, connected: s?.connected ?? false, left: s?.left ?? false, graceMs: s ? graceLeft(s, now) : null },
+  };
+}
+
+/** `first`'s messages go out before `then`'s; `then` has the final room. */
+const chain = (first: RoomResult, then: RoomResult): RoomResult => (first.out.length === 0 ? then : { ...then, out: [...first.out, ...then.out] });
+
+/**
+ * The grace invariant. Only in 'playing': a disconnected seat whose opponent
+ * is connected has a deadline (a running one is kept, otherwise a fresh one
+ * starts); a running deadline is also kept while both are away (roomAlarm
+ * drops it if nobody is back by then). Connected seats and other phases: none.
+ */
+function syncGrace(room: RoomState, clock: RoomClock): RoomState {
+  const seat = (s: Seat): SeatState | null => {
+    const st = room.seats[s];
+    if (!st) return null;
+    let graceUntil: number | null = null;
+    if (room.phase === 'playing' && !st.connected) {
+      const running = st.graceUntil !== null && st.graceUntil > clock.now ? st.graceUntil : null;
+      graceUntil = running ?? (room.seats[other(s)]?.connected ? clock.now + clock.reconnectGraceMs : null);
+    }
+    return graceUntil === st.graceUntil ? st : { ...st, graceUntil };
+  };
+  const A = seat('A');
+  const B = seat('B');
+  return A === room.seats.A && B === room.seats.B ? room : { ...room, seats: { A, B } };
+}
+
+/** `loser` forfeits: the other seat wins, the match is over (no rematch after a forfeit). */
+function forfeit(room: RoomState, loser: Seat, clock: RoomClock): RoomResult {
+  const outcome: MatchOutcome = { winner: other(loser), reason: 'forfeit' };
+  const next = syncGrace({ ...room, phase: 'matchOver', outcome, rematch: { A: false, B: false } }, clock);
+  return { room: next, out: [{ to: 'all', msg: { type: 'forfeit', room: roomSnapshot(next, clock.now) } }] };
+}
+
+/** The earliest reconnect deadline (RoomClock time), or null: the Durable Object calls roomAlarm then. */
+export function roomDeadline(room: RoomState): number | null {
+  if (room.phase !== 'playing') return null;
+  let at: number | null = null;
+  for (const s of SEATS) {
+    const g = room.seats[s]?.graceUntil ?? null;
+    if (g !== null && (at === null || g < at)) at = g;
+  }
+  return at;
+}
+
+/**
+ * Resolves the reconnect deadlines that have passed: the player who stayed
+ * wins by forfeit; with nobody there to claim it the deadline is dropped.
+ * Also run first by every other event, so the outcome never depends on
+ * how late the alarm fires.
+ */
+export function roomAlarm(room: RoomState, clock: RoomClock): RoomResult {
+  let next = room;
+  for (const s of SEATS) {
+    const st = next.seats[s];
+    if (next.phase !== 'playing' || !st || st.graceUntil === null || st.graceUntil > clock.now) continue;
+    if (next.seats[other(s)]?.connected) return forfeit(next, s, clock);
+    next = { ...next, seats: { ...next.seats, [s]: { ...st, graceUntil: null } } };
+  }
+  return { room: next, out: [] };
+}
+
+/**
+ * A stored room after the Durable Object restarted (deploy, crash): sockets
+ * can be gone without a close event, so a seat only counts as connected if a
+ * live socket holds it (the live opponent, if any, is told and gets the
+ * countdown). Also fills in fields an older server did not store. Returns the
+ * same room object when nothing changed.
+ */
+export function restoreRoom(stored: RoomState, liveSeats: readonly (Seat | null)[], clock: RoomClock): RoomResult {
+  const fill = (st: SeatState | null): SeatState | null => (st && st.graceUntil === undefined ? { ...st, graceUntil: null } : st);
+  let room: RoomState = stored;
+  if (stored.outcome === undefined || fill(stored.seats.A) !== stored.seats.A || fill(stored.seats.B) !== stored.seats.B) {
+    room = { ...stored, outcome: stored.outcome ?? null, seats: { A: fill(stored.seats.A), B: fill(stored.seats.B) } };
+  }
+  const stale = SEATS.filter((s) => room.seats[s]?.connected === true && !liveSeats.includes(s));
+  if (stale.length === 0) return { room, out: [] };
+  const seats = { ...room.seats };
+  for (const s of stale) seats[s] = { ...(seats[s] as SeatState), connected: false };
+  room = syncGrace({ ...room, seats }, clock);
+  const out = stale.filter((s) => room.seats[other(s)]?.connected).map((s) => connectionMsg(room, s, clock.now));
+  return { room, out };
 }
 
 const error = (code: ErrorCode, detail?: string, fatal = false): ServerMessage =>
@@ -136,56 +254,69 @@ const fatal = (room: RoomState, code: ErrorCode, close: number, detail?: string)
   close,
 });
 
-/** Starts a (re)match: fresh rules state from the server's entropy. */
-function startMatch(room: RoomState, entropy: Entropy): RoomState {
-  return {
-    ...room,
-    phase: 'playing',
-    seq: room.seq + 1,
-    matchNumber: room.matchNumber + 1,
-    match: createMatch(entropy.seed >>> 0, matchConfig(SERVER_CFG, room.length), entropy.firstTeam),
-    rematch: { A: false, B: false },
-  };
+/** Starts a (re)match: fresh rules state from the server's entropy (a seat that is away gets a countdown). */
+function startMatch(room: RoomState, entropy: Entropy, clock: RoomClock): RoomState {
+  return syncGrace(
+    {
+      ...room,
+      phase: 'playing',
+      seq: room.seq + 1,
+      matchNumber: room.matchNumber + 1,
+      match: createMatch(entropy.seed >>> 0, matchConfig(SERVER_CFG, room.length), entropy.firstTeam),
+      rematch: { A: false, B: false },
+      outcome: null,
+    },
+    clock,
+  );
 }
 
 /**
- * A socket says hello. Same token -> same seat (reconnect); a new token takes
- * the first free seat; a third token gets roomFull. Taking the second seat in
- * the lobby starts the match.
+ * A socket says hello. Same token -> same seat (reconnect, in time or after a
+ * forfeit: the snapshot says which); a new token takes the first free seat; a
+ * third token gets roomFull. Taking the second seat in the lobby starts the match.
  */
-export function joinRoom(room: RoomState, hello: HelloMsg, entropy: Entropy): RoomResult {
+export function joinRoom(room: RoomState, hello: HelloMsg, entropy: Entropy, clock: RoomClock): RoomResult {
   if (hello.protocolVersion !== PROTOCOL_VERSION || hello.configHash !== CONFIG_HASH) {
     return fatal(room, 'versionMismatch', CLOSE_CODES.versionMismatch, `server protocol ${PROTOCOL_VERSION}, config ${CONFIG_HASH}`);
   }
   if (hello.roomCode !== room.code) return fatal(room, 'roomNotFound', CLOSE_CODES.roomNotFound);
 
-  const known = (['A', 'B'] as const).find((s) => room.seats[s]?.token === hello.clientToken);
-  const seat = known ?? (['A', 'B'] as const).find((s) => room.seats[s] === null);
-  if (!seat) return fatal(room, 'roomFull', CLOSE_CODES.roomFull);
+  // A deadline that passed is settled first (a late rejoin finds the forfeit).
+  const due = roomAlarm(room, clock);
+  const cur = due.room;
+  const known = SEATS.find((s) => cur.seats[s]?.token === hello.clientToken);
+  const seat = known ?? SEATS.find((s) => cur.seats[s] === null);
+  if (!seat) return chain(due, fatal(cur, 'roomFull', CLOSE_CODES.roomFull));
 
-  const seats = { ...room.seats, [seat]: { token: hello.clientToken, nickname: hello.nickname, connected: true, left: false } };
-  let next: RoomState = { ...room, seats };
+  const seats = { ...cur.seats, [seat]: { token: hello.clientToken, nickname: hello.nickname, connected: true, left: false, graceUntil: null } };
+  let next: RoomState = { ...cur, seats };
   const starts = next.phase === 'lobby' && seats.A !== null && seats.B !== null;
-  if (starts) next = startMatch(next, entropy);
+  next = starts ? startMatch(next, entropy, clock) : syncGrace(next, clock);
 
   const out: Outgoing[] = [
+    // The joining socket gets the forfeit in its welcome snapshot.
+    ...due.out.map((o): Outgoing => (o.to === 'all' ? { ...o, to: other(seat) } : o)),
     {
       to: 'self',
-      msg: { type: 'welcome', protocolVersion: PROTOCOL_VERSION, configHash: CONFIG_HASH, seat, room: roomSnapshot(next) },
+      msg: { type: 'welcome', protocolVersion: PROTOCOL_VERSION, configHash: CONFIG_HASH, seat, room: roomSnapshot(next, clock.now) },
     },
   ];
-  if (starts) out.push({ to: 'all', msg: { type: 'matchStarted', room: roomSnapshot(next) } });
-  else if (next.phase === 'lobby') out.push({ to: other(seat), msg: { type: 'roomState', room: roomSnapshot(next) } });
-  if (known) out.push({ to: other(seat), msg: { type: 'opponentConnection', seat, connected: true, left: false } });
+  if (starts) out.push({ to: 'all', msg: { type: 'matchStarted', room: roomSnapshot(next, clock.now) } });
+  else if (next.phase === 'lobby') out.push({ to: other(seat), msg: { type: 'roomState', room: roomSnapshot(next, clock.now) } });
+  if (known) out.push(connectionMsg(next, seat, clock.now));
   return { room: next, out, seat };
 }
 
-/** The last open socket of `seat` closed (network drop, app backgrounded...). */
-export function seatDisconnected(room: RoomState, seat: Seat): RoomResult {
-  const s = room.seats[seat];
-  if (!s || !s.connected) return { room, out: [] };
-  const next: RoomState = { ...room, seats: { ...room.seats, [seat]: { ...s, connected: false } } };
-  return { room: next, out: [{ to: other(seat), msg: { type: 'opponentConnection', seat, connected: false, left: s.left } }] };
+/**
+ * The last open socket of `seat` closed (network drop, app backgrounded...).
+ * Mid-match, with the opponent still there, the reconnect countdown starts.
+ */
+export function seatDisconnected(room: RoomState, seat: Seat, clock: RoomClock): RoomResult {
+  const due = roomAlarm(room, clock);
+  const s = due.room.seats[seat];
+  if (!s || !s.connected) return due;
+  const next = syncGrace({ ...due.room, seats: { ...due.room.seats, [seat]: { ...s, connected: false } } }, clock);
+  return chain(due, { room: next, out: [connectionMsg(next, seat, clock.now)] });
 }
 
 /** Referees one throw: rules -> server simulation -> rules. */
@@ -207,6 +338,7 @@ function handleThrow(room: RoomState, seat: Seat, msg: Extract<ClientMessage, { 
     match: settled,
     phase: over ? 'matchOver' : 'playing',
     rematch: { A: false, B: false },
+    outcome: over && settled.winner ? { winner: settled.winner, reason: 'score' } : null,
   };
   return {
     room: next,
@@ -222,40 +354,45 @@ function handleNextEnd(room: RoomState, endNumber: number): RoomResult {
   return { room: next, out: [{ to: 'all', msg: { type: 'endStarted', seq: next.seq, match: publicMatch(next.match as MatchState) } }] };
 }
 
-/** A rematch vote; both votes start a new match. Ignored outside 'matchOver' (late duplicate). */
-function handleRematch(room: RoomState, seat: Seat, entropy: Entropy): RoomResult {
-  if (room.phase !== 'matchOver') return { room, out: [] };
+/** A rematch vote; both votes start a new match. Ignored outside 'matchOver' (late duplicate) and after a forfeit. */
+function handleRematch(room: RoomState, seat: Seat, entropy: Entropy, clock: RoomClock): RoomResult {
+  if (room.phase !== 'matchOver' || room.outcome?.reason === 'forfeit') return { room, out: [] };
   const rematch = { ...room.rematch, [seat]: true };
   if (rematch.A && rematch.B) {
-    const next = startMatch(room, entropy);
-    return { room: next, out: [{ to: 'all', msg: { type: 'matchStarted', room: roomSnapshot(next) } }] };
+    const next = startMatch(room, entropy, clock);
+    return { room: next, out: [{ to: 'all', msg: { type: 'matchStarted', room: roomSnapshot(next, clock.now) } }] };
   }
   const next: RoomState = { ...room, rematch };
-  return { room: next, out: [{ to: 'all', msg: { type: 'roomState', room: roomSnapshot(next) } }] };
+  return { room: next, out: [{ to: 'all', msg: { type: 'roomState', room: roomSnapshot(next, clock.now) } }] };
 }
 
-/** Explicit leave: frees the seat in the lobby; during/after a match the seat is kept (same token can return). */
-function handleLeave(room: RoomState, seat: Seat): RoomResult {
+/**
+ * Explicit leave: frees the seat in the lobby; mid-match it is an immediate
+ * forfeit; after a match the seat is kept (same token can return).
+ */
+function handleLeave(room: RoomState, seat: Seat, clock: RoomClock): RoomResult {
   const s = room.seats[seat];
   if (!s) return { room, out: [], close: CLOSE_CODES.left };
   if (room.phase === 'lobby') {
     const next: RoomState = { ...room, seats: { ...room.seats, [seat]: null } };
-    return { room: next, out: [{ to: other(seat), msg: { type: 'roomState', room: roomSnapshot(next) } }], close: CLOSE_CODES.left };
+    return { room: next, out: [{ to: other(seat), msg: { type: 'roomState', room: roomSnapshot(next, clock.now) } }], close: CLOSE_CODES.left };
   }
   const next: RoomState = {
     ...room,
-    seats: { ...room.seats, [seat]: { ...s, connected: false, left: true } },
+    seats: { ...room.seats, [seat]: { ...s, connected: false, left: true, graceUntil: null } },
     rematch: { ...room.rematch, [seat]: false },
   };
-  return {
-    room: next,
-    out: [{ to: other(seat), msg: { type: 'opponentConnection', seat, connected: false, left: true } }],
-    close: CLOSE_CODES.left,
-  };
+  if (room.phase === 'playing') return { ...forfeit(next, seat, clock), close: CLOSE_CODES.left };
+  return { room: next, out: [connectionMsg(next, seat, clock.now)], close: CLOSE_CODES.left };
 }
 
 /** Any message from a socket already seated as `seat` (hello goes through joinRoom). */
-export function roomMessage(room: RoomState, seat: Seat, msg: ClientMessage, entropy: Entropy): RoomResult {
+export function roomMessage(room: RoomState, seat: Seat, msg: ClientMessage, entropy: Entropy, clock: RoomClock): RoomResult {
+  const due = roomAlarm(room, clock);
+  return chain(due, seatMessage(due.room, seat, msg, entropy, clock));
+}
+
+function seatMessage(room: RoomState, seat: Seat, msg: ClientMessage, entropy: Entropy, clock: RoomClock): RoomResult {
   switch (msg.type) {
     case 'hello':
       return reply(room, 'badMessage', 'already joined');
@@ -264,9 +401,9 @@ export function roomMessage(room: RoomState, seat: Seat, msg: ClientMessage, ent
     case 'nextEnd':
       return handleNextEnd(room, msg.endNumber);
     case 'rematch':
-      return handleRematch(room, seat, entropy);
+      return handleRematch(room, seat, entropy, clock);
     case 'leave':
-      return handleLeave(room, seat);
+      return handleLeave(room, seat, clock);
     case 'ping':
       return { room, out: [{ to: 'self', msg: { type: 'pong' } }] };
   }

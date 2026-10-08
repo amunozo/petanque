@@ -12,6 +12,14 @@
  * `rematch` after the match. Keepalive is the exact text PING_TEXT, answered
  * with PONG_TEXT (handled by the runtime without waking the room).
  *
+ * Forfeit: when a player's socket drops mid-match while the opponent is
+ * connected, the opponent is told how long the reconnect grace period has
+ * left (`graceMs`, one message, the client counts down itself). Coming back
+ * in time resumes the match; otherwise the server ends it and broadcasts
+ * `forfeit` (room.outcome: the player who stayed wins). `leave` mid-match is
+ * an immediate forfeit. With both players gone nobody wins (the room just
+ * expires when idle).
+ *
  * Bump PROTOCOL_VERSION whenever a message shape OR the behaviour of the
  * engine/rules changes (the config fingerprint only covers config numbers).
  */
@@ -19,7 +27,7 @@ import type { Body, Loft, ThrowIntent } from '../engine';
 import type { MatchState, TeamId, ThrowRecord } from '../games/petanque/matchTypes';
 import type { MatchLength } from '../games/petanque/matchLength';
 
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 /** Room codes: 5 chars from an alphabet without 0/O, 1/I/L (31^5 ≈ 28.6 M codes). */
 export const ROOM_CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -69,6 +77,18 @@ export interface PlayerInfo {
   connected: boolean;
   /** The player sent `leave` (they may still come back with the same token). */
   left: boolean;
+  /**
+   * Disconnected mid-match: ms left of the reconnect grace period when the
+   * server sent this (null when no countdown runs). Relative, so it does not
+   * depend on the client's clock: the client adds it to its own clock on receipt.
+   */
+  graceMs: number | null;
+}
+
+/** How the last match ended: on the score, or by forfeit (`winner` is the player who stayed). */
+export interface MatchOutcome {
+  winner: Seat;
+  reason: 'score' | 'forfeit';
 }
 
 /**
@@ -87,8 +107,10 @@ export interface RoomSnapshot {
   matchNumber: number;
   players: Record<Seat, PlayerInfo | null>;
   match: PublicMatchState | null;
-  /** Rematch votes (meaningful in 'matchOver'). */
+  /** Rematch votes (meaningful in 'matchOver'; no rematch after a forfeit). */
   rematch: Record<Seat, boolean>;
+  /** Set in 'matchOver': who won and how. */
+  outcome: MatchOutcome | null;
 }
 
 // ---- client -> server -------------------------------------------------------------
@@ -169,6 +191,16 @@ export interface OpponentConnectionMsg {
   seat: Seat;
   connected: boolean;
   left: boolean;
+  /** See PlayerInfo.graceMs. */
+  graceMs: number | null;
+}
+/**
+ * The match ended by forfeit (a player left mid-match, or did not come back
+ * within the grace period): room.phase is 'matchOver', room.outcome says who won.
+ */
+export interface ForfeitMsg {
+  type: 'forfeit';
+  room: RoomSnapshot;
 }
 export type ErrorCode =
   | 'roomNotFound'
@@ -200,6 +232,7 @@ export type ServerMessage =
   | ThrowResultMsg
   | EndStartedMsg
   | OpponentConnectionMsg
+  | ForfeitMsg
   | ErrorMsg
   | PongMsg;
 
@@ -210,6 +243,7 @@ const SERVER_TYPES: readonly ServerMessage['type'][] = [
   'throwResult',
   'endStarted',
   'opponentConnection',
+  'forfeit',
   'error',
   'pong',
 ];

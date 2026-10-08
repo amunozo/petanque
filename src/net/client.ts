@@ -7,7 +7,8 @@
  * It mirrors the room snapshot from the server messages (`room`), so `sendThrow`
  * quotes the right `seq`, and each `throwResult` event carries `before` — the
  * match state to replay the throw from (null when the client missed a step:
- * then just snap to the result).
+ * then just snap to the result). A reconnect countdown (`graceMs`, sent once)
+ * becomes a deadline on this device's clock: `graceDeadline(seat)`.
  *
  * Server URL: VITE_SERVER_URL at build time (e.g. https://petanque-server.<account>.workers.dev);
  * dev builds default to the local `wrangler dev` (http://localhost:8787).
@@ -25,6 +26,7 @@ import {
   type ClientMessage,
   type EndStartedMsg,
   type ErrorMsg,
+  type ForfeitMsg,
   type MatchStartedMsg,
   type OpponentConnectionMsg,
   type PublicMatchState,
@@ -73,6 +75,8 @@ export interface NetEvents {
   throwResult: ThrowResultMsg & { before: PublicMatchState | null };
   endStarted: EndStartedMsg;
   opponentConnection: OpponentConnectionMsg;
+  /** The match ended by forfeit (client.room has the outcome). */
+  forfeit: ForfeitMsg;
   error: ErrorMsg;
 }
 export type NetEventName = keyof NetEvents;
@@ -124,6 +128,8 @@ export interface NetClient {
   disconnect(): void;
   /** Reconnect right away if waiting on backoff (call on `online` / `visibilitychange`). */
   reconnectNow(): void;
+  /** When `seat` (away mid-match) forfeits, in Date.now() time; null when no countdown runs. */
+  graceDeadline(seat: Seat): number | null;
   on<K extends NetEventName>(name: K, cb: (ev: NetEvents[K]) => void): () => void;
   readonly status: NetStatus;
   readonly seat: Seat | null;
@@ -184,6 +190,8 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
   let nickname = '';
   let seat: Seat | null = null;
   let room: RoomSnapshot | null = null;
+  /** Reconnect deadlines on this device's clock (the server sends time left, not a time). */
+  let grace: Record<Seat, number | null> = { A: null, B: null };
   let attempts = 0;
   let wanted = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -248,25 +256,45 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
     reconnectTimer = setTimeout(open, delay);
   }
 
+  const deadline = (graceMs: number | null): number | null => (graceMs === null ? null : Date.now() + graceMs);
+  function setRoom(next: RoomSnapshot): void {
+    room = next;
+    grace = { A: deadline(next.players.A?.graceMs ?? null), B: deadline(next.players.B?.graceMs ?? null) };
+  }
+
   function apply(msg: ServerMessage): void {
     switch (msg.type) {
       case 'welcome':
         attempts = 0;
         seat = msg.seat;
-        room = msg.room;
+        setRoom(msg.room);
         emit('welcome', msg);
         return;
       case 'roomState':
-        room = msg.room;
+        setRoom(msg.room);
         emit('roomState', msg);
         return;
       case 'matchStarted':
-        room = msg.room;
+        setRoom(msg.room);
         emit('matchStarted', msg);
+        return;
+      case 'forfeit':
+        setRoom(msg.room);
+        emit('forfeit', msg);
         return;
       case 'throwResult': {
         const before = room && room.match && room.seq === msg.seq - 1 ? room.match : null;
-        if (room) room = { ...room, seq: msg.seq, match: msg.match, phase: msg.match.phase === 'matchOver' ? 'matchOver' : 'playing', rematch: { A: false, B: false } };
+        if (room) {
+          const over = msg.match.phase === 'matchOver';
+          room = {
+            ...room,
+            seq: msg.seq,
+            match: msg.match,
+            phase: over ? 'matchOver' : 'playing',
+            rematch: { A: false, B: false },
+            outcome: over && msg.match.winner ? { winner: msg.match.winner, reason: 'score' } : null,
+          };
+        }
         emit('throwResult', { ...msg, before });
         return;
       }
@@ -276,7 +304,8 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
         return;
       case 'opponentConnection': {
         const p = room?.players[msg.seat];
-        if (room && p) room = { ...room, players: { ...room.players, [msg.seat]: { ...p, connected: msg.connected, left: msg.left } } };
+        if (room && p) room = { ...room, players: { ...room.players, [msg.seat]: { ...p, connected: msg.connected, left: msg.left, graceMs: msg.graceMs } } };
+        grace = { ...grace, [msg.seat]: deadline(msg.graceMs) };
         emit('opponentConnection', msg);
         return;
       }
@@ -356,6 +385,7 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
       nickname = nick;
       seat = null;
       room = null;
+      grace = { A: null, B: null };
       attempts = 0;
       wanted = true;
       open();
@@ -390,6 +420,7 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
         ws.send(PING_TEXT); // probe a possibly stale socket; keepalive replaces it if silent
       }
     },
+    graceDeadline: (s: Seat) => grace[s],
     on(name, cb) {
       let set = listeners.get(name);
       if (!set) listeners.set(name, (set = new Set()));

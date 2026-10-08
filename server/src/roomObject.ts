@@ -2,13 +2,26 @@
  * One Durable Object per room code. Thin shell around the pure referee in
  * src/net/room.ts: it owns the sockets (WebSocket Hibernation API), persists
  * the RoomState in storage after every change (so an evicted/hibernated
- * object resumes exactly), supplies crypto entropy, rate-limits sockets and
- * expires idle rooms with an alarm.
+ * object resumes exactly), supplies crypto entropy and the clock, rate-limits
+ * sockets, and runs ONE alarm at the earliest of: the idle expiry and the
+ * room's reconnect deadline (roomDeadline -> roomAlarm decides a forfeit).
  */
 import { DurableObject } from 'cloudflare:workers';
 import type { MatchLength } from '../../src/games/petanque/matchLength';
 import { CLOSE_CODES, PING_TEXT, PONG_TEXT, encode, parseClientMessage, type ErrorCode, type Seat, type ServerMessage } from '../../src/net/protocol';
-import { createRoomState, joinRoom, roomMessage, seatDisconnected, type Entropy, type Outgoing, type RoomState } from '../../src/net/room';
+import {
+  createRoomState,
+  joinRoom,
+  restoreRoom,
+  roomAlarm,
+  roomDeadline,
+  roomMessage,
+  seatDisconnected,
+  type Entropy,
+  type Outgoing,
+  type RoomClock,
+  type RoomState,
+} from '../../src/net/room';
 import { SERVER_CONFIG } from './config';
 import { isAllowedOrigin } from './http';
 import { newBucket, take, type Bucket } from './rateLimit';
@@ -32,6 +45,8 @@ interface Attachment {
 }
 
 const ROOM_KEY = 'room';
+/** When the room expires if nothing happens (ms epoch), pushed back on every change. */
+const IDLE_KEY = 'idleUntil';
 /** WebSocket.readyState OPEN. */
 const OPEN = 1;
 
@@ -41,23 +56,13 @@ function entropy(): Entropy {
   return { seed: r[0] ?? 0, firstTeam: ((r[1] ?? 0) & 1) === 1 ? 'A' : 'B' };
 }
 
+const clock = (): RoomClock => ({ now: Date.now(), reconnectGraceMs: SERVER_CONFIG.reconnectGraceMs });
+const idleMs = (phase: RoomState['phase']): number =>
+  phase === 'playing' ? SERVER_CONFIG.matchIdleMs : phase === 'matchOver' ? SERVER_CONFIG.matchOverIdleMs : SERVER_CONFIG.lobbyIdleMs;
+
 const seatOf = (ws: WebSocket): Seat | null => (ws.deserializeAttachment() as Attachment | null)?.seat ?? null;
 const errorMsg = (code: ErrorCode, fatal: boolean, detail?: string): ServerMessage =>
   detail === undefined ? { type: 'error', code, fatal } : { type: 'error', code, fatal, detail };
-
-/**
- * After a restart (deploy, crash) sockets can be gone without a close event:
- * a seat only counts as connected if a live (possibly hibernated) socket holds it.
- * Nobody needs telling: whoever reconnects gets a fresh snapshot in `welcome`.
- */
-function reconcileConnections(room: RoomState, liveSeats: (Seat | null)[]): RoomState {
-  const seats = { ...room.seats };
-  for (const s of ['A', 'B'] as const) {
-    const st = seats[s];
-    if (st && st.connected && !liveSeats.includes(s)) seats[s] = { ...st, connected: false };
-  }
-  return { ...room, seats };
-}
 
 function sendTo(ws: WebSocket, msg: ServerMessage): void {
   try {
@@ -76,6 +81,7 @@ function closeWs(ws: WebSocket, code: number, reason: string): void {
 
 export class Room extends DurableObject<Env> {
   private room: RoomState | null = null;
+  private idleUntil = 0;
   /** Per-socket rate limit (in memory: resets after hibernation, which is fine). */
   private buckets = new WeakMap<WebSocket, Bucket>();
 
@@ -85,7 +91,15 @@ export class Room extends DurableObject<Env> {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING_TEXT, PONG_TEXT));
     void ctx.blockConcurrencyWhile(async () => {
       const stored = (await ctx.storage.get<RoomState>(ROOM_KEY)) ?? null;
-      this.room = stored ? reconcileConnections(stored, ctx.getWebSockets().map(seatOf)) : null;
+      // Rooms stored before IDLE_KEY existed: their alarm was the idle expiry.
+      this.idleUntil = (await ctx.storage.get<number>(IDLE_KEY)) ?? (await ctx.storage.getAlarm()) ?? Date.now() + SERVER_CONFIG.lobbyIdleMs;
+      this.room = stored;
+      if (!stored) return;
+      // A live (possibly hibernated) socket holds each connected seat; seats whose socket died with the old instance go offline.
+      const restored = restoreRoom(stored, ctx.getWebSockets().map(seatOf), clock());
+      if (restored.room === stored) return;
+      await this.save(restored.room);
+      this.deliver(null, restored.out);
     });
   }
 
@@ -153,7 +167,7 @@ export class Room extends DurableObject<Env> {
     const seat = seatOf(ws);
     if (msg.type === 'hello') {
       if (seat) return sendTo(ws, errorMsg('badMessage', false, 'already joined'));
-      const result = joinRoom(room, msg, entropy());
+      const result = joinRoom(room, msg, entropy(), clock());
       if (result.seat) {
         // Another socket with this seat (old tab, half-dead connection) is replaced by this one.
         for (const other of this.ctx.getWebSockets()) {
@@ -168,7 +182,7 @@ export class Room extends DurableObject<Env> {
     }
 
     if (!seat) return sendTo(ws, errorMsg('notJoined', false));
-    const result = roomMessage(room, seat, msg, entropy());
+    const result = roomMessage(room, seat, msg, entropy(), clock());
     await this.commit(result.room);
     this.deliver(ws, result.out);
     if (result.close !== undefined) await this.kick(ws, result.close, 'closed');
@@ -182,8 +196,20 @@ export class Room extends DurableObject<Env> {
     await this.socketGone(ws, 1011);
   }
 
-  /** Idle expiry: the alarm is pushed back on every change, so firing means the room went quiet. */
+  /** Either a reconnect deadline passed (forfeit, or nobody to claim it) or the room went quiet (expiry). */
   override async alarm(): Promise<void> {
+    const room = this.room;
+    const now = Date.now();
+    const deadline = room ? roomDeadline(room) : null;
+    if (room && deadline !== null && deadline <= now) {
+      const result = roomAlarm(room, clock());
+      // A forfeit ends the match (new idle period); a dropped countdown (both away) leaves the idle expiry as it was.
+      if (result.room.phase !== room.phase) await this.commit(result.room);
+      else await this.save(result.room);
+      this.deliver(null, result.out);
+      return;
+    }
+    if (room && now < this.idleUntil) return this.scheduleAlarm(); // woke early
     for (const ws of this.ctx.getWebSockets()) {
       sendTo(ws, errorMsg('roomExpired', true));
       this.closeSocket(ws, CLOSE_CODES.roomExpired, 'roomExpired');
@@ -207,7 +233,7 @@ export class Room extends DurableObject<Env> {
     if (!this.room) return;
     const stillThere = this.ctx.getWebSockets().some((o) => o !== gone && o.readyState === OPEN && seatOf(o) === seat);
     if (stillThere) return;
-    const result = seatDisconnected(this.room, seat);
+    const result = seatDisconnected(this.room, seat, clock());
     await this.commit(result.room);
     this.deliver(null, result.out);
   }
@@ -241,13 +267,23 @@ export class Room extends DurableObject<Env> {
     }
   }
 
-  /** Stores a changed room and pushes the idle-expiry alarm back. */
+  /** Stores a changed room and pushes the idle expiry back (any change is activity). */
   private async commit(next: RoomState): Promise<void> {
     if (next === this.room) return;
+    this.idleUntil = Date.now() + idleMs(next.phase);
+    await this.save(next);
+  }
+
+  /** Stores the room (and the idle expiry) and re-arms the alarm. */
+  private async save(next: RoomState): Promise<void> {
     this.room = next;
-    await this.ctx.storage.put(ROOM_KEY, next);
-    const idle =
-      next.phase === 'playing' ? SERVER_CONFIG.matchIdleMs : next.phase === 'matchOver' ? SERVER_CONFIG.matchOverIdleMs : SERVER_CONFIG.lobbyIdleMs;
-    await this.ctx.storage.setAlarm(Date.now() + idle);
+    await this.ctx.storage.put({ [ROOM_KEY]: next, [IDLE_KEY]: this.idleUntil });
+    await this.scheduleAlarm();
+  }
+
+  /** One alarm for both timers: the idle expiry or the room's next reconnect deadline, whichever comes first. */
+  private async scheduleAlarm(): Promise<void> {
+    const deadline = this.room ? roomDeadline(this.room) : null;
+    await this.ctx.storage.setAlarm(deadline === null ? this.idleUntil : Math.min(deadline, this.idleUntil));
   }
 }

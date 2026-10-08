@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { createMatch, type MatchState } from '../../games/petanque';
 import { defaultConfig } from '../../tuning';
-import { canAimOnline, connectionNotice, opponentsTurn, otherSeat, rejoinDecision, seatNames, stripRoomParam, throwAction, type AimCheck } from './rules';
+import type { RoomSnapshot } from '../../net';
+import {
+  canAimOnline,
+  connectionNotice,
+  forfeitView,
+  formatCountdown,
+  opponentsTurn,
+  otherSeat,
+  rejoinDecision,
+  seatNames,
+  stripRoomParam,
+  throwAction,
+  type AimCheck,
+} from './rules';
 
 const state = (over: Partial<MatchState> = {}): MatchState => ({ ...createMatch(1, defaultConfig), ...over });
-const ok: AimCheck = { status: 'open', seat: 'A', roomSeq: 3, shownSeq: 3, state: state({ phase: 'boule', toThrow: 'A' }), pending: false, queued: 0, busy: false, opponentLeft: false };
+const ok: AimCheck = { status: 'open', seat: 'A', roomSeq: 3, shownSeq: 3, state: state({ phase: 'boule', toThrow: 'A' }), pending: false, queued: 0, busy: false, opponentLeft: false, over: false };
 
 describe('canAimOnline', () => {
   it('lets you aim on your own turn when everything is caught up', () => {
@@ -20,6 +33,7 @@ describe('canAimOnline', () => {
     expect(canAimOnline({ ...ok, queued: 1 })).toBe(false);
     expect(canAimOnline({ ...ok, busy: true })).toBe(false);
     expect(canAimOnline({ ...ok, opponentLeft: true })).toBe(false);
+    expect(canAimOnline({ ...ok, over: true })).toBe(false); // e.g. a forfeit: the rules state alone still allows a throw
     expect(canAimOnline({ ...ok, roomSeq: 4 })).toBe(false); // the screen lags the server
   });
 });
@@ -49,7 +63,7 @@ describe('throwAction', () => {
 });
 
 describe('connectionNotice', () => {
-  const p = (connected: boolean, left = false) => ({ nickname: 'Bo', connected, left });
+  const p = (connected: boolean, left = false) => ({ nickname: 'Bo', connected, left, graceMs: null });
   it('puts our own connection first', () => {
     expect(connectionNotice('reconnecting', p(false))).toBe('reconnecting');
     expect(connectionNotice('connecting', null)).toBe('reconnecting');
@@ -63,10 +77,42 @@ describe('connectionNotice', () => {
   });
 });
 
+describe('reconnect countdown and forfeit', () => {
+  it('formats the time left as m:ss, rounded up', () => {
+    expect(formatCountdown(60_000)).toBe('1:00');
+    expect(formatCountdown(59_001)).toBe('1:00');
+    expect(formatCountdown(27_000)).toBe('0:27');
+    expect(formatCountdown(26_100)).toBe('0:27');
+    expect(formatCountdown(9_000)).toBe('0:09');
+    expect(formatCountdown(0)).toBe('0:00');
+    expect(formatCountdown(-500)).toBe('0:00');
+  });
+  it('tells the winner from the player who left', () => {
+    const room = (over: Partial<RoomSnapshot>): RoomSnapshot => ({
+      code: 'K7M9P',
+      phase: 'matchOver',
+      length: 'quick',
+      seq: 3,
+      matchNumber: 1,
+      players: { A: null, B: null },
+      match: null,
+      rematch: { A: false, B: false },
+      outcome: { winner: 'B', reason: 'forfeit' },
+      ...over,
+    });
+    expect(forfeitView(room({}), 'B')).toBe('won');
+    expect(forfeitView(room({}), 'A')).toBe('lost');
+    expect(forfeitView(room({ outcome: { winner: 'B', reason: 'score' } }), 'A')).toBeNull();
+    expect(forfeitView(room({ phase: 'playing', outcome: null }), 'A')).toBeNull();
+    expect(forfeitView(null, 'A')).toBeNull();
+    expect(forfeitView(room({}), null)).toBeNull();
+  });
+});
+
 describe('seats and names', () => {
   it('maps nicknames by seat with a fallback', () => {
     expect(otherSeat('A')).toBe('B');
-    expect(seatNames({ A: { nickname: 'Ana', connected: true, left: false }, B: null }, (s) => `?${s}`)).toEqual({ A: 'Ana', B: '?B' });
+    expect(seatNames({ A: { nickname: 'Ana', connected: true, left: false, graceMs: null }, B: null }, (s) => `?${s}`)).toEqual({ A: 'Ana', B: '?B' });
     expect(seatNames(undefined, () => 'Friend')).toEqual({ A: 'Friend', B: 'Friend' });
   });
 });

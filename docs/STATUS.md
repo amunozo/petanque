@@ -165,14 +165,20 @@ to submit. To open for everyone: set repo variable VITE_SERVER_URL (or show
 the entry by default) and redeploy.
 
 ## In flight (2026-10-08, update when done)
-- **Online forfeit rule** — IN PROGRESS 2026-10-08 (Opus subagent, uncommitted; if lost,
-  restart it from this spec): disconnected player has **60 s**
-  (SERVER_CONFIG.reconnectGraceMs) to rejoin; the player who stays sees a
-  server-driven countdown; after 60 s the stayer wins by forfeit; explicit
-  Leave mid-match = immediate forfeit; both gone = no winner (idle expiry);
-  late rejoin sees "You left the match". PROTOCOL_VERSION 2 → 3. No turn
-  timer for now. On completion: review, run checks, commit, push (deploys
-  site + server), owner tests phone+PC.
+- **Online forfeit rule** — DONE 2026-10-08, PROTOCOL_VERSION 3 (old tabs get
+  versionMismatch until they reload). A player who drops mid-match has 60 s
+  (`SERVER_CONFIG.reconnectGraceMs`) to rejoin; the other sees "<Name> lost
+  connection — 0:27" (server sends `graceMs` once; client counts down).
+  Expiry → stayer wins by forfeit (new `forfeit` message, snapshot `outcome
+  {winner, reason: 'score'|'forfeit'}`); Leave mid-match = immediate forfeit;
+  both away at the deadline = no winner (room idles out). No rematch after a
+  forfeit. room.ts stays pure (`RoomClock` passed in; `roomDeadline` /
+  `roomAlarm` / `restoreRoom`); the DO keeps ONE alarm = min(idle expiry,
+  reconnect deadline). Tests: `src/net/room.forfeit.test.ts`. Known gaps:
+  a late rejoiner who fully closed the app never sees "You left the match"
+  (start-up forgets finished rooms; only a reconnecting socket shows it);
+  the winner card always says "<Name> left the match". **Owner to test**
+  phone + PC: close the app on one, watch the countdown on the other.
 - **Play forms** submitted for review 2026-10-08: Data safety (Name, Device
   or other IDs, App interactions; collected, not shared, optional, app
   functionality, encrypted in transit, no accounts) and new content rating

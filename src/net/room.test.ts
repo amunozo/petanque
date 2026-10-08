@@ -6,11 +6,29 @@ import { defaultConfig } from '../tuning/config';
 import { CONFIG_HASH } from './fingerprint';
 import { CLOSE_CODES, PROTOCOL_VERSION, type HelloMsg, type Seat, type ServerMessage, type ThrowResultMsg } from './protocol';
 import { replayThrowWorld } from './replay';
-import { MAX_THROW_SECONDS, createRoomState, joinRoom, roomMessage, seatDisconnected, type Entropy, type RoomResult, type RoomState } from './room';
+import {
+  MAX_THROW_SECONDS,
+  createRoomState,
+  joinRoom as joinAt,
+  roomMessage as messageAt,
+  seatDisconnected as disconnectAt,
+  type Entropy,
+  type RoomClock,
+  type RoomResult,
+  type RoomState,
+} from './room';
 
 const CODE = 'K7M9P';
 const ENTROPY: Entropy = { seed: 12345, firstTeam: 'B' };
 const TOKENS = { a: 'token-aaaaaaaaaaaaaaaa', b: 'token-bbbbbbbbbbbbbbbb', c: 'token-cccccccccccccccc' };
+const GRACE_MS = 60_000;
+const T0 = 1_000_000;
+const at = (now: number): RoomClock => ({ now, reconnectGraceMs: GRACE_MS });
+
+// Most tests do not care about time: the same instant throughout.
+const joinRoom = (room: RoomState, h: HelloMsg, e: Entropy) => joinAt(room, h, e, at(T0));
+const roomMessage = (room: RoomState, seat: Seat, m: Parameters<typeof messageAt>[2], e: Entropy) => messageAt(room, seat, m, e, at(T0));
+const seatDisconnected = (room: RoomState, seat: Seat) => disconnectAt(room, seat, at(T0));
 
 const hello = (clientToken: string, nickname = 'P', over: Partial<HelloMsg> = {}): HelloMsg => ({
   type: 'hello',
@@ -56,8 +74,8 @@ describe('room: seats', () => {
     const started = msgs(r2, 'all')[0];
     expect(started?.type === 'matchStarted' && started.room.match).toMatchObject({ seed: 0, rng: 0, toThrow: 'B' });
     expect(started?.type === 'matchStarted' && started.room.players).toEqual({
-      A: { nickname: 'Ana', connected: true, left: false },
-      B: { nickname: 'Bob', connected: true, left: false },
+      A: { nickname: 'Ana', connected: true, left: false, graceMs: null },
+      B: { nickname: 'Bob', connected: true, left: false, graceMs: null },
     });
   });
 
@@ -83,7 +101,7 @@ describe('room: seats', () => {
 
   it('disconnect notifies the opponent once', () => {
     const r = seatDisconnected(startedRoom(), 'B');
-    expect(msgs(r, 'A')).toEqual([{ type: 'opponentConnection', seat: 'B', connected: false, left: false }]);
+    expect(msgs(r, 'A')).toEqual([{ type: 'opponentConnection', seat: 'B', connected: false, left: false, graceMs: GRACE_MS }]);
     expect(seatDisconnected(r.room, 'B').out).toEqual([]);
   });
 
@@ -98,7 +116,7 @@ describe('room: seats', () => {
     expect(w.close).toBe(CLOSE_CODES.roomNotFound);
   });
 
-  it('leaving the lobby frees the seat; leaving a match keeps it for the same token', () => {
+  it('leaving the lobby frees the seat; leaving a match forfeits it but keeps it for the same token', () => {
     const lobby = joinRoom(createRoomState(CODE, 'standard'), hello(TOKENS.a), ENTROPY).room;
     const left = roomMessage(lobby, 'A', { type: 'leave' }, ENTROPY);
     expect(left.room.seats.A).toBeNull();
@@ -106,7 +124,8 @@ describe('room: seats', () => {
 
     const inMatch = roomMessage(startedRoom(), 'A', { type: 'leave' }, ENTROPY);
     expect(inMatch.room.seats.A).toMatchObject({ connected: false, left: true });
-    expect(msgs(inMatch, 'B')).toEqual([{ type: 'opponentConnection', seat: 'A', connected: false, left: true }]);
+    expect(inMatch.room).toMatchObject({ phase: 'matchOver', outcome: { winner: 'B', reason: 'forfeit' } });
+    expect(types(inMatch)).toEqual(['all:forfeit']);
     expect(joinRoom(inMatch.room, hello(TOKENS.c), ENTROPY).close).toBe(CLOSE_CODES.roomFull);
     expect(joinRoom(inMatch.room, hello(TOKENS.a), ENTROPY).room.seats.A).toMatchObject({ connected: true, left: false });
   });
@@ -181,6 +200,7 @@ describe('room: refereeing', () => {
     expect(m.phase).toBe('matchOver');
     expect(m.winner).not.toBeNull();
     expect(m.score[m.winner!]).toBeGreaterThanOrEqual(7);
+    expect(room.outcome).toEqual({ winner: m.winner, reason: 'score' });
     expect(ends).toBeGreaterThan(0);
 
     // Determinism: the same inputs give the same match, throw for throw.

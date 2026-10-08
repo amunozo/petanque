@@ -8,7 +8,7 @@ simulates every throw with the same engine as the game, always with the
 ```
 server/src/index.ts       HTTP routes (create room, room info, WebSocket upgrade, health)
 server/src/roomObject.ts  Durable Object "Room": sockets (Hibernation API), storage, alarm, rate limit
-server/src/config.ts      limits and timeouts (message size, rate limit, idle expiry, CORS origins)
+server/src/config.ts      limits and timeouts (message size, rate limit, idle expiry, reconnect grace, CORS origins)
 ../src/net/protocol.ts    wire protocol shared with the browser (+ validation)
 ../src/net/room.ts        pure room state machine (lobby -> playing -> matchOver), unit-tested
 ```
@@ -33,6 +33,18 @@ CORS allows `https://petanque.amunozo.com` and any `http://localhost:*` /
 
 Rooms expire after 30 min idle in the lobby or after the match, and 2 h idle
 during a match (a Durable Object alarm, pushed back on every change).
+
+**Disconnects and forfeits** (protocol 3): a player whose connection drops
+mid-match has `SERVER_CONFIG.reconnectGraceMs` (60 s) to come back. The
+opponent gets the time left once (`opponentConnection.graceMs`) and counts
+down locally. Back in time: the match goes on. Otherwise the player who stayed
+wins by forfeit (`forfeit` message, `room.outcome = {winner, reason:
+'forfeit'}`); `leave` mid-match forfeits at once. If both players are gone
+nobody wins and the room just expires. `src/net/room.ts` has no clock: the
+Durable Object passes `now` in, asks `roomDeadline(room)` for the next
+reconnect deadline and keeps ONE alarm at the earlier of that and the idle
+expiry (`idleUntil` in storage); when it fires it calls `roomAlarm(room, now)`
+or expires the room.
 
 ## Local development
 

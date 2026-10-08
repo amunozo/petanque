@@ -6,7 +6,9 @@
  * DEFAULT config (net/replay.ts), then snapped to the server's resting bodies
  * and match state, and matchCore.ts shows the usual result (toasts, cards,
  * measuring, celebration). Server steps queue up and are shown one at a time,
- * so a slow device never skips an animation it can still play.
+ * so a slow device never skips an animation it can still play. While the
+ * opponent is away mid-match their reconnect countdown ticks on this device
+ * (the server sends the deadline once); a forfeit shows its own card.
  */
 import { beginMatchThrow, type MatchState } from '../../games/petanque';
 import type { ThrowRecord } from '../../games/petanque/matchTypes';
@@ -20,7 +22,7 @@ import type { AppContext, Mode } from '../context';
 import { button, el, shieldPointer } from '../dom';
 import type { MatchCore, MatchDriver } from '../matchCore';
 import { voiceOnline } from '../matchText';
-import { canAimOnline, connectionNotice, opponentsTurn, otherSeat, seatNames, throwAction } from './rules';
+import { canAimOnline, connectionNotice, forfeitView, formatCountdown, opponentsTurn, otherSeat, seatNames, throwAction } from './rules';
 
 type Step =
   | { kind: 'throw'; ev: NetEvents['throwResult'] }
@@ -51,8 +53,10 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
   let pending = false;
   let rematchVoted = false;
   let offs: (() => void)[] = [];
-  /** The turn line says "<Name> left the match" instead of "<Name> is aiming…". */
+  /** The turn line shows the forfeit card's title instead of "<Name> is aiming…". */
   let chipSaysLeft = false;
+  /** Last connection notice painted (the countdown repaints only when its text changes). */
+  let noticeText: string | null = null;
   let active = false;
 
   const mine = (): Seat => client.seat ?? 'A';
@@ -61,15 +65,30 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
   const opponentName = (): string => names()[theirs()];
   const opponent = () => client.room?.players[theirs()] ?? null;
   const opponentLeft = (): boolean => opponent()?.left === true;
+  const forfeit = () => forfeitView(client.room, client.seat);
 
-  // ---- "<Name> left the match" card -------------------------------------------------
+  // ---- forfeit card: "You win by forfeit / <Name> left the match" or "You left the match" ----
   const leftCard = el('div', 'mh-card ol-left');
   leftCard.hidden = true;
   const leftTitle = el('div', 'mh-card-title');
+  const leftDetail = el('div', 'mh-card-detail');
   const leftMenu = button('mh-btn mh-primary', '', () => hooks.quit());
-  leftCard.append(leftTitle, leftMenu);
+  leftCard.append(leftTitle, leftDetail, leftMenu);
   shieldPointer(leftCard);
   app.append(leftCard);
+
+  /** Our connection, or the opponent's (with the time they have left to come back). `force`: repaint even if unchanged. */
+  function paintNotice(force: boolean): void {
+    const name = opponentName();
+    const n = forfeit() ? null : connectionNotice(client.status, opponent());
+    const until = client.graceDeadline(theirs());
+    let text: string | null = null;
+    if (n === 'reconnecting') text = t('net.reconnecting');
+    else if (n === 'opponentLost') text = until === null ? t('net.opponentLost', { name }) : t('net.opponentLostTimer', { name, time: formatCountdown(until - Date.now()) });
+    if (text === noticeText && !force) return;
+    noticeText = text;
+    matchHud.setNotice(text);
+  }
 
   function paintRematch(): void {
     const room = client.room;
@@ -83,16 +102,17 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
     matchHud.setRematchHint(!opponentLeft() && !votedHere && room.rematch[theirs()] ? t('over.rematchAsked', { name }) : null);
   }
 
-  /** Connection notice, the opponent-left card, the rematch button. */
+  /** Connection notice, the forfeit card, the rematch button. */
   function paint(): void {
     if (!active) return;
     const name = opponentName();
-    const n = connectionNotice(client.status, opponent());
-    matchHud.setNotice(n === 'reconnecting' ? t('net.reconnecting') : n === 'opponentLost' ? t('net.opponentLost', { name }) : null);
-    leftCard.hidden = !(n === 'opponentLeft' && client.room?.phase === 'playing');
-    app.classList.toggle('is-opponent-left', !leftCard.hidden); // the card replaces the end card
-    leftTitle.textContent = t('net.opponentLeft', { name });
-    // Never "<Name> is aiming…" for someone who left (nor after they come back).
+    paintNotice(true);
+    const f = forfeit();
+    leftCard.hidden = f === null;
+    app.classList.toggle('is-forfeit', !leftCard.hidden); // the card replaces the end / match-over cards
+    leftTitle.textContent = f === 'lost' ? t('over.youLeft') : t('over.forfeitWin');
+    leftDetail.textContent = f === 'lost' ? t('over.forfeitLost', { name }) : t('net.opponentLeft', { name });
+    // Never "<Name> is aiming…" after a forfeit (nor once the match moves on).
     if (!leftCard.hidden) core.setChip(leftTitle.textContent);
     else if (chipSaysLeft) core.refreshChip();
     chipSaysLeft = !leftCard.hidden;
@@ -155,7 +175,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
   /** Marks whose turn it is on the page: 'you' when this device may aim, 'remote' while the opponent aims (their mark pulses). Also a hook for tests. */
   function paintTurn(): void {
     const s = core.state();
-    const remote = (s.phase === 'jack' || s.phase === 'boule') && s.toThrow === theirs() && !core.busy() && !opponentLeft();
+    const remote = (s.phase === 'jack' || s.phase === 'boule') && s.toThrow === theirs() && !core.busy() && !opponentLeft() && client.room?.phase === 'playing';
     const turn = canAim() ? 'you' : remote ? 'remote' : null;
     if (turn) app.dataset['turn'] = turn;
     else delete app.dataset['turn'];
@@ -197,6 +217,11 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       }),
       client.on('roomState', paint),
       client.on('opponentConnection', paint),
+      client.on('forfeit', () => {
+        pending = false;
+        paint();
+        if (forfeit() === 'won') ctx.audio.chime('win');
+      }),
       client.on('status', paint),
       client.on('error', (ev) => {
         if (ev.fatal) return; // online/flow.ts handles fatal errors
@@ -218,6 +243,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       queued: queue.length,
       busy: core.busy(),
       opponentLeft: opponentLeft(),
+      over: client.room?.phase !== 'playing',
     });
 
   onLangChange(paint);
@@ -229,6 +255,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       pending = false;
       rematchVoted = false;
       chipSaysLeft = false;
+      noticeText = null;
       core.attach(driver);
       subscribe();
       const room = client.room;
@@ -242,7 +269,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       offs = [];
       queue = [];
       leftCard.hidden = true;
-      app.classList.remove('is-opponent-left');
+      app.classList.remove('is-forfeit');
       delete app.dataset['turn'];
       app.classList.remove('is-their-turn');
       core.detach();
@@ -268,6 +295,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
         run(step);
         paint();
       }
+      if (active) paintNotice(false); // the countdown ticks
       paintTurn();
     },
   };

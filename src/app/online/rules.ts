@@ -1,7 +1,8 @@
 /**
  * Pure decisions of the online match UI (no DOM, no network), unit-tested:
  * who may aim, what a server step does to the screen, which connection notice
- * shows, whether to offer "Rejoin", and invite-URL clean-up.
+ * shows, the reconnect countdown, forfeits, whether to offer "Rejoin", and
+ * invite-URL clean-up.
  */
 import { canThrow, type MatchState } from '../../games/petanque';
 import type { NetStatus, PlayerInfo, RoomInfo, RoomSnapshot, Seat } from '../../net';
@@ -27,6 +28,8 @@ export interface AimCheck {
   /** A throw is being played back / the end's result presented. */
   busy: boolean;
   opponentLeft: boolean;
+  /** The server ended the match (on the score or by forfeit). */
+  over: boolean;
 }
 
 /** The local player may aim only on their own turn, connected, with the screen caught up with the server. */
@@ -37,6 +40,7 @@ export const canAimOnline = (c: AimCheck): boolean =>
   c.queued === 0 &&
   !c.busy &&
   !c.opponentLeft &&
+  !c.over &&
   c.roomSeq === c.shownSeq &&
   canThrow(c.state, c.seat);
 
@@ -61,6 +65,18 @@ export function connectionNotice(status: NetStatus, opponent: PlayerInfo | null 
   if (status !== 'open' || !opponent) return null;
   if (opponent.left) return 'opponentLeft';
   return opponent.connected ? null : 'opponentLost';
+}
+
+/** Reconnect countdown text, m:ss, rounded up (it reads 1:00 at the start, 0:00 only when time is up). */
+export function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/** The match ended by forfeit: 'won' for the player who stayed, 'lost' for the one who left (or came back too late). */
+export function forfeitView(room: RoomSnapshot | null, seat: Seat | null): 'won' | 'lost' | null {
+  if (!room || !seat || room.phase !== 'matchOver' || room.outcome?.reason !== 'forfeit') return null;
+  return room.outcome.winner === seat ? 'won' : 'lost';
 }
 
 /** Score-bar names: the nicknames by seat, `fallback` for an empty seat. */

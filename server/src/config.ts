@@ -16,6 +16,8 @@ export const SERVER_CONFIG = {
   lobbyIdleMs: 30 * 60 * 1000,
   matchIdleMs: 2 * 60 * 60 * 1000,
   matchOverIdleMs: 30 * 60 * 1000,
+  /** A player whose connection drops mid-match has this long to come back before the opponent wins by forfeit. */
+  reconnectGraceMs: 60_000,
   /** POST /rooms tries this many random codes before giving up (collisions are rare). */
   createAttempts: 8,
   /** Browser origins allowed by CORS / for WebSocket upgrades (plus ALLOWED_ORIGINS env, comma-separated). */
