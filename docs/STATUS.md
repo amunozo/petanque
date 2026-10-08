@@ -126,6 +126,18 @@ tell the owner exactly what to change in Play Console *before* it goes live:
    tester services ($15–35) are an acceptable fallback.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
 
+## Tester feedback log (closed test, from r/petanque)
+- 2026-10-08 (7 testers so far): works well on iPhone in the browser. High lob
+  is by far the easiest/most precise way to point, and even to shoot. Real
+  shooting is too random to be as effective as in real life. Suggestion:
+  choose the landing point first, then the height. Owner agrees on lob/shoot;
+  unsure about the control change → experiment on a separate branch/preview
+  URL first. NO changes made yet (owner asked to wait).
+  Diagnosis notes: execution noise is identical for every loft
+  (aimNoiseDeg 0.8, powerNoisePct 1.5) and boules have no landing scatter, so
+  a 52° lob lands exactly and stops; shoot is a 20° / 1.35× speed throw that
+  lands short of the target and skips, so small errors are amplified.
+
 ## Next steps for Claude
 1. ~~Domain switch~~ — done 2026-10-06: site, manifest and
    `/.well-known/assetlinks.json` load over HTTPS at https://petanque.amunozo.com/
