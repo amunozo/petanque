@@ -11,6 +11,7 @@ import {
   launch,
   predictFlight,
   simulateToRest,
+  type BallSpec,
   type Body,
   type Loft,
   type ThrowIntent,
@@ -85,14 +86,25 @@ export const budgetLeft = (ctx: SimCtx): number => ctx.limit - ctx.used;
 
 const noNoise = { aim: 0, power: 0 } as const;
 
-/** Simulates one noise-free throw from the current position. Null when the budget is spent. */
-export function simulateThrow(ctx: SimCtx, intent: ThrowIntent): SimOutcome | null {
+/**
+ * A thrown boule's spec for PLANNING: without the landing kick (BallSpec.landingScatter),
+ * i.e. the expected path. The kick is deterministic per contact point, so a
+ * noise-free search would otherwise "find" lucky lobs that real execution error
+ * never reproduces. The error-sampling pass (`scatter: true`) keeps the kick.
+ */
+const plannedBoule = (spec: BallSpec): BallSpec => ({ ...spec, landingScatter: 0, landingScatterSpeed: 0 });
+
+/**
+ * Simulates one noise-free throw from the current position. Null when the budget is spent.
+ * `scatter`: keep the thrown boule's landing kick (see plannedBoule); the jack always keeps it.
+ */
+export function simulateThrow(ctx: SimCtx, intent: ThrowIntent, scatter = false): SimOutcome | null {
   if (budgetLeft(ctx) <= 0) return null;
   ctx.used++;
   const { cfg, state, team } = ctx;
   const jackPhase = state.phase === 'jack';
   const params = intentToThrow(intent, cfg.throw, noNoise);
-  const spec = jackPhase ? cfg.balls.jack : cfg.balls.boule;
+  const spec = jackPhase ? cfg.balls.jack : scatter ? cfg.balls.boule : plannedBoule(cfg.balls.boule);
   const body = createBody(ctx.throwId, jackPhase ? JACK_KIND : BOULE_KIND, spec, params.origin);
   const world = launch({ time: 0, bodies: ctx.resting }, body, params);
   const bodies = simulateToRest(world, cfg.physics, SIM_MAX_TIME).world.bodies;
@@ -120,7 +132,7 @@ function sampleReach(ctx: SimCtx, kind: 'jack' | 'boule', loft: Loft, yaw: numbe
   ctx.used++;
   const { cfg } = ctx;
   const params = intentToThrow({ aim: yaw, power, loft }, cfg.throw, noNoise);
-  const spec = kind === 'jack' ? cfg.balls.jack : cfg.balls.boule;
+  const spec = kind === 'jack' ? cfg.balls.jack : plannedBoule(cfg.balls.boule);
   const body = createBody('lone', kind, spec, params.origin);
   const world = launch({ time: 0, bodies: [] }, body, params);
   const out = simulateToRest(world, cfg.physics, SIM_MAX_TIME).world.bodies[0] as Body;

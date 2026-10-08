@@ -38,9 +38,26 @@ export interface GameConfig {
     backspinShoot: number;
     /** Multiplies min/max launch speed for the 'shoot' loft (le tir). */
     shootSpeedMul: number;
+    /**
+     * 'shoot' aim ring sits this far (m) beyond the first ground contact: a boule
+     * under the ring is struck squarely (in the air / first hop), not on its top.
+     */
+    shootRingAhead: number;
     /** Random error, 1 standard deviation. */
     aimNoiseDeg: number;
     powerNoisePct: number;
+    /**
+     * Per-loft multipliers on the random error (see engine/throwModel.ts): a high lob
+     * is harder to judge (more error), a practised shot flies along a straight line.
+     */
+    aimNoiseMulRoll: number;
+    aimNoiseMulHalf: number;
+    aimNoiseMulLob: number;
+    aimNoiseMulShoot: number;
+    powerNoiseMulRoll: number;
+    powerNoiseMulHalf: number;
+    powerNoiseMulLob: number;
+    powerNoiseMulShoot: number;
   };
   controls: {
     scheme: ControlScheme;
@@ -142,7 +159,17 @@ export const defaultConfig: GameConfig = {
     arena: { minX: -2, maxX: 2, minZ: -9.5, maxZ: 5.5, boardContact: 'dead', boardRestitution: 0.3, endBoardRestitution: 0.3, endBoards: true },
   },
   balls: {
-    boule: { radius: 0.0375, mass: 0.7, restitution: 0.6 },
+    // Steel boule: soft landings (roll, half-lob) roll true; a hard, steep landing
+    // (high lob) digs into the gravel and is kicked unpredictably.
+    boule: {
+      radius: 0.0375,
+      mass: 0.7,
+      restitution: 0.6,
+      landingScatter: 20,
+      landingScatterSpeed: 0.1,
+      landingScatterMinImpact: 5.2,
+      landingScatterFullImpact: 9,
+    },
     // The 30 mm wooden jack: sinks into the gravel (more rolling resistance), is
     // deflected more by small bumps, hops a little more on landing than a boule
     // and gets kicked sideways by the grit it lands on.
@@ -169,14 +196,23 @@ export const defaultConfig: GameConfig = {
     loftRollDeg: 10,
     loftHalfDeg: 32,
     loftLobDeg: 52,
-    loftShootDeg: 20,
+    loftShootDeg: 26,
     backspinRoll: 0,
     backspinHalf: 0,
     backspinLob: 0,
-    backspinShoot: 0,
+    backspinShoot: 100,
     shootSpeedMul: 1.35,
+    shootRingAhead: 0.1,
     aimNoiseDeg: 0.8,
     powerNoisePct: 1.5,
+    aimNoiseMulRoll: 1,
+    aimNoiseMulHalf: 1,
+    aimNoiseMulLob: 1.3,
+    aimNoiseMulShoot: 0.6,
+    powerNoiseMulRoll: 1,
+    powerNoiseMulHalf: 1,
+    powerNoiseMulLob: 1.4,
+    powerNoiseMulShoot: 0.5,
   },
   controls: {
     scheme: 'slingshot',
@@ -250,12 +286,21 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'throw.loftLobDeg', label: 'lob angle°', min: 35, max: 80, step: 1 },
       { path: 'throw.loftShootDeg', label: 'shoot angle°', min: 0, max: 45, step: 1 },
       { path: 'throw.shootSpeedMul', label: 'shoot speed ×', min: 1, max: 2, step: 0.01 },
+      { path: 'throw.shootRingAhead', label: 'shoot ring ahead m', min: 0, max: 0.5, step: 0.01 },
       { path: 'throw.backspinRoll', label: 'roll backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.backspinHalf', label: 'half backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.backspinLob', label: 'lob backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.backspinShoot', label: 'shoot backspin', min: 0, max: 100, step: 1 },
       { path: 'throw.aimNoiseDeg', label: 'aim error°', min: 0, max: 5, step: 0.1 },
       { path: 'throw.powerNoisePct', label: 'power error %', min: 0, max: 10, step: 0.1 },
+      { path: 'throw.aimNoiseMulRoll', label: 'roll aim error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.aimNoiseMulHalf', label: 'half aim error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.aimNoiseMulLob', label: 'lob aim error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.aimNoiseMulShoot', label: 'shoot aim error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.powerNoiseMulRoll', label: 'roll power error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.powerNoiseMulHalf', label: 'half power error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.powerNoiseMulLob', label: 'lob power error ×', min: 0, max: 3, step: 0.05 },
+      { path: 'throw.powerNoiseMulShoot', label: 'shoot power error ×', min: 0, max: 3, step: 0.05 },
       { path: 'throw.originY', label: 'release height', min: 0.1, max: 1.2, step: 0.05 },
     ],
   },
@@ -280,6 +325,10 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'physics.airDrag', label: 'air drag', min: 0, max: 0.5, step: 0.005 },
       { path: 'balls.boule.restitution', label: 'boule bounce', min: 0, max: 1, step: 0.01 },
       { path: 'balls.boule.mass', label: 'boule mass kg', min: 0.3, max: 1.5, step: 0.01 },
+      { path: 'balls.boule.landingScatter', label: 'boule landing scatter°', min: 0, max: 45, step: 0.5 },
+      { path: 'balls.boule.landingScatterSpeed', label: 'boule scatter speed', min: 0, max: 1, step: 0.01 },
+      { path: 'balls.boule.landingScatterMinImpact', label: 'boule scatter from m/s', min: 0, max: 10, step: 0.1 },
+      { path: 'balls.boule.landingScatterFullImpact', label: 'boule scatter full m/s', min: 0.5, max: 15, step: 0.1 },
       { path: 'balls.jack.restitution', label: 'jack bounce', min: 0, max: 1, step: 0.01 },
       { path: 'balls.jack.mass', label: 'jack mass kg', min: 0.005, max: 0.2, step: 0.005 },
       { path: 'balls.jack.rollingResistanceMul', label: 'jack rolling friction ×', min: 0.5, max: 3, step: 0.05 },

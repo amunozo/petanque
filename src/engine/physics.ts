@@ -13,7 +13,9 @@
  *      impactRestitution / impactFriction) adjust the surface values below for
  *      that ball only; absent = the shared surface values. landingScatter /
  *      landingScatterSpeed add a deterministic hash-of-impact-point kick to the
- *      horizontal velocity at each ground impact (see scatter.ts).
+ *      horizontal velocity at each ground impact (see scatter.ts), scaled by
+ *      the vertical impact speed between landingScatterMinImpact and
+ *      landingScatterFullImpact (hard, steep landings are kicked most).
  *  - rolling: horizontal deceleration rollingResistance*gravity against the
  *      motion, plus slope acceleration -gravity*slope from the deterministic
  *      bumpiness field. Backspin (Body.spin, rad/s) acts as sliding friction:
@@ -43,7 +45,7 @@ function scatterLanding(b: Body, impact: number): void {
   const deg = b.spec.landingScatter ?? 0;
   const frac = b.spec.landingScatterSpeed ?? 0;
   if (deg <= 0 && frac <= 0) return;
-  const kick = landingKick(b.pos.x, b.pos.z, impact, deg, frac);
+  const kick = landingKick(b.pos.x, b.pos.z, impact, deg, frac, b.spec.landingScatterMinImpact, b.spec.landingScatterFullImpact);
   const c = Math.cos(kick.angle);
   const sn = Math.sin(kick.angle);
   const vx = b.vel.x;

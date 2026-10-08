@@ -152,6 +152,18 @@ describe('practice', () => {
     expect(p.flight.landing.z).toBeLessThan(cfg.throw.originZ);
     expect(p.params.yaw).toBeCloseTo(0.02, 12);
   });
+
+  it('the aim ring is the landing point, except for a shot: shootRingAhead further along the line', () => {
+    for (const loft of ['roll', 'half', 'lob'] as const) {
+      const p = previewThrow({ aim: 0.05, power: 0.6, loft }, cfg);
+      expect(p.ring).toEqual(p.flight.landing);
+    }
+    const s = previewThrow({ aim: 0.05, power: 0.6, loft: 'shoot' }, cfg);
+    const dx = s.ring.x - s.flight.landing.x;
+    const dz = s.ring.z - s.flight.landing.z;
+    expect(Math.hypot(dx, dz)).toBeCloseTo(cfg.throw.shootRingAhead, 9);
+    expect(Math.atan2(-dx, -dz)).toBeCloseTo(0.05, 9);
+  });
 });
 
 describe('predictRestPoint', () => {

@@ -11,6 +11,8 @@ export const cloneSpec = (s: BallSpec): BallSpec => {
   if (s.impactFriction !== undefined) c.impactFriction = s.impactFriction;
   if (s.landingScatter !== undefined) c.landingScatter = s.landingScatter;
   if (s.landingScatterSpeed !== undefined) c.landingScatterSpeed = s.landingScatterSpeed;
+  if (s.landingScatterMinImpact !== undefined) c.landingScatterMinImpact = s.landingScatterMinImpact;
+  if (s.landingScatterFullImpact !== undefined) c.landingScatterFullImpact = s.landingScatterFullImpact;
   return c;
 };
 

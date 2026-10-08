@@ -46,8 +46,8 @@ export function createAimPreviewer(ctx: AppContext, config: () => GameConfig = (
     showIntent(intent, ball) {
       scene.setCameraMode('aim');
       hud.setPower(null);
-      const { params, flight } = previewThrow(intent, ballCfg(config(), ball));
-      scene.setAimPreview({ origin: params.origin, aim: intent.aim, landing: flight.landing, rest: null, points: flight.points });
+      const { params, flight, ring } = previewThrow(intent, ballCfg(config(), ball));
+      scene.setAimPreview({ origin: params.origin, aim: intent.aim, landing: ring, rest: null, points: flight.points });
     },
     update(p, ball) {
       if (!p || !ball) {
@@ -59,8 +59,9 @@ export function createAimPreviewer(ctx: AppContext, config: () => GameConfig = (
       scene.setCameraMode('aim');
       hud.setPower(cfg.controls.showPowerMeter ? p.power : null);
       const loft = loftPicker.get();
-      const { params, flight } = previewThrow({ aim: p.aim, power: p.power, loft }, ballCfg(cfg, ball));
-      scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: flight.landing, rest: restFor(cfg, p, loft, ball, params), points: flight.points });
+      const { params, flight, ring } = previewThrow({ aim: p.aim, power: p.power, loft }, ballCfg(cfg, ball));
+      // The ring is the first ground contact (for 'shoot': the spot a boule is struck squarely, see aimRing).
+      scene.setAimPreview({ origin: params.origin, aim: p.aim, landing: ring, rest: restFor(cfg, p, loft, ball, params), points: flight.points });
     },
   };
 }

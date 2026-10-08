@@ -36,6 +36,18 @@ export interface BallSpec {
   landingScatter?: number;
   /** Max fractional change of the horizontal speed at each ground impact (0.1 = ±10 %), same kick source as `landingScatter`. */
   landingScatterSpeed?: number;
+  /**
+   * Vertical impact speed (m/s) below which a landing gets no kick (absent = 0).
+   * Lets a heavy boule shrug off soft landings (rolls, half-lobs) while a
+   * steep, hard landing (a high lob digging into the gravel) is deflected.
+   */
+  landingScatterMinImpact?: number;
+  /**
+   * Vertical impact speed (m/s) at and above which the kick is at full strength
+   * (absent = SCATTER_FULL_IMPACT, 3 m/s). Between the min and this the kick
+   * ramps up linearly.
+   */
+  landingScatterFullImpact?: number;
 }
 
 export type BodyState = 'flying' | 'rolling' | 'resting' | 'out';

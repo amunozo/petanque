@@ -178,7 +178,18 @@ describe('jack surface tuning', () => {
     expect(store.set('balls.jack.rollingResistanceMul', 2)).toBe(true);
     expect(store.config.balls.jack.rollingResistanceMul).toBe(2);
     expect(defaultConfig.balls.jack.rollingResistanceMul).toBe(1.6);
-    // Boules carry no modifiers: they use the shared ground values.
-    expect(Object.keys(defaultConfig.balls.boule).sort()).toEqual(['mass', 'radius', 'restitution']);
+    // Boules carry no surface modifiers (they use the shared ground values), only the hard-landing kick.
+    expect(Object.keys(defaultConfig.balls.boule).sort()).toEqual([
+      'landingScatter',
+      'landingScatterFullImpact',
+      'landingScatterMinImpact',
+      'landingScatterSpeed',
+      'mass',
+      'radius',
+      'restitution',
+    ]);
+    for (const k of ['landingScatter', 'landingScatterSpeed', 'landingScatterMinImpact', 'landingScatterFullImpact']) {
+      expect(paths).toContain(`balls.boule.${k}`);
+    }
   });
 });

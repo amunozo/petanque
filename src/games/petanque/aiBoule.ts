@@ -6,7 +6,7 @@
  * Then the best few finalists are re-simulated under +-1 sigma execution error
  * and the plan with the best expected value wins.
  */
-import type { Loft, ThrowIntent } from '../../engine';
+import { noiseMuls, type Loft, type ThrowIntent } from '../../engine';
 import type { GameConfig } from '../../tuning/config';
 import type { AiLevel } from './aiTypes';
 import { evaluate } from './aiScore';
@@ -55,7 +55,7 @@ const SHOOT_SHORTS = [0.15, 0.4, 0.0] as const;
  * pointing is likely (>= POINT_CLEAR_RATE of the error samples) to take the point.
  */
 const CLOSE_GAP = 0.1;
-const POINT_CLEAR_RATE = 0.25;
+const POINT_CLEAR_RATE = 0.5;
 /**
  * Outside the forced case above, a shot must beat the best point by this much
  * expected value (score units ~ points) to be chosen: shots are high-variance
@@ -135,9 +135,12 @@ function shootCandidates(sh: Shared, out: Candidate[]): void {
 const STRATA = [-1.6, -0.69, -0.22, 0.22, 0.69, 1.6] as const;
 const POWER_PAIRING = [3, 0, 5, 2, 4, 1] as const;
 
-/** Expected score of a candidate under aim/power execution error (one simulation per stratum). */
-function refine(sh: Shared, c: Candidate, aimSd: number, powerSd: number): void {
+/** Expected score of a candidate under aim/power execution error (one simulation per stratum), scaled per loft. */
+function refine(sh: Shared, c: Candidate, aimSd0: number, powerSd0: number): void {
   const { ctx } = sh;
+  const [aimMul, powerMul] = noiseMuls(c.intent.loft, ctx.cfg.throw);
+  const aimSd = aimSd0 * aimMul;
+  const powerSd = powerSd0 * powerMul;
   let sum = 0;
   let holds = 0;
   for (let i = 0; i < STRATA.length; i++) {
@@ -148,7 +151,7 @@ function refine(sh: Shared, c: Candidate, aimSd: number, powerSd: number): void 
       aim: c.intent.aim + zAim * aimSd,
       power: clamp01(c.intent.power * (1 + zPow * powerSd)),
     };
-    const o = simulateThrow(ctx, probe);
+    const o = simulateThrow(ctx, probe, true);
     if (!o) return; // out of budget: keep the nominal score
     sum += evaluate(ctx.state, o.after, ctx.team);
     if (holdingTeam(o.after)?.team === ctx.team) holds++;
