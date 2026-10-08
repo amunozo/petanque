@@ -181,13 +181,13 @@ the entry by default) and redeploy.
   `VITE_SERVER_URL=https://petanque-server.amunozo-gamedev.workers.dev` (or
   show the entry by default), redeploy, announce to testers (Reddit + Google
   Group; draft the message).
-- **GoatCounter analytics** — owner asked; waiting for their choice: separate
-  GoatCounter site (recommended, e.g. code `amunozo-petanque`) vs the
-  existing `amunozo` site with `petanque.amunozo.com/…` path labels. Plan:
-  script + a few anonymous events (practice/vs-computer/online room/match
-  finished), privacy page update (5 languages), Data safety: App interactions
-  gets purpose Analytics and becomes required. Push only after the owner
-  updates the form.
+- **GoatCounter analytics** — owner created a SEPARATE site, code
+  `amunozo-petanque` (dashboard amunozo-petanque.goatcounter.com). Subagent
+  building it in worktree /home/user/petanque-analytics, branch `analytics`
+  (does not deploy; not pushed until the owner updates Play Data safety):
+  pageview per load + anonymous game events, privacy page update. Then:
+  give the owner the Data safety changes → owner submits → merge into the
+  main branch + push.
 - Testers: ~7+ opted in via r/petanque (as of 2026-10-08); need 12 for 14
   days.
 
