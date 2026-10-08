@@ -138,8 +138,10 @@ lob-as-shot 7/6/3 %. Owner approved → MERGED into the main branch and live
 then a quick swipe whose quality sets the error; same ThrowIntent so
 engine/rules/AI/online are unchanged; "Controls: Classic / Landing spot"
 setting. Preview: https://petanque.amunozo.com/exp/exp-landing/ — built
-(0b2d526), waiting for the owner's verdict. Swipe pace/tolerances are
-guesses: tune `landing.*` in the dev panel.
+(0b2d526) and REJECTED by the owner 2026-10-08: "extremely confusing and
+counterintuitive… more complicated and less fun". Classic slingshot controls
+stay. Branch kept for reference only; do not merge or revive without the
+owner asking.
 Online play is on the main
 branch but hidden (no server deployed, no `VITE_SERVER_URL`).
 
