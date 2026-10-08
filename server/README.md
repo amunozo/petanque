@@ -73,8 +73,10 @@ PETANQUE_SERVER_URL=http://127.0.0.1:8787 npx vitest run src/net/server.smoke.te
    `VITE_SERVER_URL` = `https://petanque-server.<subdomain>.workers.dev`
    (Settings -> Secrets and variables -> Actions -> Variables). The site
    build (`deploy.yml`) passes it to Vite. Without it the client falls back
-   to `PROD_SERVER_URL` in `src/net/client.ts` (a guess:
-   `https://petanque-server.amunozo.workers.dev`).
+   to `PROD_SERVER_URL` in `src/net/client.ts` (the real URL:
+   `https://petanque-server.amunozo-gamedev.workers.dev`). Players without
+   `VITE_SERVER_URL` see the online entry only after opening the site once with
+   `?online=1` (hidden beta switch, remembered per device; `?online=0` turns it off).
 
 ## Environment / config
 

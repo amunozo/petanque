@@ -3,7 +3,7 @@
 export * from './protocol';
 export { CONFIG_HASH, configFingerprint } from './fingerprint';
 export { replayThrowWorld } from './replay';
-export { INVITE_BASE_URL, ROOM_PARAM, inviteLink, roomCodeFromSearch } from './invite';
+export { INVITE_BASE_URL, ONLINE_PARAM, ROOM_PARAM, inviteLink, roomCodeFromSearch } from './invite';
 export {
   CLIENT_TOKEN_KEY,
   DEV_SERVER_URL,

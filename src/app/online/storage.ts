@@ -1,13 +1,15 @@
 /**
  * What online play remembers on this device (best effort; everything works without storage):
  * the nickname, the room of the match in progress (to offer "Rejoin" after the app was
- * closed) and, in developer mode only, a server URL override (`?server=`).
+ * closed), in developer mode only a server URL override (`?server=`), and the hidden "online beta"
+ * switch (`?online=1` / `?online=0`) that shows the online entry to non-developer players.
  */
 import { cleanNickname, normalizeRoomCode, PROTOCOL_LIMITS } from '../../net/protocol';
 
 export const NICKNAME_KEY = 'petanque.nickname';
 export const ACTIVE_ROOM_KEY = 'petanque.activeRoom';
 export const SERVER_URL_KEY = 'petanque.serverUrl';
+export const ONLINE_KEY = 'petanque.online';
 
 export type KeyValueStore = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
@@ -86,12 +88,26 @@ export interface ServerChoice {
 }
 
 /**
- * Which server to use. Players: only the URL baked into the build (none = no online entry).
- * Developer mode: `?server=<url>` (remembered; `?server=default` forgets it), else the
- * remembered override, else the build's URL, else `fallback` (the client's default).
+ * The hidden "online beta" switch: `?online=1` turns it on (remembered on this device), `?online=0`
+ * turns it off and forgets it. Without the param the remembered value applies. It never enables
+ * developer mode. If storage is blocked, `?online=1` still counts for this page load.
  */
-export function chooseServer(o: { configured: string | null; devMode: boolean; param: string | null; saved: string | null; fallback: string }): ServerChoice {
-  if (!o.devMode) return { url: o.configured };
+export function resolveOnlineBeta(params: URLSearchParams, store = local()): boolean {
+  const flag = params.get('online');
+  if (flag === '1') write(ONLINE_KEY, '1', store);
+  else if (flag === '0') write(ONLINE_KEY, null, store);
+  if (flag === '0') return false;
+  return flag === '1' || read(ONLINE_KEY, store) === '1';
+}
+
+/**
+ * Which server to use. Players: the URL baked into the build; without one, `fallback` (the
+ * client's default) only when the online beta switch is on; otherwise none (no online entry).
+ * Developer mode (the beta switch is irrelevant there): `?server=<url>` (remembered;
+ * `?server=default` forgets it), else the remembered override, else the build's URL, else `fallback`.
+ */
+export function chooseServer(o: { configured: string | null; devMode: boolean; onlineBeta?: boolean; param: string | null; saved: string | null; fallback: string }): ServerChoice {
+  if (!o.devMode) return { url: o.configured ?? (o.onlineBeta ? o.fallback : null) };
   const base = o.configured ?? o.fallback;
   if (o.param !== null) {
     const url = normalizeServerUrl(o.param);
@@ -101,8 +117,8 @@ export function chooseServer(o: { configured: string | null; devMode: boolean; p
 }
 
 /** chooseServer() with the URL params and storage of this page. */
-export function resolveServer(params: URLSearchParams, devMode: boolean, configured: string | null, fallback: string, store = local()): string | null {
-  const choice = chooseServer({ configured, devMode, param: params.get('server'), saved: read(SERVER_URL_KEY, store), fallback });
+export function resolveServer(params: URLSearchParams, devMode: boolean, onlineBeta: boolean, configured: string | null, fallback: string, store = local()): string | null {
+  const choice = chooseServer({ configured, devMode, onlineBeta, param: params.get('server'), saved: read(SERVER_URL_KEY, store), fallback });
   if (choice.save !== undefined) write(SERVER_URL_KEY, choice.save, store);
   return choice.url;
 }

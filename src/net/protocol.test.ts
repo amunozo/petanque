@@ -108,6 +108,8 @@ describe('helpers', () => {
 
   it('invite links round-trip', () => {
     expect(inviteLink('K7M9P')).toBe('https://petanque.amunozo.com/?room=K7M9P');
+    expect(inviteLink('K7M9P', undefined, true)).toBe('https://petanque.amunozo.com/?room=K7M9P&online=1');
+    expect(roomCodeFromSearch('?room=K7M9P&online=1')).toBe('K7M9P');
     expect(roomCodeFromSearch('?dev=1&room=k7m9p')).toBe('K7M9P');
     expect(roomCodeFromSearch('?room=nope!')).toBeNull();
     expect(roomCodeFromSearch('')).toBeNull();

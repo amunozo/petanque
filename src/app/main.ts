@@ -32,7 +32,7 @@ import { createUpdateToast } from './updateToast';
 import { configuredServerUrl, defaultServerUrl, INVITE_BASE_URL, ROOM_PARAM } from '../net';
 import { createOnlineFlow, type OnlineFlow } from './online/flow';
 import { stripRoomParam } from './online/rules';
-import { resolveServer } from './online/storage';
+import { resolveOnlineBeta, resolveServer } from './online/storage';
 
 /** Longest real-time gap one frame may simulate (after a tab switch etc.). */
 const MAX_FRAME_SECONDS = 0.25;
@@ -130,8 +130,10 @@ const panel = createTuningPanel(store, tuningSchema, { onOpenChange: () => refre
 const practice = createPracticeMode(ctx);
 const core = createMatchCore(ctx);
 const match = createMatchMode(ctx, core, () => goMenu());
-// Online play shows only when this build has a server, or in developer mode (`?server=` overrides it there).
-const serverUrl = resolveServer(params, devMode, configuredServerUrl(), defaultServerUrl());
+// Online play shows only when this build has a server, in developer mode (`?server=` overrides it there),
+// or when the hidden beta switch (`?online=1`, remembered) is on; the switch never enables developer mode.
+const onlineBeta = resolveOnlineBeta(params);
+const serverUrl = resolveServer(params, devMode, onlineBeta, configuredServerUrl(), defaultServerUrl());
 const updates = registerServiceWorker();
 const online: OnlineFlow | null = serverUrl
   ? createOnlineFlow({
@@ -141,6 +143,7 @@ const online: OnlineFlow | null = serverUrl
       points: () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }),
       serverUrl,
       inviteBase: devMode ? `${location.origin}${location.pathname}` : INVITE_BASE_URL,
+      inviteOnline: onlineBeta,
       enterMode: (m) => enterMode(m),
       goMenu: () => goMenu(),
       update: () => updates.applyOrCheck(),

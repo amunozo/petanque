@@ -36,8 +36,8 @@ import {
   type WelcomeMsg,
 } from './protocol';
 
-/** Placeholder until the Worker is deployed: set VITE_SERVER_URL (see server/README.md). */
-export const PROD_SERVER_URL = 'https://petanque-server.amunozo.workers.dev';
+/** The deployed Cloudflare Worker; used when no VITE_SERVER_URL is baked into the build (see server/README.md). */
+export const PROD_SERVER_URL = 'https://petanque-server.amunozo-gamedev.workers.dev';
 export const DEV_SERVER_URL = 'http://localhost:8787';
 export const CLIENT_TOKEN_KEY = 'petanque.clientToken';
 

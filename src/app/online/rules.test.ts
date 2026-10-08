@@ -87,6 +87,7 @@ describe('rejoinDecision', () => {
 describe('stripRoomParam', () => {
   it('drops only the invite code', () => {
     expect(stripRoomParam('https://petanque.amunozo.com/?room=K7M9P')).toBe('https://petanque.amunozo.com/');
+    expect(stripRoomParam('https://petanque.amunozo.com/?room=K7M9P&online=1')).toBe('https://petanque.amunozo.com/?online=1');
     expect(stripRoomParam('http://localhost:4180/?dev=1&room=K7M9P&lang=fr#x')).toBe('http://localhost:4180/?dev=1&lang=fr#x');
   });
 });

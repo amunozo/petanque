@@ -26,6 +26,8 @@ export interface OnlineFlowDeps {
   serverUrl: string;
   /** Invite links point at the live site, or (developer mode) at this page. */
   inviteBase: string;
+  /** The online beta switch is on here: invite links carry `online=1` so the friend gets the online UI too. */
+  inviteOnline: boolean;
   enterMode(mode: Mode): void;
   goMenu(): void;
   /** versionMismatch: start the PWA update (apply a waiting version, or look for one). */
@@ -194,7 +196,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   async function share(): Promise<void> {
     const code = client.code;
     if (!code) return;
-    const url = inviteLink(code, d.inviteBase);
+    const url = inviteLink(code, d.inviteBase, d.inviteOnline);
     const text = t('lobby.shareText', { code });
     if (typeof navigator.share === 'function') {
       try {
