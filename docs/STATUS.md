@@ -12,6 +12,11 @@ step is finished or re-planned, or a new owner preference is learned. Update
 push. A new session should be able to continue from this file alone.
 
 ## Release checklist (every update, owner's standing rule)
+(Content rating as submitted 2026-10-08 for online-by-invite: users interact
+= Yes; block = No; report = No; chat moderation = No; limited to invited
+friends = Yes. When quick match with strangers ships: that last answer
+becomes No → add a nickname filter + report option first, redo the
+questionnaire.)
 Before shipping any change that players get (site deploy or new AAB), check
 whether it makes a Google Play declaration or the privacy page untrue, and if so
 tell the owner exactly what to change in Play Console *before* it goes live:
