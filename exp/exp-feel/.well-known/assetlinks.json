@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.amunozo.petanque",
+      "sha256_cert_fingerprints": [
+        "2D:D1:99:6F:5D:C9:73:6E:44:A8:5F:56:34:62:4C:0B:1F:B0:2A:89:71:9C:4F:16:07:DA:42:99:97:01:FC:50",
+        "35:F8:0B:12:81:66:C2:90:AA:FA:A0:18:7C:11:87:80:43:A8:AB:16:AD:3A:E0:18:88:F7:B2:14:E6:C7:72:FE"
+      ]
+    }
+  }
+]
