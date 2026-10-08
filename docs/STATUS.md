@@ -165,8 +165,8 @@ to submit. To open for everyone: set repo variable VITE_SERVER_URL (or show
 the entry by default) and redeploy.
 
 ## In flight (2026-10-08, update when done)
-- **Online forfeit rule** — NOT STARTED (first subagent was lost in a session
-  restart; restart it from this spec): disconnected player has **60 s**
+- **Online forfeit rule** — IN PROGRESS 2026-10-08 (Opus subagent, uncommitted; if lost,
+  restart it from this spec): disconnected player has **60 s**
   (SERVER_CONFIG.reconnectGraceMs) to rejoin; the player who stays sees a
   server-driven countdown; after 60 s the stayer wins by forfeit; explicit
   Leave mid-match = immediate forfeit; both gone = no winner (idle expiry);
