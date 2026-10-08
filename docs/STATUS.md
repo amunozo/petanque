@@ -159,6 +159,21 @@ functionality) and content rating ("users interact" = Yes) are the owner's
 to submit. To open for everyone: set repo variable VITE_SERVER_URL (or show
 the entry by default) and redeploy.
 
+## Next Android package (AAB) — not urgent, bundle with the next wrapper change
+Play pre-launch "for your next release" notes on 0.5.0 (1), none blocking:
+- Edge-to-edge (Android 15+, targetSdk 35+): check the game draws correctly
+  under status/nav bars (web side uses `viewport-fit=cover`; verify safe-area
+  insets on a real Android 15 phone).
+- "Deprecated edge-to-edge APIs": comes from Bubblewrap's
+  android-browser-helper (status/nav bar colour calls) → update Bubblewrap /
+  androidbrowserhelper when rebuilding.
+- Orientation/resizability on large screens: Android 16 ignores portrait locks
+  on tablets/foldables for apps targeting SDK 36 unless the app is a game →
+  add `android:appCategory="game"` to the <application> in
+  android/app/src/main/AndroidManifest.xml, and make sure the web game copes
+  with landscape/wide windows anyway.
+Bump `appVersionCode` to 2 in android/twa-manifest.json when rebuilding.
+
 ## Tester feedback log (closed test, from r/petanque)
 - 2026-10-08 (7 testers so far): works well on iPhone in the browser. High lob
   is by far the easiest/most precise way to point, and even to shoot. Real
