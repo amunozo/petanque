@@ -128,7 +128,13 @@ tell the owner exactly what to change in Play Console *before* it goes live:
 Push a branch named `exp-<name>` → the deploy workflow publishes it ONLY to
 `https://petanque.amunozo.com/exp/exp-<name>/` (root and `v/` untouched; the
 root service worker never serves its shell there). Use for game-feel changes
-the owner wants to try before testers get them. Online play is on the main
+the owner wants to try before testers get them. Current experiment: **`exp-feel`** (2026-10-08) — lob/shoot rebalance from
+tester feedback (per-loft noise multipliers, boule landing kick on hard
+landings, shoot flies onto the target; PROTOCOL_VERSION 2). Measured: lob
+pointing error ~1.5× half-lob; shot hit 80/66/54 % at 6/8/10 m (was 41/32/26);
+lob-as-shot 7/6/3 %. Waiting for the owner's verdict before merging into the
+main branch. Next experiment: `exp-landing` (pick landing spot, then height).
+Online play is on the main
 branch but hidden (no server deployed, no `VITE_SERVER_URL`).
 
 ## Tester feedback log (closed test, from r/petanque)
