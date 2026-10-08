@@ -15,6 +15,7 @@ import { onLangChange, t } from '../../i18n';
 import { replayThrowWorld, type NetClient, type NetEvents, type RoomSnapshot, type Seat } from '../../net';
 import type { Body } from '../../engine';
 import { defaultConfig } from '../../tuning';
+import { track } from '../analytics';
 import type { AppContext, Mode } from '../context';
 import { button, el, shieldPointer } from '../dom';
 import type { MatchCore, MatchDriver } from '../matchCore';
@@ -167,6 +168,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
     // The server's config: tuning never changes an online match.
     cfg: () => defaultConfig,
     onTurn: () => ctx.refreshInput(),
+    onMatchOver: () => track('match-finished-online'),
     nextEnd() {
       client.sendNextEnd();
     },

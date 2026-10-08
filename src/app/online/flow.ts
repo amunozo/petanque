@@ -11,6 +11,7 @@ import { CLOSE_CODES, createNetClient, inviteLink, ROOM_PARAM, roomCodeFromSearc
 import { defaultConfig } from '../../tuning';
 import type { AppContext, Mode } from '../context';
 import type { MatchCore } from '../matchCore';
+import { track } from '../analytics';
 import type { MatchLength } from '../matchLength';
 import { noticeDialog, type LengthPoints, type Menu } from '../menu';
 import { createOnlineMatch, type OnlineMatch } from './match';
@@ -145,6 +146,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
       return;
     }
     if (stage !== 'connecting') return; // cancelled meanwhile
+    track('online-room-created');
     saveActiveRoom({ code, nickname, opponent: null });
     client.connect(code, nickname);
   }
@@ -165,9 +167,15 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     const active = loadActiveRoom();
     if (active?.code === info.code) return join(info.code, active.nickname); // our own match: rejoin
     if (info.phase !== 'lobby') return notice('full');
-    if (nickname) return join(info.code, nickname);
+    if (nickname) {
+      track('online-joined');
+      return join(info.code, nickname);
+    }
     const r = await sheet.open({ code: info.code, points: onlinePoints(info.length) });
-    if (r) join(info.code, r.nickname);
+    if (r) {
+      track('online-joined');
+      join(info.code, r.nickname);
+    }
   }
 
   async function openSheet(): Promise<void> {

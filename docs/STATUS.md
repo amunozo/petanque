@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-08 (exp-feel branch: lob/shoot rebalance for tester feedback, preview only). Read this first in a new session, together with
+Last updated: 2026-10-08 (GoatCounter analytics implemented on branch `analytics`, waiting for the owner's Data safety update). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -181,13 +181,34 @@ the entry by default) and redeploy.
   `VITE_SERVER_URL=https://petanque-server.amunozo-gamedev.workers.dev` (or
   show the entry by default), redeploy, announce to testers (Reddit + Google
   Group; draft the message).
-- **GoatCounter analytics** — owner asked; waiting for their choice: separate
-  GoatCounter site (recommended, e.g. code `amunozo-petanque`) vs the
-  existing `amunozo` site with `petanque.amunozo.com/…` path labels. Plan:
-  script + a few anonymous events (practice/vs-computer/online room/match
-  finished), privacy page update (5 languages), Data safety: App interactions
-  gets purpose Analytics and becomes required. Push only after the owner
-  updates the form.
+- **GoatCounter analytics** — IMPLEMENTED 2026-10-08 on branch `analytics`
+  (committed, NOT pushed: push only after the owner updates the Play Data safety
+  form, see below). Site code `amunozo-petanque`. `src/app/analytics.ts`
+  (config object `ANALYTICS`, pure decisions unit-tested in `analytics.test.ts`):
+  script `gc.zgo.at/count.js` loaded lazily after the first paint; one page view
+  per load with path `/` (website) or `/app` (Play TWA: referrer
+  `android-app://…`), never any URL parameters (`q` and the referrer are blanked
+  in count.js's request; room codes, `?online=1`, `?source=pwa` never leave).
+  Off in developer mode (`?dev=1`), offline, on localhost/private hosts, plain
+  http, and on `/exp/<name>/` previews and frozen `/v/<version>/` copies; a
+  blocked script just disables it. No cookies, no storage. Events (typed
+  `AnalyticsEvent`): `practice-start`, `vs-computer-start-<easy|medium|hard>`,
+  `two-players-start` (menu.onX handlers in main.ts), `online-room-created` and
+  `online-joined` (online/flow.ts; a rejoin is not a join),
+  `match-finished-<vs-computer|two-players|online>` (MatchDriver.onMatchOver,
+  fired from matchCore when a match is decided), `howto-opened` (user taps only,
+  not the first-launch offer), `pwa-update-applied` (pwa.ts apply()),
+  `language-<xx>` (langPicker, only when the language changes). Browser tests:
+  build with `ANALYTICS_TEST=1` (defines `__ANALYTICS_TEST__`, never set in the
+  deploy workflow) and open `?analytics=force` to count on localhost (dev mode
+  and offline still disable it). Privacy page updated in 5 languages (new
+  "Anonymous usage statistics" section; summary, "What we collect", "Sharing",
+  "Hosting", "Children" adjusted). **Play Data safety to change BEFORE the
+  push**: App activity > App interactions: add purpose Analytics and make it
+  required (not optional); Location > Approximate location (country derived
+  from the IP): declare collected, not shared, required, purpose Analytics
+  (recommended); Name and Device or other IDs stay optional (online only).
+  Not shared: GoatCounter is a service provider.
 - Testers: ~7+ opted in via r/petanque (as of 2026-10-08); need 12 for 14
   days.
 

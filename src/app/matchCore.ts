@@ -30,6 +30,8 @@ export interface MatchDriver {
   cfg(): GameConfig;
   /** A turn is up (after a settle, or at the start of an end / match): e.g. the computer starts thinking. */
   onTurn(): void;
+  /** The match was just decided (not when an already finished one is shown again). */
+  onMatchOver?(): void;
   /** Card buttons. */
   nextEnd(): void;
   rematch(): void;
@@ -254,6 +256,7 @@ export function createMatchCore(ctx: AppContext): MatchCore {
 
   function land(thrownId: string, bodies: readonly Body[], next: MatchState): void {
     const jackBody = bodies.find((b) => b.id === 'jack');
+    const decided = state.phase !== 'matchOver' && next.phase === 'matchOver';
     state = next;
     world = null;
     resolveFn = null;
@@ -266,6 +269,7 @@ export function createMatchCore(ctx: AppContext): MatchCore {
     }
     afterSettle(fault);
     ctx.refreshInput();
+    if (decided) driver.onMatchOver?.();
   }
 
   function onSettled(w: World): void {

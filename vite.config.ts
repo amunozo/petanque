@@ -5,6 +5,8 @@ export default defineConfig({
   base: './',
   define: {
     __BUILD_ID__: JSON.stringify(process.env['BUILD_ID'] || 'dev'),
+    // Browser tests of the analytics module build with ANALYTICS_TEST=1 (never set in the deploy workflow).
+    __ANALYTICS_TEST__: JSON.stringify(process.env['ANALYTICS_TEST'] === '1'),
   },
   build: {
     target: 'es2022',

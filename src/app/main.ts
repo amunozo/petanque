@@ -10,6 +10,7 @@ import { resolveLang, setLang, t } from '../i18n';
 import { createLoftPicker, createThrowController, type AimPreview, type ThrowIntent } from '../input';
 import { createPitchScene } from '../render';
 import { createConfigStore, createTuningPanel, defaultConfig, tuningSchema } from '../tuning';
+import { initAnalytics, track } from './analytics';
 import { resolveDevMode } from './devMode';
 import type { AppContext, Mode } from './context';
 import { createFx } from './fx';
@@ -117,14 +118,19 @@ howTo.onClose(() => {
   markHowToSeen();
   refreshInput();
 });
-const openHowTo = (): void => {
-  if (dialogOpen || howTo.isOpen()) return;
+const openHowTo = (): boolean => {
+  if (dialogOpen || howTo.isOpen()) return false;
   hud.closeSheet();
   howTo.open();
   refreshInput();
+  return true;
 };
-menu.onHowTo(openHowTo);
-hud.onHowTo(openHowTo);
+/** The player asked for it (the first-launch offer below is not counted). */
+const openHowToFromUi = (): void => {
+  if (openHowTo()) track('howto-opened');
+};
+menu.onHowTo(openHowToFromUi);
+hud.onHowTo(openHowToFromUi);
 
 const panel = createTuningPanel(store, tuningSchema, { onOpenChange: () => refreshInput() });
 const practice = createPracticeMode(ctx);
@@ -224,12 +230,18 @@ async function requestRestart(): Promise<void> {
   if (await confirmLeave(t('confirm.restart.title'), t('confirm.restart.ok'))) match.restart();
 }
 
-menu.onPractice(() => enterMode(practice));
+// Anonymous usage events (analytics.ts) fire on the menu choices only, not on the `?mode=` dev shortcuts.
+menu.onPractice(() => {
+  track('practice-start');
+  enterMode(practice);
+});
 menu.onMatch((length) => {
+  track('two-players-start');
   match.setSetup(setup2p(length));
   enterMode(match);
 });
 menu.onVsComputer((difficulty, length) => {
+  track(`vs-computer-start-${difficulty}`);
   match.setSetup(setupVsComputer(difficulty, length));
   enterMode(match);
 });
@@ -354,6 +366,7 @@ else if (startMode === 'match') {
   }
 }
 requestAnimationFrame(frame);
+initAnalytics({ devMode, search: location.search }); // after the first paint; a no-op in developer mode, offline, on localhost
 
 // Dev shortcut: `?fxdemo=carreau|hit` plays a good-shot celebration once, in front of the throwing circle (to tune sound and visuals).
 const demo = params.get('fxdemo');

@@ -119,7 +119,7 @@ Puxe para baixo para apontar e solte para lançar. Aproxime-se do bolim, lance p
 | Ads | No, the app does not contain ads (factual form, not a promise) |
 | Content rating | Category Game; "No" to violence, fear, sexuality, language, drugs, gambling, user interaction/chat, location sharing, digital purchases → expected PEGI 3 / Everyone |
 | Target audience | 13–15, 16–17, 18+ (not under 13, to stay out of the Families policy); appeals to children: No |
-| Data safety | Collects data: No. Shares data: No. (**Update when online play ships**: nickname + random device token go to the server; content rating "users interact" also changes.) |
+| Data safety | As submitted 2026-10-08: Name, Device or other IDs (online play, optional), App interactions; collected, not shared, encrypted in transit, no accounts. With anonymous analytics (GoatCounter): App interactions gets purpose Analytics and becomes required; Approximate location (country derived from IP, not stored IP) declared too. |
 | Advertising ID | No |
 | Government / financial / health / news | No / none |
 

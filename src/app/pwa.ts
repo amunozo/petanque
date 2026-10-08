@@ -7,6 +7,8 @@
  * tells it to activate and reloads the page. So nothing swaps under the player mid-throw.
  */
 
+import { track } from './analytics';
+
 export interface UpdateWatcher {
   /** Called (once per waiting version) when a new version is installed and ready. */
   onUpdate(fn: () => void): void;
@@ -73,6 +75,7 @@ export function registerServiceWorker(): UpdateWatcher {
 
   const apply = (): void => {
     if (!waiting) return;
+    track('pwa-update-applied'); // sent as a beacon, so it survives the reload that follows
     applying = true;
     waiting.postMessage({ type: 'SKIP_WAITING' });
   };

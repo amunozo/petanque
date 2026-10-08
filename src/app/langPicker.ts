@@ -1,5 +1,6 @@
 /** Language chips (EN FR ES IT PT): one segmented row, used in the start menu and the ⋯ sheet. Styles: "Language picker" in src/style.css (lg-*). */
 import { getLang, LANG_CODES, LANG_NAMES, LANGS, onLangChange, setLang, t } from '../i18n';
+import { track } from './analytics';
 import { button, el } from './dom';
 import { saveLang } from './prefs';
 
@@ -12,6 +13,7 @@ export function createLangPicker(extraClass = ''): LangPicker {
   row.setAttribute('role', 'radiogroup');
   const chips = LANGS.map((lang) => {
     const b = button('lg-chip', LANG_CODES[lang], () => {
+      if (lang !== getLang()) track(`language-${lang}`);
       saveLang(lang);
       setLang(lang);
     });
