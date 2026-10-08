@@ -165,8 +165,8 @@ to submit. To open for everyone: set repo variable VITE_SERVER_URL (or show
 the entry by default) and redeploy.
 
 ## In flight (2026-10-08, update when done)
-- **Online forfeit rule** — subagent implementing (uncommitted in the main
-  worktree until reviewed): disconnected player has **60 s**
+- **Online forfeit rule** — NOT STARTED (first subagent was lost in a session
+  restart; restart it from this spec): disconnected player has **60 s**
   (SERVER_CONFIG.reconnectGraceMs) to rejoin; the player who stays sees a
   server-driven countdown; after 60 s the stayer wins by forfeit; explicit
   Leave mid-match = immediate forfeit; both gone = no winner (idle expiry);
@@ -181,13 +181,12 @@ the entry by default) and redeploy.
   `VITE_SERVER_URL=https://petanque-server.amunozo-gamedev.workers.dev` (or
   show the entry by default), redeploy, announce to testers (Reddit + Google
   Group; draft the message).
-- **GoatCounter analytics** — owner created a SEPARATE site, code
-  `amunozo-petanque` (dashboard amunozo-petanque.goatcounter.com). Subagent
-  building it in worktree /home/user/petanque-analytics, branch `analytics`
-  (does not deploy; not pushed until the owner updates Play Data safety):
-  pageview per load + anonymous game events, privacy page update. Then:
-  give the owner the Data safety changes → owner submits → merge into the
-  main branch + push.
+- **GoatCounter analytics** — DONE on branch `analytics` (0579027, pushed as a
+  backup; that branch name does not deploy). Site code `amunozo-petanque`.
+  WAITING for the owner to update Play Data safety: App interactions + purpose
+  Analytics, now Required; add Location → Approximate location (collected,
+  not shared, required, Analytics). Then merge `analytics` into the main
+  branch and push (privacy page goes live with it).
 - Testers: ~7+ opted in via r/petanque (as of 2026-10-08); need 12 for 14
   days.
 
