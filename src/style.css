@@ -2611,3 +2611,87 @@ body.is-dialog .tn-root {
   background: var(--terracotta);
   color: #fff;
 }
+
+/* ==========================================================================
+   iOS hint (src/app/iosHintCard.ts): "Add to Home Screen" card, iPhone Safari only.
+   A small non-modal card at the bottom of the menu; the menu's buttons stay fully usable above it.
+   ========================================================================== */
+.ih-card {
+  position: absolute;
+  z-index: 2100; /* over the menu (2000), under the update toast (2200) */
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 56px); /* above the menu's "How to play" / "Privacy" row */
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 12px;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 2 * var(--edge) - var(--safe-left) - var(--safe-right)));
+  padding: 12px 40px 12px 16px;
+  border-radius: var(--r-lg);
+  background: var(--glass-strong);
+  box-shadow: var(--shadow-lg);
+  font: 600 14px/1.35 var(--font-body);
+  color: var(--ink);
+  transform: translateX(-50%);
+  touch-action: manipulation;
+  animation: ih-in var(--dur-2) var(--ease-out) both;
+}
+.ih-card[hidden] {
+  display: none;
+}
+@keyframes ih-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.ih-text {
+  margin: 0;
+  text-wrap: pretty;
+}
+/* Short phones: the menu fills the screen, so the card sits over its small links row instead of the buttons. */
+@media (max-height: 760px) {
+  .ih-card {
+    bottom: calc(var(--safe-bottom) + 10px);
+  }
+}
+.ih-glyph {
+  display: inline-block;
+  vertical-align: -5px;
+  margin: 0 2px;
+  color: var(--terracotta);
+}
+.ih-share {
+  display: block;
+}
+.ih-ok {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--terracotta);
+  color: #fff;
+  font: 800 14px var(--font-body);
+  touch-action: manipulation;
+}
+.ih-ok:active {
+  filter: brightness(0.92);
+}
+.ih-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-2);
+  touch-action: manipulation;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ih-card {
+    animation: none;
+  }
+}

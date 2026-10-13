@@ -18,6 +18,7 @@ import { replayThrowWorld, type NetClient, type NetEvents, type RoomSnapshot, ty
 import type { Body } from '../../engine';
 import { defaultConfig } from '../../tuning';
 import { track } from '../analytics';
+import { noteGameFinished } from '../iosHint';
 import type { AppContext, Mode } from '../context';
 import { button, el, shieldPointer } from '../dom';
 import type { MatchCore, MatchDriver } from '../matchCore';
@@ -198,7 +199,10 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
     // The server's config: tuning never changes an online match.
     cfg: () => defaultConfig,
     onTurn: () => ctx.refreshInput(),
-    onMatchOver: () => track('match-finished-online'),
+    onMatchOver: () => {
+      track('match-finished-online');
+      noteGameFinished();
+    },
     nextEnd() {
       client.sendNextEnd();
     },

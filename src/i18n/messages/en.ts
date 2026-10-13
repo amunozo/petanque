@@ -44,6 +44,11 @@ export const en = {
   'update.action': 'Update',
   'update.dismiss': 'Dismiss',
 
+  // ---- iPhone Safari "Add to Home Screen" hint (src/app/iosHint*.ts); {share} is the share icon ----
+  'iosHint.text': 'Play it like an app: tap {share} then “Add to Home Screen”.',
+  'iosHint.ok': 'Got it',
+  'iosHint.close': 'Close',
+
   // ---- ⋯ sheet ----
   'hud.menu.aria': 'Game menu',
   'hud.sound': 'Sound',

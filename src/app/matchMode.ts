@@ -11,6 +11,7 @@ import type { AiDecision, AiDifficulty, AiRequest } from '../games/petanque/aiTy
 import type { AimPreview, ThrowIntent } from '../input';
 import { t } from '../i18n';
 import { track } from './analytics';
+import { noteGameFinished } from './iosHint';
 import { createAiClient } from './aiClient';
 import { createAiTurn } from './aiTurn';
 import type { AppContext, Mode } from './context';
@@ -107,7 +108,10 @@ export function createMatchMode(ctx: AppContext, core: MatchCore, goMenu: () => 
       app.dataset['ai'] = 'thinking'; // also a hook for tests / styling
       ai.start();
     },
-    onMatchOver: () => track(isVs() ? 'match-finished-vs-computer' : 'match-finished-two-players'),
+    onMatchOver: () => {
+      track(isVs() ? 'match-finished-vs-computer' : 'match-finished-two-players');
+      noteGameFinished();
+    },
     nextEnd() {
       if (state().phase !== 'endOver') return;
       stopAi();

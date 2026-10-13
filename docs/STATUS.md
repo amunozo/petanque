@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-08 (GoatCounter analytics implemented on branch `analytics`, waiting for the owner's Data safety update). Read this first in a new session, together with
+Last updated: 2026-10-13 (iOS Add-to-Home-Screen hint on branch `ios-install-hint`; 2026-10-08: GoatCounter analytics implemented on branch `analytics`, waiting for the owner's Data safety update). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -89,6 +89,16 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   `src/net/invite.ts`; Cloudflare Worker + Durable Object in `server/` (see
   `server/README.md`), deployed by `.github/workflows/deploy-server.yml` once the
   `CLOUDFLARE_API_TOKEN` secret exists. `npm run typecheck` also checks `server/`.
+- iOS "Add to Home Screen" hint (branch `ios-install-hint`, not merged yet): a small dismissible card
+  at the bottom of the menu ("Play it like an app: tap [share icon] then 'Add to Home Screen'", 5 languages, Apple's
+  iOS wording; `iosHint.*` keys). Rules (`src/app/iosHint.ts`, pure `shouldShowIosHint`, unit-tested; card in
+  `iosHintCard.ts`): only real iOS Safari (iPhone/iPod/iPad, incl. iPadOS reporting a Mac UA with touch; UA must have
+  `Version/` + `Safari/` and no CriOS/FxiOS/EdgiOS/OPiOS/GSA/in-app tokens), not installed (`navigator.standalone`,
+  display-mode standalone), never Android/TWA/desktop, not before the first finished game (match over, or leaving
+  practice: `noteGameFinished()` next to the `match-finished-*` track calls and in `goMenu()`), shown at most once per
+  page load, never again after "Got it"/x (`petanque.iosHintDismissed`; storage failures fall back to memory).
+  Analytics events `ios-hint-shown` / `ios-hint-dismissed` (generic game events, privacy page unchanged; release
+  checklist re-checked: no new data). To test on desktop: iPhone Safari UA + `localStorage['petanque.gamesFinished']='1'`.
 - Research: `docs/research/competitor-reviews.md` (Bochas 3D/Giraffe, La
   Pétanque/Royer, Paradise Roll, etc.).
 

@@ -18,6 +18,8 @@ import { createHaptics } from './haptics';
 import { createHowTo } from './howto';
 import { createHud } from './hud';
 import { createInstaller } from './install';
+import { createIosHintCard } from './iosHintCard';
+import { noteGameFinished } from './iosHint';
 import { createMatchHud } from './matchHud';
 import { pointsFor } from './matchLength';
 import { createMatchCore } from './matchCore';
@@ -70,6 +72,7 @@ const hud = createHud(hudRoot, __BUILD_ID__);
 const matchHud = createMatchHud(hudRoot);
 const menu = createMenu(app, __BUILD_ID__, () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }));
 const touchHint = createTouchHint(app);
+const iosHint = createIosHintCard(app); // iPhone Safari only; shows on the menu after a finished game (iosHint.ts)
 const haptics = createHaptics(() => cfg.controls.haptics);
 const audio = createAudio();
 const loftPicker = createLoftPicker('half');
@@ -187,11 +190,13 @@ function enterMode(next: Mode): void {
   if (isOnline) panel.close();
   mode = next;
   menu.hide();
+  iosHint.hide();
   next.enter();
   refreshInput();
 }
 
 function goMenu(): void {
+  if (mode === practice) noteGameFinished(); // leaving practice counts as a finished game (matches report it themselves)
   mode?.exit();
   audio.setRolling(0);
   mode = null;
@@ -199,6 +204,7 @@ function goMenu(): void {
   scene.setCameraMode('aim');
   fx.clear();
   menu.show();
+  iosHint.menuShown();
   online?.refresh(); // is the saved online match still there?
   refreshInput();
 }
