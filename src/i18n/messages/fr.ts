@@ -38,6 +38,11 @@ export const fr: Catalogue = {
   'update.action': 'Mettre à jour',
   'update.dismiss': 'Fermer',
 
+  // ---- iPhone Safari "Add to Home Screen" hint (src/app/iosHint*.ts); {share} is the share icon ----
+  'iosHint.text': 'Jouez comme dans une appli\xa0: touchez {share} puis «\xa0Sur l’écran d’accueil\xa0».',
+  'iosHint.ok': 'Compris',
+  'iosHint.close': 'Fermer',
+
   'hud.menu.aria': 'Menu du jeu',
   'hud.sound': 'Son',
   'hud.on': 'Activé',

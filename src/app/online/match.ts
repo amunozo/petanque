@@ -18,6 +18,7 @@ import { replayThrowWorld, type NetClient, type NetEvents, type RoomSnapshot, ty
 import type { Body } from '../../engine';
 import { defaultConfig } from '../../tuning';
 import { track } from '../analytics';
+import { noteGameFinished } from '../iosHint';
 import type { AppContext, Mode } from '../context';
 import { button, el, shieldPointer } from '../dom';
 import type { MatchCore, MatchDriver } from '../matchCore';
@@ -200,7 +201,10 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
     onTurn: () => ctx.refreshInput(),
     // Back behind the circle only for this device's throws; the opponent's turn keeps the view from above.
     nextThrower: (s) => (s.phase !== 'jack' && s.phase !== 'boule' ? 'none' : s.toThrow === mine() ? 'local' : 'remote'),
-    onMatchOver: () => track('match-finished-online'),
+    onMatchOver: () => {
+      track('match-finished-online');
+      noteGameFinished();
+    },
     nextEnd() {
       client.sendNextEnd();
     },

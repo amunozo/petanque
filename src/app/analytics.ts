@@ -41,6 +41,8 @@ export type AnalyticsEvent =
   | 'online-joined'
   | `match-finished-${MatchKind}`
   | 'howto-opened'
+  | 'ios-hint-shown'
+  | 'ios-hint-dismissed'
   | 'pwa-update-applied'
   | `language-${Lang}`;
 
