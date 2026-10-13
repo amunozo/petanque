@@ -294,8 +294,10 @@ const paintTuningDot = (): void => hud.setSettingsChanged(store.diffCount() > 0)
 store.subscribe(paintTuningDot);
 paintTuningDot();
 
-// Any touch on the field while aiming brings the camera back behind the circle.
+// A touch while the settled result is still shown from above glides back behind the circle (and never throws:
+// gestures stay off until then). Any touch while aiming also makes sure the camera is behind the circle.
 canvas.addEventListener('pointerdown', () => {
+  if (mode && !ctx.uiBlocked() && mode.skipRest?.()) return;
   if (inputOpen()) scene.setCameraMode('aim');
 });
 

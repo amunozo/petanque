@@ -1568,6 +1568,38 @@ a.hud-item {
   font-weight: 600;
   color: var(--ink-2);
 }
+/* Round ▶ at the end of every mode row: says "tap me" (the row itself is the button). */
+.mn-btn-text {
+  flex: 1;
+}
+.mn-go {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--terracotta);
+  color: #fff;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.16);
+}
+.mn-go .ic {
+  margin-left: 2px; /* optical centre of the triangle */
+}
+/* "Tap a game to start", just above the rows. */
+.mn-pick {
+  align-self: center;
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+  background: rgba(38, 33, 48, 0.62);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  text-align: center;
+}
 /* "vs computer" card holds its difficulty picker. */
 .mn-vs-box {
   display: flex;
@@ -1582,6 +1614,44 @@ a.hud-item {
 }
 .mn-vs-box .mn-seg {
   margin: 0 10px 10px;
+}
+/* The highlighted default ("vs computer"): a terracotta card, white text, white ▶. */
+.mn-vs-box.mn-primary {
+  background: var(--terracotta);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.16), 0 6px 18px rgba(204, 74, 22, 0.38), var(--shadow-md);
+}
+.mn-primary .mn-btn {
+  color: #fff;
+}
+.mn-primary .mn-btn-sub {
+  color: rgba(255, 255, 255, 0.9);
+}
+.mn-primary .mn-btn-art {
+  background: rgba(255, 255, 255, 0.92);
+}
+.mn-primary .mn-go {
+  width: 40px;
+  height: 40px;
+  background: #fff;
+  color: var(--terracotta);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+  animation: mn-go-pulse 2.4s var(--ease-out) 0.8s infinite;
+}
+@keyframes mn-go-pulse {
+  0%, 70%, 100% { transform: scale(1); }
+  80% { transform: scale(1.12); }
+  90% { transform: scale(0.97); }
+}
+.mn-primary .mn-seg {
+  background: rgba(0, 0, 0, 0.16);
+}
+.mn-primary .mn-seg-btn {
+  color: rgba(255, 255, 255, 0.92);
+}
+.mn-primary .mn-seg-btn[aria-checked='true'] {
+  background: #fff;
+  color: var(--terracotta-ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 .mn-length {
   display: flex;
@@ -1731,19 +1801,24 @@ body.is-dialog .tn-root {
   .mn-btn-sub {
     font-size: 13px;
   }
+  .mn-btn {
+    gap: 11px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
 }
 
 /* Short phones: tighten the menu so all three choices fit. */
 @media (max-height: 680px) {
   .mn-root {
-    gap: 12px;
+    gap: 10px;
   }
   /* The emblem makes room for the language pill and longer translated titles. */
   .mn-logo {
     display: none;
   }
   .mn-title {
-    font-size: 50px;
+    font-size: 46px;
   }
   .mn-logo .mn-ball {
     width: 34px;
@@ -1757,12 +1832,20 @@ body.is-dialog .tn-root {
     display: none;
   }
   .mn-btn {
-    min-height: 60px;
+    min-height: 56px;
     padding-top: 7px;
     padding-bottom: 7px;
   }
   .mn-buttons {
     gap: 9px;
+  }
+  .mn-pick {
+    padding: 3px 10px;
+    font-size: 13px;
+  }
+  .mn-length {
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 }
 
@@ -1856,9 +1939,25 @@ body.is-dialog .tn-root {
 .mn-btn[hidden] {
   display: none;
 }
+/* The online row (beta / developer mode) adds a row too: drop the emblem, and on short phones the "tap a game" line. */
+@media (max-height: 900px) {
+  .mn-root.has-online .mn-logo,
+  .mn-root.has-online.has-rejoin .mn-tagline,
+  .mn-root.has-online.has-rejoin .mn-pick {
+    display: none;
+  }
+}
+@media (max-height: 680px) {
+  /* "Quick · 7 / Standard · 13" reads on its own. */
+  .mn-root.has-online .mn-pick,
+  .mn-root.has-online .mn-length-label {
+    display: none;
+  }
+}
 /* A rejoin offer adds a row: tighten the menu on short phones. */
 @media (max-height: 680px) {
   .mn-root.has-rejoin .mn-head,
+  .mn-root.has-rejoin .mn-pick,
   .mn-root.has-rejoin .mn-length-label {
     display: none;
   }
@@ -2573,7 +2672,8 @@ body.is-dialog .tn-root {
   .touch-hint-marker,
   .touch-hint-arrow,
   .mh-over.is-celebrate .mh-bunting path[fill],
-  #app[data-ai='thinking'] .mh-chip .mh-mark {
+  #app[data-ai='thinking'] .mh-chip .mh-mark,
+  .mn-primary .mn-go {
     animation: none;
   }
   .touch-hint-arrow {

@@ -54,6 +54,8 @@ export function createMatchMode(ctx: AppContext, core: MatchCore, goMenu: () => 
   const voice = () => (isVs() ? voiceVs() : voice2p());
   const isAiTurn = (): boolean => canThrow(state(), thrower()) && setup.seats[thrower()] === 'ai';
   const isHumanTurn = (): boolean => canThrow(state(), thrower()) && setup.seats[thrower()] === 'human';
+  /** A human may start a throw gesture: their turn, and the view is back behind the circle. */
+  const canAim = (): boolean => isHumanTurn() && !core.resting();
 
   // ---- the computer's turn -----------------------------------------------------
   const ai = createAiTurn({
@@ -107,6 +109,7 @@ export function createMatchMode(ctx: AppContext, core: MatchCore, goMenu: () => 
       app.dataset['ai'] = 'thinking'; // also a hook for tests / styling
       ai.start();
     },
+    nextThrower: (s) => (canThrow(s, s.toThrow) ? (setup.seats[s.toThrow] === 'ai' ? 'computer' : 'local') : 'none'),
     onMatchOver: () => track(isVs() ? 'match-finished-vs-computer' : 'match-finished-two-players'),
     nextEnd() {
       if (state().phase !== 'endOver') return;
@@ -131,18 +134,20 @@ export function createMatchMode(ctx: AppContext, core: MatchCore, goMenu: () => 
       aiClient.dispose();
       core.detach();
     },
-    canAim: isHumanTurn,
+    canAim,
+    skipRest: () => core.skipRest(),
     inProgress: () => core.inProgress(),
     onPreview(p: AimPreview | null) {
-      core.onPreview(p, isHumanTurn());
+      core.onPreview(p, canAim());
     },
     onThrow(intent: ThrowIntent) {
-      if (!isHumanTurn()) return;
+      if (!canAim()) return;
       ctx.noteThrow();
       doThrow(thrower(), intent);
     },
     frame(dtReal) {
-      ai.tick(dtReal, ctx.uiBlocked());
+      // The computer waits while the last result is shown from above, then aims from the circle like a player.
+      ai.tick(dtReal, ctx.uiBlocked() || core.resting());
       core.frame(dtReal);
     },
   };

@@ -121,13 +121,20 @@ function balls(kinds: readonly ('a' | 'b' | 'j')[]): HTMLElement {
   return art;
 }
 
+/**
+ * One mode row: the whole row is the button (art, title, subtitle and a round ▶ "play" mark at the
+ * end, so it reads as something to tap, not as a label).
+ */
 function choice(cls: string, art: readonly ('a' | 'b' | 'j')[]): { btn: HTMLButtonElement; title: HTMLElement; sub: HTMLElement } {
   const btn = button(`mn-btn ${cls}`, '');
   const titleEl = el('span', 'mn-btn-title');
   const subEl = el('span', 'mn-btn-sub');
   const text = el('span', 'mn-btn-text');
   text.append(titleEl, subEl);
-  btn.append(balls(art), text);
+  const go = el('span', 'mn-go');
+  go.setAttribute('aria-hidden', 'true');
+  go.insertAdjacentHTML('afterbegin', icon('play', 18));
+  btn.append(balls(art), text, go);
   return { btn, title: titleEl, sub: subEl };
 }
 
@@ -148,7 +155,8 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   const match = choice('mn-match', ['a', 'b']);
   const vs = choice('mn-vs', ['a', 'b']);
   const level = difficultyPicker();
-  const vsBox = el('div', 'mn-vs-box');
+  // The highlighted default: one tap on the row starts a match against the computer at the level picked below it.
+  const vsBox = el('div', 'mn-vs-box mn-primary');
   vsBox.append(vs.btn, level.element);
   const paintMatchInfo = (): void => {
     match.sub.textContent = matchInfoText(points()[length.get()]);
@@ -164,8 +172,10 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
     rejoin.title.textContent = t('menu.rejoin.title');
     rejoin.sub.textContent = rejoinOffer.opponent ? t('menu.rejoin.sub', { name: rejoinOffer.opponent }) : t('menu.rejoin.lobby', { code: rejoinOffer.code });
   };
+  // "Tap a game to start": first-time players must see at once that the rows below are buttons.
+  const pick = el('div', 'mn-pick');
   const buttons = el('div', 'mn-buttons');
-  buttons.append(rejoin.btn, practice.btn, vsBox, match.btn, online.btn, length.element);
+  buttons.append(pick, rejoin.btn, vsBox, match.btn, practice.btn, online.btn, length.element);
 
   const muteBtn = el('button', 'mn-mute');
   muteBtn.type = 'button';
@@ -192,6 +202,7 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   const relabel = (): void => {
     root.setAttribute('aria-label', t('menu.aria'));
     tagline.textContent = t('menu.tagline');
+    pick.textContent = t('menu.pick');
     practice.title.textContent = t('menu.practice.title');
     practice.sub.textContent = t('menu.practice.sub');
     vs.title.textContent = t('menu.vs.title');
@@ -267,6 +278,7 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
     },
     setOnlineAvailable(available) {
       online.btn.hidden = !available;
+      root.classList.toggle('has-online', available); // one more row: the head tightens on shorter phones
     },
     onOnline(fn) {
       onlineFn = fn;

@@ -4,6 +4,7 @@ import type { Catalogue } from '../types';
 export const pt: Catalogue = {
   'menu.aria': 'Menu principal',
   'menu.tagline': 'Petanca na praça da vila',
+  'menu.pick': 'Toque num modo de jogo para começar',
   'menu.practice.title': 'Treino',
   'menu.practice.sub': 'Lance ao bolim, sozinho',
   'menu.vs.title': '1 jogador contra o computador',

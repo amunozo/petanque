@@ -102,6 +102,13 @@ export interface GameConfig {
     closeUpBack: number;
     /** The close-up backs off by up to this factor to keep the jack and the nearest boule in view. */
     closeUpMaxZoomOut: number;
+    /**
+     * After a throw settles the close-up stays this long (s) before the view glides back behind the
+     * circle for the next throw from this device (a touch skips it; measuring lines extend it).
+     */
+    restDwellS: number;
+    /** Glide back behind the circle on its own after `restDwellS`; off = stay on the close-up until the field is touched. */
+    autoReturnToAim: boolean;
   };
   practice: {
     jackMinDist: number;
@@ -240,6 +247,8 @@ export const defaultConfig: GameConfig = {
     closeUpHeight: 1.5,
     closeUpBack: 1.2,
     closeUpMaxZoomOut: 5,
+    restDwellS: 2,
+    autoReturnToAim: true,
   },
   practice: { jackMinDist: 6, jackMaxDist: 10, boulesPerEnd: 3 },
   look: {
@@ -371,6 +380,8 @@ export const tuningSchema: TuningFolder[] = [
       { path: 'camera.closeUpHeight', label: 'close-up height', min: 0.4, max: 4, step: 0.05 },
       { path: 'camera.closeUpBack', label: 'close-up back', min: 0.3, max: 4, step: 0.05 },
       { path: 'camera.closeUpMaxZoomOut', label: 'close-up max zoom-out', min: 1, max: 6, step: 0.1 },
+      { path: 'camera.restDwellS', label: 'result dwell s', min: 0, max: 6, step: 0.1 },
+      { path: 'camera.autoReturnToAim', label: 'auto return to aim', toggle: true },
     ],
   },
   {

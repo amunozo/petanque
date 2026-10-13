@@ -19,11 +19,14 @@ import { createAimPreviewer } from './aimPreview';
 import type { AppContext, Mode } from './context';
 import { formatDistance, type DistanceRow } from './hud';
 import { createPlayback } from './playback';
+import { createRestDwell, markDwell } from './restDwell';
 
 export function createPracticeMode(ctx: AppContext): Mode {
   const { cfg, scene, hud, app } = ctx;
   const playback = createPlayback(ctx);
   const preview = createAimPreviewer(ctx);
+  /** After each boule: read the result from above, then back behind the circle for the next one (restDwell.ts). */
+  const dwell = createRestDwell(() => ({ dwellS: cfg.camera.restDwellS, auto: cfg.camera.autoReturnToAim }), markDwell(app));
 
   let state: PracticeState = createPractice(1, cfg);
   let world: World | null = null;
@@ -63,7 +66,16 @@ export function createPracticeMode(ctx: AppContext): Mode {
     }
   }
 
+  const canAim = (): boolean => state.phase === 'aiming' && !dwell.active();
+
+  function backToAim(): void {
+    dwell.clear();
+    scene.setCameraMode('aim');
+    ctx.refreshInput();
+  }
+
   function resetView(): void {
+    dwell.clear();
     hud.setDistances(null);
     hud.setPower(null);
     hud.showEndCard(null);
@@ -87,6 +99,7 @@ export function createPracticeMode(ctx: AppContext): Mode {
     world = null;
     playback.reset();
     scene.setCameraMode('rest');
+    if (state.phase === 'aiming') dwell.start(); // the end card (end over) waits for "New end" instead
     app.classList.toggle('is-endover', state.phase === 'endOver');
     showResult();
     updateStatus();
@@ -122,13 +135,18 @@ export function createPracticeMode(ctx: AppContext): Mode {
       resetView();
       hud.setStatus('');
     },
-    canAim: () => state.phase === 'aiming',
+    canAim,
+    skipRest() {
+      if (!dwell.active()) return false;
+      backToAim();
+      return true;
+    },
     inProgress: () => false,
     onPreview(p: AimPreview | null) {
-      preview.update(p, state.phase === 'aiming' ? 'boule' : null);
+      preview.update(p, canAim() ? 'boule' : null);
     },
     onThrow(intent: ThrowIntent) {
-      if (state.phase !== 'aiming') return;
+      if (!canAim()) return;
       ctx.noteThrow();
       const r = beginThrow(state, intent, cfg);
       state = r.state;
@@ -144,6 +162,7 @@ export function createPracticeMode(ctx: AppContext): Mode {
     },
     frame(dtReal) {
       if (world && state.phase === 'inFlight' && playback.advance(world, dtReal)) settle(world);
+      else if (dwell.tick(dtReal)) backToAim();
       scene.syncBodies(world ? world.bodies : state.bodies, lastThrowId());
     },
   };

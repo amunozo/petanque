@@ -198,6 +198,8 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
     // The server's config: tuning never changes an online match.
     cfg: () => defaultConfig,
     onTurn: () => ctx.refreshInput(),
+    // Back behind the circle only for this device's throws; the opponent's turn keeps the view from above.
+    nextThrower: (s) => (s.phase !== 'jack' && s.phase !== 'boule' ? 'none' : s.toThrow === mine() ? 'local' : 'remote'),
     onMatchOver: () => track('match-finished-online'),
     nextEnd() {
       client.sendNextEnd();
@@ -243,6 +245,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
 
   const canAim = (): boolean =>
     active &&
+    !core.resting() &&
     canAimOnline({
       status: client.status,
       seat: client.seat,
@@ -286,6 +289,7 @@ export function createOnlineMatch(ctx: AppContext, core: MatchCore, client: NetC
       core.detach();
     },
     canAim,
+    skipRest: () => core.skipRest(),
     inProgress: () => client.room?.phase === 'playing' && !opponentLeft(),
     leaveText: () => t('confirm.online.text', { name: opponentName() }),
     leave: () => hooks.leave(),

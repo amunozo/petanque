@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-08 (GoatCounter analytics implemented on branch `analytics`, waiting for the owner's Data safety update). Read this first in a new session, together with
+Last updated: 2026-10-13 (first-play fixes from an iPhone web player on branch `exp-first-play`: tappable menu + camera returns behind the circle after each throw). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -260,6 +260,33 @@ Bump `appVersionCode` to 2 in android/twa-manifest.json when rebuilding.
   samples (was 25 %). Self-play (20 matches/pairing): hard > medium > easy
   still 20/20, 19/20, 20/20. `PROTOCOL_VERSION` → 2. Owner to try on the
   preview before it goes to main.
+
+- 2026-10-13 (source: iPhone web player, otherwise loves the game), branch
+  `exp-first-play` (preview https://petanque.amunozo.com/exp/exp-first-play/ once pushed):
+  1. "Couldn't figure out how to start the game at first (hit the boule next
+     to 1 player)." → Menu rows now read as buttons: every mode row (the whole
+     row is the tap target) ends in a round ▶; "1 player vs computer" is the
+     highlighted default (terracotta card with a white ▶ that pulses gently,
+     off with reduced motion; its Easy/Medium/Hard picker sits inside it) and
+     comes first, then 2 players, Practice, online; a "Tap a game to start"
+     line (`menu.pick`, 5 languages) sits above the rows. Fits 375×667 and
+     390×844 without scrolling in all 5 languages; when the online row is
+     shown (`.mn-root.has-online`) the emblem hides below 900 px tall, and
+     below 680 px the "tap a game" line and the length label hide too.
+  2. "After each toss I wish the camera came back to the view of standing in
+     the circle… wasted a few shots… the camera stays overhead." → After a
+     throw settles the close-up stays `camera.restDwellS` (2 s; measuring
+     lines extend it), then glides back behind the circle on its own
+     (`camera.autoReturnToAim`, on; off = wait for a touch) whenever the next
+     throw is made on this device: a local player, the computer (it waits,
+     then aims and throws from the circle like a player), online only this
+     device's turn (the opponent's turn keeps the view from above). End /
+     match cards keep the close-up until dismissed (as before). No throw can
+     start from above: gestures stay off during the dwell and a touch on the
+     field just skips to the aim view (that touch never throws). Same in
+     practice. Pure helper `src/app/restDwell.ts` (+ tests); `#app[data-dwell]`
+     marks the dwell. Suggested picture-in-picture minimap (top-right,
+     distances to the jack) NOT built: noted as a follow-up.
 
 ## Next steps for Claude
 1. ~~Domain switch~~ — done 2026-10-06: site, manifest and

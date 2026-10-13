@@ -46,6 +46,11 @@ export interface Mode {
   leaveText?(): string;
   /** Leaving for the menu was confirmed (online: tell the server). */
   leave?(): void;
+  /**
+   * A touch on the field while the settled result is still shown (the close-up dwell, see
+   * restDwell.ts): glide back behind the circle now. True when it did (that touch never throws).
+   */
+  skipRest?(): boolean;
   onPreview(p: AimPreview | null): void;
   onThrow(intent: ThrowIntent): void;
   /** Once per animation frame: advance the simulation and sync the view's bodies. */

@@ -4,6 +4,7 @@ import type { Catalogue } from '../types';
 export const it: Catalogue = {
   'menu.aria': 'Menu principale',
   'menu.tagline': 'Bocce nella piazza del paese',
+  'menu.pick': 'Tocca una modalità per iniziare',
   'menu.practice.title': 'Allenamento',
   'menu.practice.sub': 'Lancia verso il pallino, da solo',
   'menu.vs.title': '1 giocatore contro il computer',

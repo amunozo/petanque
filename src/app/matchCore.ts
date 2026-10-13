@@ -20,6 +20,7 @@ import type { TurnData } from './matchHud';
 import { celebrates, endCardView, jackFault, matchOverDetail, matchOverTitle, scoreLine, settleMessage, turnView, voice2p, type JackFault, type Voice } from './matchText';
 import { formatMeasure, isTight, measureTargets } from './measureLines';
 import { createPlayback } from './playback';
+import { createRestDwell, markDwell, returnsToAim, type NextThrower } from './restDwell';
 import { playShotEffects } from './shotEffects';
 
 /** What a kind of match plugs into the core. */
@@ -30,6 +31,8 @@ export interface MatchDriver {
   cfg(): GameConfig;
   /** A turn is up (after a settle, or at the start of an end / match): e.g. the computer starts thinking. */
   onTurn(): void;
+  /** Who throws next in `state` (after a settle): the view glides back behind the circle for a throw made on this device. */
+  nextThrower(state: MatchState): NextThrower;
   /** The match was just decided (not when an already finished one is shown again). */
   onMatchOver?(): void;
   /** Card buttons. */
@@ -60,6 +63,10 @@ export interface MatchCore {
   land(thrownId: string, bodies: readonly Body[], next: MatchState): void;
   /** A throw is in flight, or the end's result is still being presented (cards not up yet / up only briefly). */
   busy(): boolean;
+  /** The settled result is still shown from above (restDwell.ts): no throw may start yet, the computer waits too. */
+  resting(): boolean;
+  /** A touch during that dwell: glide back to the aim view now. True when there was a dwell to skip. */
+  skipRest(): boolean;
   /** Replaces the turn line's text (e.g. "Computer plays"). */
   setChip(text: string): void;
   /** Puts the turn line back to the state's own wording (undoes setChip). */
@@ -86,6 +93,7 @@ const IDLE: MatchDriver = {
     throw new Error('match core: no driver attached');
   },
   onTurn: () => undefined,
+  nextThrower: () => 'none',
   nextEnd: () => undefined,
   rematch: () => undefined,
   menu: () => undefined,
@@ -97,6 +105,8 @@ export function createMatchCore(ctx: AppContext): MatchCore {
   const cfg = (): GameConfig => (driver === IDLE ? ctx.cfg : driver.cfg());
   const playback = createPlayback(ctx, cfg);
   const preview = createAimPreviewer(ctx, cfg);
+  // The camera is view-only, so its live tuning applies online too (cfg() is the server's defaults there).
+  const dwell = createRestDwell(() => ({ dwellS: ctx.cfg.camera.restDwellS, auto: ctx.cfg.camera.autoReturnToAim }), markDwell(app));
 
   let state: MatchState = createMatch(1, ctx.cfg);
   let world: World | null = null;
@@ -226,10 +236,22 @@ export function createMatchCore(ctx: AppContext): MatchCore {
     const nearest = distances(state)[0];
     const nb = nearest ? state.bodies.find((b) => b.id === nearest.id) : undefined;
     scene.setResultLine(jack && nb ? jack.pos : null, jack && nb ? nb.pos : null);
-    // A photo finish in the middle of an end is measured too.
-    if (isTight(measureTargets(state, effectsConfig.measure.maxMeasured), effectsConfig.measure.tightGap)) scheduleMeasure(effectsConfig.measure.startMs);
+    // A photo finish in the middle of an end is measured too (and the close-up waits for its lines).
+    const m = effectsConfig.measure;
+    const tight = isTight(measureTargets(state, m.maxMeasured), m.tightGap);
+    if (tight) scheduleMeasure(m.startMs);
+    // Read the result from above, then glide back behind the circle if the next throw is made here.
+    if (returnsToAim(driver.nextThrower(state))) dwell.start(tight ? (m.startMs + m.drawMs + m.holdMs) / 1000 : 0);
     announceTurn();
     driver.onTurn();
+  }
+
+  /** The dwell is over (or skipped): back behind the circle, ready to aim. */
+  function backToAim(): void {
+    dwell.clear();
+    clearMeasure(); // the labels belong to the view from above
+    scene.setCameraMode('aim');
+    ctx.refreshInput();
   }
 
   /** Celebrates a good shot (sound, haptics, dust, a nudge of the view); a carreau is the big one. No words. */
@@ -245,6 +267,7 @@ export function createMatchCore(ctx: AppContext): MatchCore {
 
   /** The view as a throw starts (or lands without animation). */
   function clearThrowView(): void {
+    dwell.clear();
     clearMeasure();
     ghostJack = null;
     playback.reset();
@@ -336,6 +359,7 @@ export function createMatchCore(ctx: AppContext): MatchCore {
       matchHud.show();
     },
     detach() {
+      dwell.clear();
       clearCards();
       world = null;
       resolveFn = null;
@@ -368,6 +392,12 @@ export function createMatchCore(ctx: AppContext): MatchCore {
       land(thrownId, bodies, next);
     },
     busy: () => world !== null || cardTimer !== undefined || (cardsUp && performance.now() - cardsAt < MIN_CARD_MS),
+    resting: () => dwell.active(),
+    skipRest() {
+      if (!dwell.active()) return false;
+      backToAim();
+      return true;
+    },
     setChip(text) {
       if (!lastTurn) return;
       lastTurn = { ...lastTurn, chip: text };
@@ -383,6 +413,7 @@ export function createMatchCore(ctx: AppContext): MatchCore {
     inProgress: () => state.phase !== 'matchOver' && (state.endNumber > 1 || state.throws.length > 0 || state.score.A + state.score.B > 0),
     frame(dtReal) {
       if (world && state.phase === 'inFlight' && playback.advance(world, dtReal)) onSettled(world);
+      else if (dwell.tick(dtReal)) backToAim();
       const bodies = world ? world.bodies : ghostJack ? [...state.bodies, ghostJack] : state.bodies;
       scene.syncBodies(bodies, lastThrow()?.id ?? null, teamOf);
     },
