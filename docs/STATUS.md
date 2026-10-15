@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-13 (branch `exp-first-play`: tappable menu, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint; preview at /exp/exp-first-play/). Read this first in a new session, together with
+Last updated: 2026-10-15 (LIVE: tappable menu with vs computer first, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
