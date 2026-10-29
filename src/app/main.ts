@@ -47,12 +47,13 @@ const byId = <T extends HTMLElement>(id: string): T => {
   return el as T;
 };
 
-// Language first: every screen below is built in it. `?lang=fr` (dev, screenshots) beats the saved choice, which beats the browser's.
-const params = new URLSearchParams(location.search);
-setLang(resolveLang({ param: params.get('lang'), saved: loadLang(), preferred: navigator.languages }));
-
 // A game portal (or another site) iframes the game: no install flows, no invite links, no service worker (portal.ts).
 const portal = currentPortal();
+
+// Language first: every screen below is built in it. `?lang=fr` (dev, screenshots) beats the saved choice, which beats the browser's.
+// Portals require English by default, so there the browser's language is ignored (the player's own pick is still kept).
+const params = new URLSearchParams(location.search);
+setLang(resolveLang({ param: params.get('lang'), saved: loadLang(), preferred: portal !== null ? null : navigator.languages }));
 
 // Listen for the browser's install offer right away: the event can fire before the rest has loaded.
 const installer = createInstaller();
