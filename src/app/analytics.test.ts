@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isLocalHost, isPreviewPath, pageviewPath, shouldEnable, track, type EnableInput } from './analytics';
+import { ANALYTICS, blankReferrer, isLocalHost, isPreviewPath, pageviewPath, shouldEnable, track, type EnableInput } from './analytics';
+import { PORTALS, type Portal } from './portal';
+
+const PLAY_REFERRER = 'android-app://com.amunozo.petanque';
+/** Every portal mode, from the closed list plus the unknown-site one. */
+const PORTAL_MODES: readonly Portal[] = [...PORTALS, 'embed'];
 
 const live: EnableInput = {
   devMode: false,
@@ -19,6 +24,31 @@ describe('pageviewPath', () => {
   it('counts the Play app (Trusted Web Activity, referrer android-app://) as "/app"', () => {
     expect(pageviewPath('android-app://com.amunozo.petanque')).toBe('/app');
     expect(pageviewPath('android-app://com.amunozo.petanque/')).toBe('/app');
+  });
+  it('counts a page view per portal when the game runs inside one, whatever the referrer says', () => {
+    for (const portal of PORTAL_MODES) {
+      expect(pageviewPath('', portal)).toBe(ANALYTICS.portalPath + portal);
+      expect(pageviewPath('https://www.crazygames.com/game/petanque', portal)).toBe(ANALYTICS.portalPath + portal);
+      expect(pageviewPath(PLAY_REFERRER, portal)).toBe(ANALYTICS.portalPath + portal);
+    }
+    expect(pageviewPath('', 'crazygames')).toBe('/portal/crazygames');
+    expect(pageviewPath('', 'embed')).toBe('/portal/embed');
+  });
+  it('keeps the website and Play app paths when there is no portal (null or omitted)', () => {
+    expect(pageviewPath('', null)).toBe('/');
+    expect(pageviewPath('https://example.com/page', null)).toBe('/');
+    expect(pageviewPath(PLAY_REFERRER, null)).toBe('/app');
+  });
+});
+
+describe('blankReferrer', () => {
+  it('never sends the referrer for events, portal or not (unchanged)', () => {
+    expect(blankReferrer(true, null)).toBe(true);
+    for (const portal of PORTAL_MODES) expect(blankReferrer(true, portal)).toBe(true);
+  });
+  it('blanks the page view referrer only in portal mode (the path already says which portal)', () => {
+    expect(blankReferrer(false, null)).toBe(false);
+    for (const portal of PORTAL_MODES) expect(blankReferrer(false, portal)).toBe(true);
   });
 });
 

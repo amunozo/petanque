@@ -11,6 +11,7 @@
  */
 import type { AiDifficulty } from '../games/petanque/aiTypes';
 import type { Lang } from '../i18n';
+import type { Portal } from './portal';
 
 /** All settings in one place. */
 export const ANALYTICS = {
@@ -22,6 +23,8 @@ export const ANALYTICS = {
   /** The page view's path for the website / for the Android app (Trusted Web Activity). */
   webPath: '/',
   appPath: '/app',
+  /** Prefix of the page view's path inside a game portal: `/portal/<name>`, `/portal/embed` (see portal.ts). */
+  portalPath: '/portal/',
   /** Count `/exp/<name>/` previews and frozen `/v/<version>/` copies? No: only the live site and the Play app. */
   countPreviews: false,
   /** Events fired before the script is ready wait here (extra ones are dropped). */
@@ -54,12 +57,24 @@ export function isLocalHost(hostname: string): boolean {
   return /(^|\.)localhost$|\.local$|^127\.|^10\.|^172\.(1[6-9]|2\d|3[01])\.|^192\.168\.|^0\.0\.0\.0$|^::1?$/.test(h);
 }
 
-/** Path counted for this page load, whatever the URL says (`?online=1`, `?room=ABCDE`, `?source=pwa`, `?dev=1` never matter). */
-export function pageviewPath(referrer: string): string {
+/**
+ * Path counted for this page load, whatever the URL says (`?online=1`, `?room=ABCDE`, `?source=pwa`, `?dev=1` never
+ * matter). A portal gets the same path in every referrer situation: a page view per portal says where the players come from.
+ */
+export function pageviewPath(referrer: string, portal: Portal | null = null): string {
+  if (portal !== null) return ANALYTICS.portalPath + portal;
   // The Play app opens the site as a Trusted Web Activity, and Chrome then reports `android-app://<package>` as the referrer
   // (the app already relies on this to hide its "Install app" link). Display-mode checks would also match
   // browser-installed PWAs, and `?source=pwa` is the manifest's start_url for those, so neither says "Play app".
   return referrer.startsWith('android-app://') ? ANALYTICS.appPath : ANALYTICS.webPath;
+}
+
+/**
+ * Drop the referrer from this request? Events never send it (invite links carry room codes). In portal mode the page
+ * view drops it too: its path already says which portal, and the privacy page promises only a path/title.
+ */
+export function blankReferrer(isEvent: boolean, portal: Portal | null): boolean {
+  return isEvent || portal !== null;
 }
 
 /** A preview (`…/exp/<name>/`) or a frozen version (`…/v/<version>/`) of the site. */
@@ -126,6 +141,7 @@ function load(): void {
     no_onload: true, // we send the page view ourselves, with a clean path
     no_events: true,
     allow_local: forceLocal,
+    allow_frame: true, // portals iframe the game; count.js would otherwise refuse to count in a frame
   };
   (window as GcWindow).goatcounter = gc;
   const s = document.createElement('script');
@@ -139,9 +155,9 @@ function load(): void {
       if (!real || typeof real.count !== 'function') return turnOff();
       // count.js adds the page's query string and the referrer to every request: send neither (invite links carry room codes).
       const getData = real.get_data?.bind(real);
-      if (getData) real.get_data = (v) => ({ ...getData(v), q: '', ...(isEvent(v) ? { r: '' } : {}) });
+      if (getData) real.get_data = (v) => ({ ...getData(v), q: '', ...(blankReferrer(isEvent(v), pagePortal) ? { r: '' } : {}) });
       state = 'ready';
-      send(pageviewPath(document.referrer), document.title, false);
+      send(pageviewPath(document.referrer, pagePortal), document.title, false);
       for (const name of queue.splice(0)) send(name, name, true);
     } catch {
       turnOff();
@@ -153,11 +169,14 @@ function load(): void {
 const isEvent = (v: unknown): boolean => typeof v === 'object' && v !== null && (v as { event?: unknown }).event === true;
 
 let forceLocal = false;
+/** The page load's portal (portal.ts), for the page view path and its referrer. */
+let pagePortal: Portal | null = null;
 
 /** Starts analytics once per page load (call after the first frame is on screen). Safe to call in any environment. */
-export function initAnalytics(o: { devMode: boolean; search: string }): void {
+export function initAnalytics(o: { devMode: boolean; search: string; portal: Portal | null }): void {
   try {
     if (state !== 'idle') return;
+    pagePortal = o.portal;
     // Test builds only (ANALYTICS_TEST=1 at build time): `?analytics=force` also counts on localhost. A normal build never reads it.
     forceLocal = __ANALYTICS_TEST__ && new URLSearchParams(o.search).get('analytics') === 'force';
     const on = shouldEnable({

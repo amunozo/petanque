@@ -10,6 +10,22 @@ export const ONLINE_PARAM = 'online';
 export const inviteLink = (code: string, base: string = INVITE_BASE_URL, onlineBeta = false): string =>
   `${base}?${ROOM_PARAM}=${encodeURIComponent(code)}${onlineBeta ? `&${ONLINE_PARAM}=1` : ''}`;
 
+/** What the share sheet gets for a room: a sentence, and the invite link when there is one. */
+export interface ShareContent {
+  text: string;
+  url?: string;
+}
+
+/**
+ * Share sheet payload for a room. `base === null` means no link at all (portals forbid links off their site), so
+ * the player shares the room code alone. Callers pass the translated sentence as `text` (this file stays free of
+ * i18n); the bare code is only a fallback for a caller that has none.
+ */
+export function shareContent(code: string, base: string | null, onlineBeta = false, text?: string): ShareContent {
+  const body = text ?? code;
+  return base === null ? { text: body } : { text: body, url: inviteLink(code, base, onlineBeta) };
+}
+
 /** Room code from a query string such as `location.search` ("?room=ab2cd"), or null. */
 export function roomCodeFromSearch(search: string): string | null {
   const m = /[?&]room=([^&#]*)/.exec(search);

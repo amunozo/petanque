@@ -39,6 +39,7 @@ const base: IosHintInput = {
   finishedGame: true,
   dismissed: false,
   shownThisLoad: false,
+  portal: false,
 };
 const show = (o: Partial<IosHintInput> = {}): boolean => shouldShowIosHint({ ...base, ...o });
 
@@ -86,6 +87,25 @@ describe('shouldShowIosHint: state', () => {
   it('not before the first finished game', () => expect(show({ finishedGame: false })).toBe(false));
   it('not once dismissed', () => expect(show({ dismissed: true })).toBe(false));
   it('not twice in one page load', () => expect(show({ shownThisLoad: true })).toBe(false));
+});
+
+describe('shouldShowIosHint: never inside a portal iframe', () => {
+  it('never shows in portal mode, even with every other condition saying show', () => {
+    expect(
+      show({
+        portal: true,
+        userAgent: IPHONE_SAFARI,
+        platform: 'iPhone',
+        maxTouchPoints: 5,
+        navigatorStandalone: false,
+        displayModeStandalone: false,
+        finishedGame: true,
+        dismissed: false,
+        shownThisLoad: false,
+      }),
+    ).toBe(false);
+  });
+  it('still shows on the site itself (portal: false)', () => expect(show({ portal: false })).toBe(true));
 });
 
 describe('stored state', () => {

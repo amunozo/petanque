@@ -23,7 +23,9 @@ const RECHECK_MS = 60 * 60 * 1000;
 
 const NOOP: UpdateWatcher = { onUpdate: () => undefined, apply: () => undefined, applyOrCheck: () => location.reload() };
 
-export function registerServiceWorker(): UpdateWatcher {
+export function registerServiceWorker(skip = false): UpdateWatcher {
+  // Portal mode: no offline copy inside a portal's iframe, so every load gets the latest build (the same one the server expects).
+  if (skip) return NOOP;
   // Not in dev: the worker would cache stale modules and fight Vite's HMR.
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return NOOP;
 

@@ -28,6 +28,7 @@ import { createMeasureOverlay } from './measure';
 import { confirmDialog, createMenu } from './menu';
 import { hasSeenHowTo, isDifficulty, loadDifficulty, loadLang, loadMatchLength, markHowToSeen } from './prefs';
 import { createPracticeMode } from './practiceMode';
+import { currentPortal } from './portal';
 import { registerServiceWorker } from './pwa';
 import { createTouchHint } from './touchHint';
 import { playShotEffects } from './shotEffects';
@@ -49,6 +50,9 @@ const byId = <T extends HTMLElement>(id: string): T => {
 // Language first: every screen below is built in it. `?lang=fr` (dev, screenshots) beats the saved choice, which beats the browser's.
 const params = new URLSearchParams(location.search);
 setLang(resolveLang({ param: params.get('lang'), saved: loadLang(), preferred: navigator.languages }));
+
+// A game portal (or another site) iframes the game: no install flows, no invite links, no service worker (portal.ts).
+const portal = currentPortal();
 
 // Listen for the browser's install offer right away: the event can fire before the rest has loaded.
 const installer = createInstaller();
@@ -143,7 +147,7 @@ const match = createMatchMode(ctx, core, () => goMenu());
 // or when the hidden beta switch (`?online=1`, remembered) is on; the switch never enables developer mode.
 const onlineBeta = resolveOnlineBeta(params);
 const serverUrl = resolveServer(params, devMode, onlineBeta, configuredServerUrl(), defaultServerUrl());
-const updates = registerServiceWorker();
+const updates = registerServiceWorker(portal !== null);
 const online: OnlineFlow | null = serverUrl
   ? createOnlineFlow({
       ctx,
@@ -151,7 +155,7 @@ const online: OnlineFlow | null = serverUrl
       menu,
       points: () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }),
       serverUrl,
-      inviteBase: devMode ? `${location.origin}${location.pathname}` : INVITE_BASE_URL,
+      inviteBase: portal !== null ? null : devMode ? `${location.origin}${location.pathname}` : INVITE_BASE_URL,
       inviteOnline: onlineBeta,
       enterMode: (m) => enterMode(m),
       goMenu: () => goMenu(),
@@ -255,7 +259,7 @@ menu.onVsComputer((difficulty, length) => {
 
 // ---- PWA: "Install app" (menu + ⋯ sheet) and the "new version" toast ----------------------
 const paintInstall = (): void => {
-  const available = installer.canInstall();
+  const available = portal === null && installer.canInstall(); // portals have no install flow of their own
   menu.setInstallable(available);
   hud.setInstallable(available);
 };
@@ -375,7 +379,7 @@ else if (startMode === 'match') {
   }
 }
 requestAnimationFrame(frame);
-initAnalytics({ devMode, search: location.search }); // after the first paint; a no-op in developer mode, offline, on localhost
+initAnalytics({ devMode, search: location.search, portal }); // after the first paint; a no-op in developer mode, offline, on localhost
 
 // Dev shortcut: `?fxdemo=carreau|hit` plays a good-shot celebration once, in front of the throwing circle (to tune sound and visuals).
 const demo = params.get('fxdemo');

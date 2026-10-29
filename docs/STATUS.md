@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-15 (LIVE: tappable menu with vs computer first, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint). Read this first in a new session, together with
+Last updated: 2026-10-29 (portal mode on `exp-portal`, not live; LIVE: tappable menu with vs computer first, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -101,6 +101,16 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   checklist re-checked: no new data). To test on desktop: iPhone Safari UA + `localStorage['petanque.gamesFinished']='1'`.
 - Research: `docs/research/competitor-reviews.md` (Bochas 3D/Giraffe, La
   Pétanque/Royer, Paradise Roll, etc.).
+- **Portal mode** — branch `exp-portal` (preview `/exp/exp-portal/`), 2026-10-29, NOT on main yet; waiting for the
+  owner's check. Portals iframe the LIVE site (`https://petanque.amunozo.com/?portal=<name>`) instead of hosting a
+  copy, so every deploy updates them and online play never has version drift (server needs no origin change: the
+  frame's origin is our domain). `src/app/portal.ts`: `?portal=` from a closed list (`crazygames`,
+  `gamedistribution`, `kongregate`, `itch`), anything else or framed without it = `embed`. In portal mode: GoatCounter
+  `allow_frame: true` (count.js refuses frames otherwise), page view path `/portal/<name>` with the referrer blanked;
+  no Install app, no iPhone hint, no service worker, invites share the room code without a link. Privacy page (5
+  languages, effective 2026-10-29) mentions portals; Release checklist: no new data, Play declarations unchanged.
+  Plan, portal rules and sources: `docs/web-portals.md`. Owner test page: a local HTML file that iframes the preview.
+  Next: owner desktop check (mouse, wide screen, load ≤ 20 s) → merge → submit to CrazyGames (basic launch, by URL).
 
 ## Decisions taken
 - Release first on Google Play as a **TWA** (Bubblewrap) wrapping the website;

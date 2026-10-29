@@ -7,7 +7,7 @@
  */
 import { pointsFor } from '../../games/petanque';
 import { t, type MessageKey } from '../../i18n';
-import { CLOSE_CODES, createNetClient, inviteLink, ROOM_PARAM, roomCodeFromSearch, type ErrorCode, type RoomSnapshot } from '../../net';
+import { CLOSE_CODES, createNetClient, ROOM_PARAM, roomCodeFromSearch, shareContent, type ErrorCode, type RoomSnapshot } from '../../net';
 import { defaultConfig } from '../../tuning';
 import type { AppContext, Mode } from '../context';
 import type { MatchCore } from '../matchCore';
@@ -25,8 +25,8 @@ export interface OnlineFlowDeps {
   menu: Menu;
   points: LengthPoints;
   serverUrl: string;
-  /** Invite links point at the live site, or (developer mode) at this page. */
-  inviteBase: string;
+  /** Invite links point at the live site, or (developer mode) at this page; null inside a portal (it forbids links off its site). */
+  inviteBase: string | null;
   /** The online beta switch is on here: invite links carry `online=1` so the friend gets the online UI too. */
   inviteOnline: boolean;
   enterMode(mode: Mode): void;
@@ -228,18 +228,17 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   async function share(): Promise<void> {
     const code = client.code;
     if (!code) return;
-    const url = inviteLink(code, d.inviteBase, d.inviteOnline);
-    const text = t('lobby.shareText', { code });
+    const content = shareContent(code, d.inviteBase, d.inviteOnline, t('lobby.shareText', { code }));
     if (typeof navigator.share === 'function') {
       try {
-        await navigator.share({ title: 'Pétanque', text, url });
+        await navigator.share({ title: 'Pétanque', text: content.text, ...(content.url ? { url: content.url } : {}) });
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === 'AbortError') return; // the player closed the share sheet
       }
     }
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(content.url ?? content.text);
       lobby.toast(t('lobby.copied'));
     } catch {
       lobby.toast(t('lobby.copyFailed'));

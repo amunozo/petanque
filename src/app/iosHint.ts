@@ -7,8 +7,10 @@
  *
  * The card shows ONLY on real iOS Safari that is not already installed, after the player has finished a game
  * (a match, or leaving practice) and has not closed the card before. Never on Android, in the Play app (TWA),
- * on desktop, or in other iOS browsers / in-app webviews.
+ * on desktop, in other iOS browsers / in-app webviews, or inside a portal's iframe (no install flows there).
  */
+
+import { currentPortal } from './portal';
 
 /** All settings in one place. */
 export const IOS_HINT = {
@@ -40,6 +42,8 @@ export interface IosHintInput {
   dismissed: boolean;
   /** The card was already shown during this page load (it shows at most once per load, whether or not storage works). */
   shownThisLoad: boolean;
+  /** The page runs inside a game portal's iframe: portals have no home-screen install, so never offer it. */
+  portal: boolean;
 }
 
 /** An iPhone, an iPod or an iPad (iPadOS 13+ pretends to be a Mac: "MacIntel" with a multi-touch screen). */
@@ -61,7 +65,7 @@ export function isIosSafari(userAgent: string, platform: string, maxTouchPoints:
 
 /** Should the hint be offered now (on the menu)? */
 export function shouldShowIosHint(i: IosHintInput): boolean {
-  if (i.dismissed || i.shownThisLoad || !i.finishedGame) return false;
+  if (i.portal || i.dismissed || i.shownThisLoad || !i.finishedGame) return false;
   if (i.navigatorStandalone === true || i.displayModeStandalone) return false;
   return isIosSafari(i.userAgent, i.platform, i.maxTouchPoints);
 }
@@ -115,6 +119,7 @@ export function iosHintWanted(): boolean {
       finishedGame: session.finished || readFlag(IOS_HINT.finishedKey),
       dismissed: session.dismissed || readFlag(IOS_HINT.dismissedKey),
       shownThisLoad: session.shown,
+      portal: currentPortal() !== null,
     });
   } catch {
     return false;
