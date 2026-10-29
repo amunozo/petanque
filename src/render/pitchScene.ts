@@ -36,11 +36,11 @@ import { bakedDynamicMaterial, setContactOccluders } from './bakedLight';
 import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
 import { createDevStats } from './devStats';
 import { createLighting } from './lighting';
+import { RESOLUTION, initialScaleState, pixelRatioFor, stepScale } from './resolution';
 import { loadScenery } from './scenery';
 
 /** Look-and-feel constants of the placeholder art (not game feel). */
 const STYLE = {
-  maxPixelRatio: 2,
   throwCircleRadius: 0.25,
   jackColor: 0xffd23a,
   /** Boule tint (multiplies the grey metal texture): neutral = practice, A = cool blue steel, B = warm red bronze. */
@@ -153,6 +153,9 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   const arena = cfg0.physics.arena;
 
   const renderer = new WebGLRenderer({ canvas, antialias: true });
+  // Adaptive render resolution (resolution.ts): a fullscreen desktop window is far over the pixel
+  // budget, a phone is not. The scale drifts with the real frame time and re-applies on change.
+  let scaleState = initialScaleState();
   const scene = new Scene();
   const camera = new PerspectiveCamera(cfg0.camera.fovDeg, 1, 0.05, 90);
   const rig = createCameraRig(camera, getConfig);
@@ -521,7 +524,7 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   function resize(): void {
     const w = Math.max(1, canvas.clientWidth);
     const h = Math.max(1, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, STYLE.maxPixelRatio));
+    renderer.setPixelRatio(pixelRatioFor(w, h, window.devicePixelRatio, scaleState.scale));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
@@ -533,6 +536,12 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   return {
     resize,
     render(dt) {
+      if (canvas.clientWidth * canvas.clientHeight >= RESOLUTION.adaptiveMinArea || scaleState.scale < 1) {
+        const next = stepScale(scaleState, dt, RESOLUTION);
+        const changed = next.scale !== scaleState.scale;
+        scaleState = next;
+        if (changed) resize();
+      }
       rig.update(dt, focus);
       if (highlightIds.length > 0) {
         pulseClock += dt;
