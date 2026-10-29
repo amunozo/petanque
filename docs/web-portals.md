@@ -119,7 +119,9 @@ re-upload to portals the same day as a tuning change.
 3. Done 2026-10-29: a framed load sends `count?p=/portal/crazygames` (checked in headless Chromium). Owner's Firefox
    test sent nothing, likely the site's old service worker or a blocker in that browser; real portal frames get
    their own storage, so accepted.
-4. CrazyGames basic launch: submit `https://petanque.amunozo.com/?portal=crazygames`.
+4. CrazyGames basic launch: HTML5 needs an upload (no URL field), so upload only `portals/crazygames/index.html`, a
+   loader that iframes `https://petanque.amunozo.com/?portal=crazygames` full-size (tested nested in a fake portal:
+   fills the frame, counts `/portal/crazygames`). Never needs re-uploading; deploys update it.
 5. After 2–4 weeks of numbers (`match-finished-*` on `/portal/crazygames`): CrazyGames SDK + full launch (ads,
    portal invites), then GameDistribution; itch.io any time.
 
