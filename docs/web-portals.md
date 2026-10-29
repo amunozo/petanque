@@ -1,6 +1,6 @@
 # Web game portals (CrazyGames, Poki, itch.io)
 
-Notes from 2026-10-28, decision 2026-10-29 (below). Portal mode is built on branch `exp-portal`.
+Notes from 2026-10-28, decision 2026-10-29 (below). Portal mode is live since 2026-10-29.
 
 ## Decision (2026-10-29): portals iframe the live site
 
@@ -111,8 +111,8 @@ re-upload to portals the same day as a tuning change.
 
 ## Next steps
 
-1. Owner checks the `exp-portal` preview framed on a desktop (mouse aiming, wide-screen layout, load ≤ 20 s).
-2. Merge; confirm a `/portal/...` page view reaches GoatCounter from a real frame.
+1. Done 2026-10-29: owner checked it framed on desktop; merged and live.
+2. Confirm a `/portal/...` page view reaches GoatCounter from a real frame.
 3. CrazyGames basic launch: submit `https://petanque.amunozo.com/?portal=crazygames`.
 4. After 2–4 weeks of numbers (`match-finished-*` on `/portal/crazygames`): CrazyGames SDK + full launch (ads,
    portal invites), then GameDistribution; itch.io any time.
