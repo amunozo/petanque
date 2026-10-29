@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-29 (LIVE: portal mode; LIVE: tappable menu with vs computer first, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint). Read this first in a new session, together with
+Last updated: 2026-10-29 (tester recruitment posts drafted: store/tester-recruitment.md; LIVE: portal mode; LIVE: tappable menu with vs computer first, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -157,6 +157,10 @@ tell the owner exactly what to change in Play Console *before* it goes live:
    chat; r/petanque mods messaged first), 14-day clock starts at 12 testers.
 3. **12+ testers** (Android, Gmail) for the mandatory 14-day closed test; paid
    tester services ($15–35) are an acceptable fallback.
+   2026-10-29: recruitment posts drafted for 7 more communities (Reddit subs,
+   itch.io, FR/ES Facebook groups), each following that community's rules:
+   `store/tester-recruitment.md` (tick each one as posted).
+   Rules research: `docs/research/tester-community-rules-2026-10-29.md`.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
 
 ## Experiments (preview without touching the live game)
