@@ -110,7 +110,7 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   languages, effective 2026-10-29) mentions portals; Release checklist: no new data, Play declarations unchanged.
   Plan, portal rules and sources: `docs/web-portals.md`. Owner test page: a local HTML file that iframes the preview.
   Next (owner): exclude own visits (GoatCounter Ignore IPs + `#toggle-goatcounter` per browser, see
-  `docs/web-portals.md`), check a `/portal/...` page view in GoatCounter, then submit
+  `docs/web-portals.md`; portal counting verified 2026-10-29), then submit
   `https://petanque.amunozo.com/?portal=crazygames` to CrazyGames (basic launch, by URL).
 
 ## Decisions taken
