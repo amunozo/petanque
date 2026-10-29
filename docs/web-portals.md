@@ -112,7 +112,7 @@ re-upload to portals the same day as a tuning change.
 ## Next steps
 
 1. Done 2026-10-29: owner checked it framed on desktop; merged and live.
-2. Don't count the owner's own visits (no code; GoatCounter built-ins): Settings → Ignore IPs → "Add your current
+2. Done 2026-10-29 (owner): don't count the owner's own visits (no code; GoatCounter built-ins): Settings → Ignore IPs → "Add your current
    IP" (home network: site, Play app and portal frames alike), plus `https://petanque.amunozo.com/#toggle-goatcounter`
    once per browser (sets `skipgc` in localStorage; Chrome on the phone should cover the Play app too). Portal frames
    have their own storage, so only the IP rule covers portal test plays; mobile data is not covered.

@@ -113,8 +113,8 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   (0.5–1) only on views ≥ 600k CSS px², so iPhone Low Power Mode (30 fps cap) never blurs. Privacy page (5
   languages, effective 2026-10-29) mentions portals; Release checklist: no new data, Play declarations unchanged.
   Plan, portal rules and sources: `docs/web-portals.md`. Owner test page: a local HTML file that iframes the preview.
-  Next (owner): exclude own visits (GoatCounter Ignore IPs + `#toggle-goatcounter` per browser, see
-  `docs/web-portals.md`; portal counting verified 2026-10-29), then submit
+  Own visits excluded (owner, 2026-10-29: GoatCounter Ignore IPs + `#toggle-goatcounter`; portal counting verified).
+  Next (owner): submit
   `https://petanque.amunozo.com/?portal=crazygames` to CrazyGames (basic launch, by URL).
 
 ## Decisions taken
