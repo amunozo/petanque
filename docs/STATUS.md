@@ -107,7 +107,10 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   `gamedistribution`, `kongregate`, `itch`), anything else or framed without it = `embed`. In portal mode: GoatCounter
   `allow_frame: true` (count.js refuses frames otherwise), page view path `/portal/<name>` with the referrer blanked;
   no Install app, no iPhone hint, no service worker, invites share the room code without a link; English by default
-  (browser language ignored, the player's own pick kept: CrazyGames requires English as default). Privacy page (5
+  (browser language ignored, the player's own pick kept: CrazyGames requires English as default).
+- **Adaptive render resolution** — LIVE 2026-10-29 (owner: fullscreen desktop in Firefox lagged in CrazyGames QA,
+  smooth after). `src/render/resolution.ts`: pixel budget 2.4M device px (phones unaffected) + frame-time scaling
+  (0.5–1) only on views ≥ 600k CSS px², so iPhone Low Power Mode (30 fps cap) never blurs. Privacy page (5
   languages, effective 2026-10-29) mentions portals; Release checklist: no new data, Play declarations unchanged.
   Plan, portal rules and sources: `docs/web-portals.md`. Owner test page: a local HTML file that iframes the preview.
   Next (owner): exclude own visits (GoatCounter Ignore IPs + `#toggle-goatcounter` per browser, see
