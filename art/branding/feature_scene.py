@@ -104,7 +104,8 @@ def _tree(rng: Rng, at, height: float):
     return m
 
 
-def build() -> list:
+def build(cam=CAM, look_at=LOOK_AT, lens=LENS, focus_dist=FOCUS_DIST, fstop=FSTOP, shift=(0.0, 0.0)) -> list:
+    """The scene, with the camera parameterised (defaults = the Play Store feature graphic)."""
     rng = Rng(7)
     mat = palette_material()
     sky_world(zenith="#4f86c9", horizon="#e4ecef", ground=EARTH, strength=1.0)
@@ -154,10 +155,10 @@ def build() -> list:
     objs.append(flying)
     _motion(flying, (0.515, 0.345, -0.11), (0.515, 0.325, -0.065))
 
-    cam = camera(CAM, LOOK_AT, LENS)
-    cam.data.dof.use_dof = True
-    cam.data.dof.focus_distance = FOCUS_DIST
-    cam.data.dof.aperture_fstop = FSTOP
+    cam_obj = camera(cam, look_at, lens, shift=shift)
+    cam_obj.data.dof.use_dof = True
+    cam_obj.data.dof.focus_distance = focus_dist
+    cam_obj.data.dof.aperture_fstop = fstop
     return objs
 
 
