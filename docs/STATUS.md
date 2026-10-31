@@ -115,8 +115,9 @@ tell the owner exactly what to change in Play Console *before* it goes live:
   Plan, portal rules and sources: `docs/web-portals.md`. Owner test page: a local HTML file that iframes the preview.
   Own visits excluded (owner, 2026-10-29: GoatCounter Ignore IPs + `#toggle-goatcounter`; portal counting verified).
   SUBMITTED to CrazyGames 2026-10-29 (basic launch; upload = `portals/crazygames/index.html` loader; covers +
-  videos in `store/crazygames/`, made by `art/branding/covers.py` and `store/video-src/record.py`). Waiting for
-  their review email. Then: after 2–4 weeks compare `match-finished-*` on `/portal/crazygames` vs the site.
+  videos in `store/crazygames/`, made by `art/branding/covers.py` and `store/video-src/record.py`).
+  REJECTED 2026-10-31 (generic email: "overall quality does not yet meet the expectations of our platform"; no
+  specifics). Owner, 2026-10-31: web portals parked; focus on the Play Store (testers → production).
 
 ## Decisions taken
 - Release first on Google Play as a **TWA** (Bubblewrap) wrapping the website;
