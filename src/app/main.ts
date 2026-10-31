@@ -33,6 +33,7 @@ import { registerServiceWorker } from './pwa';
 import { createTouchHint } from './touchHint';
 import { playShotEffects } from './shotEffects';
 import { createUpdateToast } from './updateToast';
+import { resolveVenue } from './venue';
 import { configuredServerUrl, defaultServerUrl, INVITE_BASE_URL, ROOM_PARAM } from '../net';
 import { createOnlineFlow, type OnlineFlow } from './online/flow';
 import { stripRoomParam } from './online/rules';
@@ -68,7 +69,7 @@ document.documentElement.classList.toggle('is-dev', devMode);
 const store = createConfigStore(defaultConfig, { schema: tuningSchema, ...(devMode ? {} : { storage: null }) });
 const cfg = store.config;
 
-const scene = createPitchScene(canvas, () => store.config);
+const scene = createPitchScene(canvas, () => store.config, resolveVenue(params));
 // Overlays drawn over the 3D view (under the HUD): measuring lines, dust bursts.
 const project = (p: Parameters<typeof scene.project>[0]) => scene.project(p);
 const fx = createFx(app, canvas, project, hudRoot);

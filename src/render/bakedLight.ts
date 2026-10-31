@@ -32,8 +32,8 @@ import {
   type Texture,
   type WebGLProgramParametersWithUniforms,
 } from 'three';
-import { BAKED_SUN, COURT_LIGHT_RECT, GROUND_LIGHT_RECT } from './bakedLayout';
 import { gradeShader } from './grade';
+import { VENUES, type Venue, type VenueTextures } from './venues';
 
 /** Shared uniforms (one write updates every patched material). x = sun shadow strength, y = AO strength. */
 const strength = { value: { x: 1, y: 1 } as { x: number; y: number } };
@@ -44,11 +44,11 @@ const groundBounce: { value: Texture } = { value: blackTexture() };
 const villageBounce: { value: Texture } = { value: blackTexture() };
 /** Scale of the baked bounce light (look.bounceStrength). */
 const bounceStrength = { value: 1 };
-/** Decode range of the bounce maps (keep in sync with BOUNCE_MAX in art/lib/bake.py). */
+/** Decode range of the bounce maps (keep in sync with BOUNCE_MAX in art/lib/bake.py, shared by all venues). */
 const BOUNCE_MAX = '0.3';
 /** Linear albedo of the court gravel (palette "dust"), for the light the ground throws up onto boules and trunks. */
-const groundAlbedo = { value: new Vector3(0.5, 0.41, 0.27) };
-const courtRect = { value: new Vector4(COURT_LIGHT_RECT.x0, COURT_LIGHT_RECT.z0, COURT_LIGHT_RECT.w, COURT_LIGHT_RECT.d) };
+const groundAlbedo = { value: new Vector3() };
+const courtRect = { value: new Vector4() };
 let maxAnisotropy = 4;
 
 /** The renderer's max anisotropy, for the ground maps seen at grazing angles (call before loading). */
@@ -56,10 +56,25 @@ export function setBakedAnisotropy(n: number): void {
   maxAnisotropy = Math.max(1, n);
 }
 const detailMap: { value: Texture } = { value: greyTexture() };
-const rect = { value: new Vector3(GROUND_LIGHT_RECT.x0, GROUND_LIGHT_RECT.z0, GROUND_LIGHT_RECT.size) };
-const sunDir = { value: new Vector3(...BAKED_SUN.dir) };
+const rect = { value: new Vector3() };
+const sunDir = { value: new Vector3() };
 /** Ground grain: tile sizes (m) of the two detail samples and the strength (0 = off). */
 const detail = { value: new Vector3(0, 0, 0) };
+/**
+ * Initialises the shared baked-light uniforms (lightmap rectangles, sun, ground albedo, bounce range)
+ * from the venue. Called once at boot (createPitchScene): the venue is chosen once, and its
+ * lightmaps were baked with exactly these values.
+ */
+export function configureBakedLight(venue: Venue): void {
+  rect.value.set(venue.groundLightRect.x0, venue.groundLightRect.z0, venue.groundLightRect.size);
+  courtRect.value.set(venue.courtLightRect.x0, venue.courtLightRect.z0, venue.courtLightRect.w, venue.courtLightRect.d);
+  sunDir.value.set(...venue.sun.dir);
+  groundAlbedo.value.set(...venue.groundAlbedo);
+}
+
+// Village values until createPitchScene configures the booting venue.
+configureBakedLight(VENUES.village);
+
 /** Spheres (boules, jack) that occlude the sky light of the ground under them: contact shadows. */
 const MAX_OCCLUDERS = 16;
 const occluders = { value: Array.from({ length: MAX_OCCLUDERS }, () => new Vector4(0, -100, 0, 0)) };
@@ -108,8 +123,11 @@ export function setGroundDetail(tileA: number, tileB: number, amount: number): v
   detail.value.set(1 / Math.max(tileA, 1e-3), 1 / Math.max(tileB, 1e-3), amount);
 }
 
-/** Loads the lightmaps and the ground grain (all linear data; mipmapped, no flip: glTF UV convention). */
-export function loadBakedTextures(url: (file: string) => string): void {
+/**
+ * Loads the venue's lightmaps and the ground grain (all linear data; mipmapped, no flip: glTF UV
+ * convention). A missing file is warned about, and the surfaces it lights stay unshadowed / ungrained.
+ */
+export function loadBakedTextures(url: (file: string) => string, textures: VenueTextures): void {
   const loader = new TextureLoader();
   // The atlas skips mipmaps: smaller mips would bleed between its many small UV islands.
   const load = (file: string, slot: { value: Texture }, repeat: boolean, mips = true): void => {
@@ -128,12 +146,12 @@ export function loadBakedTextures(url: (file: string) => string): void {
       })
       .catch((err: unknown) => console.warn(`${file} failed to load (scenery stays unshadowed)`, err));
   };
-  load('ground_light.png', groundMap, false);
-  load('court_light.webp', courtMap, false);
-  load('ground_bounce.webp', groundBounce, false);
-  load('village_bounce.webp', villageBounce, false, false);
-  load('village_light.png', villageMap, false, false);
-  load('ground_detail.png', detailMap, true);
+  load(textures.groundLight, groundMap, false);
+  load(textures.courtLight, courtMap, false);
+  load(textures.groundBounce, groundBounce, false);
+  load(textures.atlasBounce, villageBounce, false, false);
+  load(textures.atlasLight, villageMap, false, false);
+  load(textures.groundDetail, detailMap, true);
 }
 
 /**

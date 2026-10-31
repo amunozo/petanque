@@ -6,16 +6,17 @@ in desktop Blender for hand edits.
 
 ```
 art/
-  build.py          runs every asset script (export glb + save .blend + render preview), then the light bake
+  build.py          runs every asset script of a venue (export glb + save .blend + render preview), then the light bake
   assets/           one script per exported file: court, plane_tree, houses, mairie, cafe, props, cypress, hills
-  lib/              palette (single colour source of truth), layout (sun + tree placements + lightmap
-                    area: single source for bake AND game), bake (Cycles lightmaps), textures (leaf
-                    atlas, gravel grain), seeded noise/rng, mesh builder, house builder (building.py),
-                    small prop shapes (props.py), materials, modifiers, glTF export + quantization,
-                    preview renderer
-  blend/<name>.blend   generated, hand-editable in Blender
-  previews/<name>*.png generated Cycles previews (for approving a look)
-  ../public/models/<name>.glb   generated, loaded by src/render/scenery.ts
+  assets/<venue>/   the asset scripts of another venue (derborence: empty until its art is made)
+  lib/              palette (single colour source of truth), venues (one per 3D environment: asset lists,
+                    layout module, output dirs), layout (sun + instanced placements + lightmap area: single
+                    source for bake AND game), bake (Cycles lightmaps), textures (leaf atlas, gravel grain),
+                    seeded noise/rng, mesh builder, house builder (building.py), small prop shapes (props.py),
+                    materials, modifiers, glTF export + quantization, preview renderer
+  blend/<name>.blend   generated, hand-editable in Blender (venues: blend/<venue>/)
+  previews/<name>*.png generated Cycles previews (for approving a look) (venues: previews/<venue>/)
+  ../public/models/<name>.glb   generated, loaded by src/render/scenery.ts (venues: models/<venue>/)
   ../public/models/*.png|webp   generated: ground_light / village_light / court_light (lightmaps), leaves (leaf
                                 atlas), ground_detail (gravel grain)
   ../src/render/bakedLayout.ts  generated from lib/layout.py (sun direction, tree placements)
@@ -43,6 +44,31 @@ npm run art -- --quick bake # bake with 1/4 of the samples (noisier; for look-de
 `npm run art` uses `art/.venv/bin/python` when it exists, otherwise `python3` (which then needs
 `bpy` installed). The generated `.glb`, `.blend` and preview `.png` files are committed, so
 you only need to run this when you change a script.
+
+## Venues
+
+The scene around the court comes in **venues** (`lib/venues.py`): the Provençal village (`village`, the
+default) and an alpine forest court (`derborence`, whose art is still to be made). A venue owns its
+asset scripts (`assets/`, or `assets/<venue>/`), its layout module (`lib/layout.py` /
+`lib/layout_derborence.py`: sun, lightmap rectangles, `INSTANCED = {asset_name: [placements...]}`),
+and its output paths: `public/models/` (or `public/models/<venue>/`), `art/blend/`,
+`art/previews/`, and the generated `src/render/bakedLayout.ts` (or
+`src/render/bakedLayoutDerborence.ts`). The court and the physics arena are shared.
+
+Every command takes `--venue <id>` (default `village`, so the commands above are unchanged):
+
+```sh
+npm run art -- --venue derborence              # every derborence asset (+ the bake); nothing yet, so a no-op
+npm run art -- --venue derborence <asset>      # one asset (+ the bake, if it is in it)
+npm run art -- --venue derborence bake         # only the light bake (says so while the venue is empty)
+```
+
+The game picks the venue from the URL: `?venue=derborence` (`src/app/venue.ts` ->
+`src/render/venues.ts`, URL only, no UI). Missing glbs / lightmaps are warned about and skipped, so the
+venue renders its fallback court + sky until the art lands.
+
+Adding a venue: `art/assets/<id>/__init__.py` + its scripts, `lib/layout_<id>.py` (same public shape as
+`lib/layout.py`), a record in `lib/venues.py`, and the matching record in `src/render/venues.ts`.
 
 ## Editing by hand
 
@@ -80,7 +106,8 @@ those no longer matches `village_light.png`; change their scripts instead.
   twigs, crown = a few hundred leaf cards on the shells of sub-crowns around the branch tips (gaps
   where the sky shows), "spherical" normals so the sun shades the crown as one volume, tint + AO in
   the vertex colours. The crowns are kept from reaching far over the court (`REACH_X`), so the court
-  gets dappled, not total, shade. The game instances them at `TREES` / `CYPRESSES` in
+  gets dappled, not total, shade. The game instances them at `INSTANCED["plane_tree"]` /
+  `INSTANCED["cypress"]` (`TREES` / `CYPRESSES`) in
   `lib/layout.py` (two rows along the court, |x| 5.2..5.9, ~4.7 m apart).
 - **Baked light** (`lib/bake.py`): all static assets + every tree instance in one Cycles scene, lit by
   the sun of `lib/layout.py` (`SUN`: elevation 40, azimuth 15, 1.1 deg disc for soft penumbrae).
@@ -113,11 +140,13 @@ those no longer matches `village_light.png`; change their scripts instead.
 
 ## Adding an asset
 
-1. Create `art/assets/<name>.py` with `NAME`, `build() -> [objects]` and `PREVIEW`
+1. Create `art/assets/<name>.py` (`art/assets/<venue>/<name>.py` for another venue) with `NAME`,
+   `build() -> [objects]` and `PREVIEW`
    (`views`: `(suffix, camera_xyz, target_xyz, lens_mm)` in game coordinates; optional `context`:
    other asset names built into the preview scene only, to judge the asset in place).
-2. Add `"<name>"` to `ASSETS` in `art/build.py`.
-3. If it is static scenery that should receive / cast baked light, add it to `BAKED` in `art/build.py`
-   (instanced trees go in `lib/layout.py` instead).
-4. `npm run art -- <name>`, look at `art/previews/<name>.png`, then load it in `src/render/scenery.ts`
-   (`STATIC_MODELS` for files in game coordinates, `loadInstanced` for placed variants).
+2. Add `"<name>"` to the venue's `assets` in `art/lib/venues.py`.
+3. If it is static scenery that should receive / cast baked light, add it to the venue's `baked`
+   (instanced assets go in the venue's `instanced` + its layout's `INSTANCED` instead).
+4. `npm run art -- <name>` (add `--venue <id>` for another venue), look at `art/previews/<name>.png`,
+   then load it in `src/render/venues.ts` (`staticModels` for files in game coordinates,
+   `instanced` for placed variants).

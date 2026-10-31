@@ -6,8 +6,8 @@ and its top is exactly y = 0 (balls roll on it). Keep ARENA in sync with that co
 Objects: court_gravel (y=0), court_boards (+ stakes), court_surround (packed earth of the square,
 limestone pavements in front of the houses of art/assets/houses.py, fields beyond the village).
 The ground (gravel + surround) is smooth shaded with soft per-vertex colour patches; its grain comes
-from a small tiling detail texture (public/models/ground_detail.png, written here) and its light
-from the ground lightmap (lib/bake.py). The boards stay flat shaded.
+from a small tiling detail texture (ground_detail.png, written here into the venue's models dir) and
+its light from the ground lightmap (lib/bake.py). The boards stay flat shaded.
 """
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from lib.modifiers import triangulate
 from lib.palette import P, mix, scale, tint
 from lib.rand import Rng, fbm, value_noise
 from lib.textures import ground_detail
+from lib import venues
 
 NAME = "court"
 SEED = 7
@@ -231,12 +232,10 @@ def _surround_color(x: float, z: float, k: int, rng: Rng):
     return scale(c, 1.0 + rng.jitter(0.03))
 
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-
 def build():
     rng = Rng(SEED)
-    ground_detail(os.path.join(ROOT, "public", "models", "ground_detail.png"))
+    # the venue's models dir (public/models, or public/models/<venue>/ for another venue)
+    ground_detail(os.path.join(venues.models_dir(), "ground_detail.png"))
     mat = palette_material()
     objs = []
     for name, data, smooth in (("court_gravel", build_gravel(rng), True), ("court_boards", build_boards(rng), False),

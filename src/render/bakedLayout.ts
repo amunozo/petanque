@@ -47,3 +47,9 @@ export const CYPRESSES: readonly Placement[] = [
   { variant: 'a', x: 18.0, z: -12.0, rotDeg: 10.0, scale: 1.1 },
   { variant: 'b', x: -18.4, z: -11.4, rotDeg: 250.0, scale: 1.0 },
 ];
+
+/** Instanced assets: asset name -> placements (`TREES` / `CYPRESSES` above are its entries). */
+export const INSTANCED: Readonly<Record<string, readonly Placement[]>> = {
+  plane_tree: TREES,
+  cypress: CYPRESSES,
+};

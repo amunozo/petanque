@@ -1,7 +1,7 @@
 """
 Light bake for the static scenery (Cycles, CPU): the whole square is assembled in one scene (court,
-houses, mairie, café, props + every plane tree and cypress at its place from lib/layout.py) and lit
-by the game's sun, then two terms are baked per texel:
+houses, mairie, café, props + every instanced asset at its place from the venue's layout module) and
+lit by the game's sun, then two terms are baked per texel:
 
   R  sun visibility 0..1: soft shadows of the trees (through the alpha-tested leaf cards, so they
      are dappled), buildings and props. Computed as direct sun light with shadows / without
@@ -16,9 +16,12 @@ into two textures (8-bit RGB PNG, linear values, B unused):
   public/models/village_light.png   one atlas for the court boards, houses, mairie, café and props,
                                     through a second UV set made here (smart project + pack)
 
+(paths and names follow the venue being baked, art/lib/venues.py.)
+
 The baked objects are exported again from this scene (with the atlas UVs) so geometry and
 lightmap always match. The real-time sun (src/render/lighting.ts) uses the same direction
-(src/render/bakedLayout.ts is written from lib/layout.py here) and only casts the boules' shadows.
+(the generated TS the game reads is written from the venue's layout module here) and only casts
+the boules' shadows.
 """
 from __future__ import annotations
 
@@ -30,7 +33,7 @@ import bpy
 import numpy as np
 from PIL import Image
 
-from . import layout
+from . import venues
 from .palette import P
 
 AO_DISTANCE = 3.0
@@ -183,24 +186,29 @@ def _save(path: str, vis: np.ndarray, ao: np.ndarray) -> int:
     return os.path.getsize(path)
 
 
-def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn, ts_path: str,
-               quality: float = 1.0) -> None:
+def bake_scene(assets: dict, venue: venues.Venue, export_fn, quality: float = 1.0) -> None:
     """
-    assets: name -> asset module (must include the baked ones plus plane_tree and cypress).
+    assets: name -> asset module (the venue's baked ones plus its instanced ones).
     export_fn(objects, path) exports a glb. quality scales the sample counts (0.25 for quick tests).
     """
+    layout = venue.layout()
+    models_dir = venue.models_dir()
+    baked_names = list(venue.baked)
+    atlas = f"{venue.atlas}_light"
     t0 = time.time()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     sc = bpy.context.scene
     built: dict[str, list] = {}
-    for name in baked_names + ["plane_tree", "cypress"]:
+    for name in venue.in_bake:
         built[name] = assets[name].build()
     by_name = {o.name: o for objs in built.values() for o in objs}
 
-    # Trees at their places (the modelled variants are removed; their meshes live on in the copies).
-    trees = _instance(by_name, "plane_tree_", layout.TREES) + _instance(by_name, "cypress_", layout.CYPRESSES)
-    for o in built["plane_tree"] + built["cypress"]:
-        bpy.data.objects.remove(o)
+    # Instanced assets at their places (the modelled variants are removed; their meshes live on in
+    # the copies). Each asset stands `<name>_<variant>` (+ `_leaves`) in its file.
+    for name in venue.instanced:
+        _instance(by_name, f"{name}_", layout.INSTANCED[name])
+        for o in built[name]:
+            bpy.data.objects.remove(o)
 
     # Ground receivers: flat quads over the lightmap rectangles (the real ground meshes are hidden
     # for the bake; they are flat to a few cm). They are coplanar, so each is baked with the other hidden.
@@ -209,8 +217,8 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     c = layout.COURT_RECT
     court_receiver = _receiver("court_receiver", c["x0"], c["z0"], c["w"], c["d"])
     court_receiver.hide_render = True
-    for o in built["court"]:
-        if o.name in ("court_gravel", "court_surround"):
+    for o in built.get("court", []):
+        if o.name in venue.court_ground:
             o.hide_render = True
 
     atlas_objs = [o for n in baked_names for o in built[n] if not o.hide_render]
@@ -218,7 +226,7 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     print(f"[bake] unwrapped {len(atlas_objs)} objects ({time.time() - t0:.1f}s)")
 
     ground_img = _new_image("ground_light", layout.GROUND_RES)
-    village_img = _new_image("village_light", layout.VILLAGE_RES)
+    atlas_img = _new_image(atlas, layout.ATLAS_RES)
     gmat = bpy.data.materials.new("GroundReceiver")
     gmat.use_nodes = True
     _set_albedo(gmat, P["earth"])
@@ -232,7 +240,7 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     _bake_target(cmat, court_img)
     mats = {s.material for o in atlas_objs for s in o.material_slots if s.material}
     for m in mats:
-        _bake_target(m, village_img)
+        _bake_target(m, atlas_img)
 
     # Light: the game's sun, no sky (direct light only), transparent leaf shadows.
     sc.render.engine = "CYCLES"
@@ -257,18 +265,18 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     targets = [receiver] + atlas_objs
     results = {}
     _bake(targets, "DIFFUSE", max(4, int(SAMPLES_SUN * quality)))
-    results["lit"] = (_pixels(ground_img), _pixels(village_img))
+    results["lit"] = (_pixels(ground_img), _pixels(atlas_img))
     print(f"[bake] sun ({time.time() - t0:.1f}s)")
     casters = [o for o in sc.objects if o.type == "MESH"]
     for o in casters:
         o.visible_shadow = False
     _bake(targets, "DIFFUSE", SAMPLES_FLAT)
-    results["flat"] = (_pixels(ground_img), _pixels(village_img))
+    results["flat"] = (_pixels(ground_img), _pixels(atlas_img))
     for o in casters:
         o.visible_shadow = True
     print(f"[bake] unshadowed ({time.time() - t0:.1f}s)")
     _bake(targets, "AO", max(4, int(SAMPLES_AO * quality)))
-    results["ao"] = (_pixels(ground_img), _pixels(village_img))
+    results["ao"] = (_pixels(ground_img), _pixels(atlas_img))
     print(f"[bake] ambient occlusion ({time.time() - t0:.1f}s)")
     # High-density court map: sun visibility only (AO comes from the ground map). The unshadowed
     # sun light on a flat, level receiver is one constant: take it from the ground receiver.
@@ -290,7 +298,7 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     sc.cycles.max_bounces = BOUNCES
     sc.cycles.diffuse_bounces = BOUNCES
     gb_img = _new_image("ground_bounce", BOUNCE_RES)
-    vb_img = _new_image("village_bounce", BOUNCE_RES)
+    vb_img = _new_image(f"{venue.atlas}_bounce", BOUNCE_RES)
     _bake_target(gmat, gb_img)
     for m in mats:
         _bake_target(m, vb_img)
@@ -304,7 +312,7 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
     bk.margin, bk.margin_type, bk.use_clear = 4, "EXTEND", True
     bpy.ops.object.bake(type="DIFFUSE")
     print(f"[bake] bounce ({time.time() - t0:.1f}s)")
-    for img, name, sigma in ((gb_img, "ground_bounce", 2.5), (vb_img, "village_bounce", 1.2)):
+    for img, name, sigma in ((gb_img, "ground_bounce", 2.5), (vb_img, f"{venue.atlas}_bounce", 1.2)):
         # Cycles' colourless indirect pass is irradiance / pi (the direct pass is not): x pi, same units
         rgb = _pixels(img, rgb=True) * math.pi
         rgb = np.stack([_blur(rgb[..., k], sigma) for k in range(3)], axis=-1)
@@ -312,7 +320,7 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
         n = _save_bounce(os.path.join(models_dir, f"{name}.webp"), rgb)
         print(f"[bake] {name}.webp {n / 1024:.0f} KB")
 
-    for i, name in enumerate(("ground_light", "village_light")):
+    for i, name in enumerate(("ground_light", atlas)):
         lit, flat, ao = results["lit"][i], results["flat"][i], results["ao"][i]
         vis = np.where(flat > 1e-3, lit / np.maximum(flat, 1e-3), 1.0)
         # light denoise (the penumbrae are wider than this); AO is low-frequency, blurred more
@@ -328,6 +336,6 @@ def bake_scene(assets: dict, baked_names: list[str], models_dir: str, export_fn,
             o.hide_render = False
         size_b = export_fn(objs, os.path.join(models_dir, f"{assets[name].NAME}.glb"))
         print(f"[bake] {name}.glb {size_b / 1024:.0f} KB")
-    with open(ts_path, "w") as f:
+    with open(venue.layout_ts_path(), "w") as f:
         f.write(layout.to_ts())
     print(f"[bake] done ({time.time() - t0:.1f}s)")

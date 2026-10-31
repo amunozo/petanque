@@ -5,6 +5,10 @@
  * Until the court arrives (or if it fails to load) a plain placeholder court is shown, so the game
  * is playable either way.
  *
+ * What is loaded, and from which directory, is the venue's (src/render/venues.ts,
+ * src/app/venue.ts): the village, or a venue whose assets are still missing (every failed file is
+ * warned about and skipped: the fallback court + sky stay).
+ *
  * Lighting is baked (art/lib/bake.py, src/render/bakedLight.ts): the ground and the buildings use
  * vertex-colour Lambert materials patched with their lightmaps (sun shadows of every tree, building
  * and prop + ambient occlusion), so nothing static renders into the real-time shadow map; only the
@@ -32,28 +36,13 @@ import {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Object3D } from 'three';
 import { bakedMaterial, foliageMaterial, loadBakedTextures, woodMaterial } from './bakedLight';
-import { CYPRESSES, TREES, type Placement } from './bakedLayout';
 import { gradeMaterial } from './grade';
+import type { InstancedModel, Venue } from './venues';
 
-/** Static models in game coordinates, lit through the village lightmap atlas (or unlit). */
-const STATIC_MODELS: readonly { file: string; unlit?: boolean }[] = [
-  { file: 'houses.glb' },
-  { file: 'mairie.glb' },
-  { file: 'cafe.glb' },
-  { file: 'props.glb' },
-  { file: 'hills.glb', unlit: true },
-];
-
-/** Court meshes on the planar ground lightmap (the rest of court.glb uses the atlas). */
-const GROUND_MESHES = new Set(['court_gravel', 'court_surround']);
-
+/** Leaf-card alpha cut-off (alpha-tested, not blended: cheap, sorted for free). */
 const STYLE = {
-  /** Leaf-card alpha cut-off (alpha-tested, not blended: cheap, sorted for free). */
   leafAlphaTest: 0.45,
 } as const;
-
-/** Model paths are relative to the page, so the site works from any sub-path. */
-const modelUrl = (name: string): string => `${import.meta.env.BASE_URL}models/${name}`;
 
 export interface CourtRect {
   minX: number;
@@ -70,12 +59,16 @@ const meshesOf = (root: Object3D): Mesh[] => {
   return out;
 };
 
-export function loadScenery(scene: Scene, court: CourtRect): void {
-  loadBakedTextures(modelUrl);
+export function loadScenery(scene: Scene, court: CourtRect, venue: Venue): void {
+  // Model paths are relative to the page, so the site works from any sub-path.
+  const modelUrl = (name: string): string => `${import.meta.env.BASE_URL}${venue.modelsDir}/${name}`;
+  loadBakedTextures(modelUrl, venue.textures);
   const ground = bakedMaterial(new MeshLambertMaterial({ vertexColors: true }), 'ground');
   const atlas = bakedMaterial(new MeshLambertMaterial({ vertexColors: true }), 'atlas');
   const wood = woodMaterial(new MeshLambertMaterial({ vertexColors: true }));
-  const leafMap = new TextureLoader().load(modelUrl('leaves.png'));
+  const leafMap = new TextureLoader().load(modelUrl(venue.textures.leaves), undefined, undefined, (err: unknown) =>
+    console.warn(`${venue.textures.leaves} failed to load, leaf cards stay untextured`, err),
+  );
   leafMap.colorSpace = SRGBColorSpace;
   leafMap.flipY = false; // glTF UV convention
   leafMap.anisotropy = 4;
@@ -92,12 +85,12 @@ export function loadScenery(scene: Scene, court: CourtRect): void {
 
   // Placeholder until the court model is in.
   const fallback = new Group();
-  const plain = new MeshLambertMaterial({ color: 0xbcab8d });
+  const plain = new MeshLambertMaterial({ color: venue.fallback.court });
   const pitch = new Mesh(new PlaneGeometry(court.maxX - court.minX, court.maxZ - court.minZ), plain);
   pitch.rotation.x = -Math.PI / 2;
   pitch.position.set((court.minX + court.maxX) / 2, 0, (court.minZ + court.maxZ) / 2);
   pitch.receiveShadow = true;
-  const around = new Mesh(new PlaneGeometry(120, 120), new MeshLambertMaterial({ color: 0xac9879 }));
+  const around = new Mesh(new PlaneGeometry(120, 120), new MeshLambertMaterial({ color: venue.fallback.ground }));
   around.rotation.x = -Math.PI / 2;
   around.position.set(0, -0.02, -15);
   around.receiveShadow = true;
@@ -107,10 +100,10 @@ export function loadScenery(scene: Scene, court: CourtRect): void {
   const loader = new GLTFLoader();
 
   loader
-    .loadAsync(modelUrl('court.glb'))
+    .loadAsync(modelUrl(venue.court.file))
     .then((gltf) => {
       for (const mesh of meshesOf(gltf.scene)) {
-        const isGround = GROUND_MESHES.has(mesh.name);
+        const isGround = venue.court.groundMeshes.includes(mesh.name);
         mesh.material = isGround ? ground : atlas;
         mesh.receiveShadow = isGround; // the boules' real-time shadows
         mesh.castShadow = false;
@@ -121,9 +114,9 @@ export function loadScenery(scene: Scene, court: CourtRect): void {
       around.geometry.dispose();
       plain.dispose();
     })
-    .catch((err: unknown) => console.warn('court.glb failed to load, keeping the placeholder court', err));
+    .catch((err: unknown) => console.warn(`${venue.court.file} failed to load, keeping the placeholder court`, err));
 
-  for (const model of STATIC_MODELS) {
+  for (const model of venue.staticModels) {
     loader
       .loadAsync(modelUrl(model.file))
       .then((gltf) => {
@@ -137,30 +130,33 @@ export function loadScenery(scene: Scene, court: CourtRect): void {
       .catch((err: unknown) => console.warn(`${model.file} failed to load`, err));
   }
 
-  loadInstanced(loader, scene, 'plane_tree.glb', 'plane_tree_', TREES, (part) => (part.endsWith('_leaves') ? leaves : wood));
-  loadInstanced(loader, scene, 'cypress.glb', 'cypress_', CYPRESSES, () => wood);
+  for (const inst of venue.instanced) {
+    const materialFor = (part: string): Material => (inst.leaves && part.endsWith('_leaves') ? leaves : wood);
+    loadInstanced(loader, scene, modelUrl, inst, materialFor);
+  }
 }
 
 /**
  * One InstancedMesh per mesh in the file (`<prefix><variant>` and e.g. `<prefix><variant>_leaves`),
  * placed at every placement of that variant. The geometry is modelled around the trunk base, so
  * node offsets in the file are ignored. Placements come from the bake layout, so the trees stand
- * exactly where their baked shadows are.
+ * exactly where their baked shadows are. A venue whose layout has no placements yet loads nothing.
  */
 function loadInstanced(
   loader: GLTFLoader,
   scene: Scene,
-  file: string,
-  prefix: string,
-  placements: readonly Placement[],
+  url: (file: string) => string,
+  model: InstancedModel,
   materialFor: (part: string) => Material,
 ): void {
+  const placements = model.placements;
+  if (placements.length === 0) return;
   loader
-    .loadAsync(modelUrl(file))
+    .loadAsync(url(model.file))
     .then((gltf) => {
       const parts = new Map<string, BufferGeometry>();
       for (const mesh of meshesOf(gltf.scene)) {
-        if (mesh.name.startsWith(prefix)) parts.set(mesh.name.slice(prefix.length), mesh.geometry);
+        if (mesh.name.startsWith(model.prefix)) parts.set(mesh.name.slice(model.prefix.length), mesh.geometry);
       }
       const m = new Matrix4();
       const q = new Quaternion();
@@ -183,5 +179,5 @@ function loadInstanced(
         scene.add(inst);
       }
     })
-    .catch((err: unknown) => console.warn(`${file} failed to load`, err));
+    .catch((err: unknown) => console.warn(`${model.file} failed to load`, err));
 }

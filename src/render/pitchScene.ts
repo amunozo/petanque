@@ -2,7 +2,8 @@
  * Three.js game view. Reads simulation state, never mutates it. The court, boards and
  * trees come from the Blender-made models (scenery.ts), light and sky from lighting.ts;
  * the boules, jack and aiming overlays are still primitives built here. The pitch is built
- * once from config.physics.arena / throw origin; everything else (camera, preview toggles,
+ * once from config.physics.arena / throw origin (the arena is the same for every venue: the
+ * surrounding world is the venue's, src/render/venues.ts); everything else (camera, preview toggles,
  * ball radii, look) is read live.
  */
 import {
@@ -32,12 +33,13 @@ import type { Body } from '../engine/types';
 import type { TeamId } from '../games/petanque/matchTypes';
 import type { Vec3 } from '../engine/vec3';
 import type { GameConfig } from '../tuning/config';
-import { bakedDynamicMaterial, setContactOccluders } from './bakedLight';
+import { bakedDynamicMaterial, configureBakedLight, setContactOccluders } from './bakedLight';
 import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
 import { createDevStats } from './devStats';
 import { createLighting } from './lighting';
 import { RESOLUTION, initialScaleState, pixelRatioFor, stepScale } from './resolution';
 import { loadScenery } from './scenery';
+import { VENUES, type VenueId } from './venues';
 
 /** Look-and-feel constants of the placeholder art (not game feel). */
 const STYLE = {
@@ -148,9 +150,11 @@ function makeBouleTexture(): CanvasTexture {
   return tex;
 }
 
-export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => GameConfig): PitchScene {
+export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => GameConfig, venueId: VenueId): PitchScene {
   const cfg0 = getConfig();
   const arena = cfg0.physics.arena;
+  // The venue (the world around the court) is chosen once, at boot; the court and physics are shared.
+  const venue = VENUES[venueId];
 
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   // Adaptive render resolution (resolution.ts): a fullscreen desktop window is far over the pixel
@@ -159,8 +163,9 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   const scene = new Scene();
   const camera = new PerspectiveCamera(cfg0.camera.fovDeg, 1, 0.05, 90);
   const rig = createCameraRig(camera, getConfig);
-  const lighting = createLighting(scene, renderer, getConfig, arena);
-  loadScenery(scene, arena);
+  configureBakedLight(venue); // the baked lightmaps, sun and bounce range are the venue's
+  const lighting = createLighting(scene, renderer, getConfig, arena, venue);
+  loadScenery(scene, arena, venue);
   const devStats = createDevStats(renderer);
 
   // Throwing circle at the throw origin

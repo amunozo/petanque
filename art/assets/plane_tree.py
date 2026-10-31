@@ -3,7 +3,8 @@ plane_tree.glb: the platanes (Platanus x hispanica) of a Provencal square, in th
 
 Each variant is two objects: `plane_tree_<v>` (wood: trunk + limbs + branches, smooth shaded, pale
 camouflage bark painted per vertex) and `plane_tree_<v>_leaves` (alpha-tested leaf cards: quads
-textured with leaf clusters from the atlas public/models/leaves.png, written by this script).
+textured with leaf clusters from the atlas leaves.png, written by this script into the venue's
+models dir).
 
 Shape: a tall pale trunk that forks at ~3 m into 3-4 big limbs, each splitting into branches and
 twigs; the crown is a loose dome of sub-crowns around the branch tips, made of a few hundred leaf
@@ -21,6 +22,7 @@ from __future__ import annotations
 import math
 import os
 
+from lib import venues
 from lib.materials import leaf_material, palette_material
 from lib.mesh import MeshData, to_object
 from lib.modifiers import triangulate
@@ -29,8 +31,6 @@ from lib.rand import Rng, fbm
 from lib.textures import leaf_atlas
 
 NAME = "plane_tree"
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-LEAF_ATLAS = os.path.join(ROOT, "public", "models", "leaves.png")
 
 VARIANTS = [
     # fork: trunk height to the fork (m); r0: trunk radius; lean: deg toward +X; mains: main limbs;
@@ -324,10 +324,12 @@ def build_leaves(v: dict, crowns, rng: Rng):
 
 
 def build():
-    os.makedirs(os.path.dirname(LEAF_ATLAS), exist_ok=True)
-    leaf_atlas(LEAF_ATLAS)
+    # the venue's models dir (public/models, or public/models/<venue>/ for another venue)
+    leaf_path = os.path.join(venues.models_dir(), "leaves.png")
+    os.makedirs(os.path.dirname(leaf_path), exist_ok=True)
+    leaf_atlas(leaf_path)
     mat = palette_material()
-    lmat = leaf_material(LEAF_ATLAS)
+    lmat = leaf_material(leaf_path)
     objs = []
     for v in VARIANTS:
         rng = Rng(v["seed"])

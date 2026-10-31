@@ -1,7 +1,8 @@
 /**
- * Clear sunny afternoon: a warm-white sun (~5600 K) along the BAKED sun direction (art/lib/layout.py
- * -> bakedLayout.ts; the static scenery's shadows are baked into lightmaps, src/render/bakedLight.ts),
- * a soft sky-blue / dusty-ground hemisphere fill, a natural blue sky dome and gentle aerial haze.
+ * Clear sunny afternoon: a warm-white sun (~5600 K) along the venue's baked sun direction
+ * (art/lib/layout.py -> bakedLayout.ts; the static scenery's shadows are baked into lightmaps,
+ * src/render/bakedLight.ts), a soft sky-blue / dusty-ground hemisphere fill, a natural blue sky dome
+ * and gentle aerial haze (all of it the venue's look, src/render/venues.ts).
  * The real-time shadow map only holds the boules and the jack (nothing static casts), so it is
  * fitted tightly around the court and stays crisp. Tone mapping, saturation grade, sun colour
  * temperature / intensity, fill, shadow darkness, ambient occlusion, ground grain, exposure and fog
@@ -26,9 +27,9 @@ import {
 } from 'three';
 import type { GameConfig, ToneMappingChoice } from '../tuning/config';
 import { setBakedAnisotropy, setBakeStrength, setBounceStrength, setGroundDetail } from './bakedLight';
-import { BAKED_SUN } from './bakedLayout';
 import { setGradeSaturation } from './grade';
-import { createSky, SKY_STYLE } from './sky';
+import { createSky } from './sky';
+import type { Venue } from './venues';
 
 const TONE_MAPPINGS: Record<ToneMappingChoice, ToneMapping> = {
   neutral: NeutralToneMapping,
@@ -38,9 +39,6 @@ const TONE_MAPPINGS: Record<ToneMappingChoice, ToneMapping> = {
 };
 
 const STYLE = {
-  /** Fill from the sky (soft, slightly hazy blue: never grey-blue shade) and the warm dusty ground. */
-  hemiSky: 0xc8d4e2,
-  hemiGround: 0xcdb48e,
   /**
    * Exposure gain per tone-mapping curve, so switching curves in the panel keeps a similar mid-grey
    * (three's ACES pre-multiplies by 1/0.6; AgX darkens the mid-tones).
@@ -58,8 +56,7 @@ const STYLE = {
   shadowNormalBias: 0.03,
   /** PCF blur radius in shadow-map texels (softer edges, like the baked penumbra). */
   shadowRadius: 3,
-  skyRadius: 70,
-  /** Ground grain (public/models/ground_detail.png): tile sizes of its two samples (m). */
+  /** Ground grain (the venue's ground_detail texture): tile sizes of its two samples (m). */
   grainTileA: 0.55,
   grainTileB: 2.3,
 } as const;
@@ -89,18 +86,20 @@ export function kelvinToColor(kelvin: number, out: Color): Color {
   return out.setRGB(clamp(r), clamp(g), clamp(b), SRGBColorSpace);
 }
 
-export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig: () => GameConfig, court: CourtBounds): Lighting {
+export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig: () => GameConfig, court: CourtBounds,
+                               venue: Venue): Lighting {
   renderer.toneMapping = NeutralToneMapping;
   renderer.shadowMap.enabled = true;
   setBakedAnisotropy(renderer.capabilities.getMaxAnisotropy());
   renderer.shadowMap.type = PCFShadowMap; // PCFSoftShadowMap was removed in three r18x; PCF is already filtered
 
-  const horizon = new Color(SKY_STYLE.horizon);
+  const horizon = new Color(venue.sky.horizon);
   scene.background = horizon;
   const fog = new FogExp2(horizon, 0.02);
   scene.fog = fog;
 
-  const hemi = new HemisphereLight(STYLE.hemiSky, STYLE.hemiGround, 2);
+  // Fill from the sky (soft, slightly hazy blue: never grey-blue shade) and the warm dusty ground.
+  const hemi = new HemisphereLight(venue.fill.hemiSky, venue.fill.hemiGround, 2);
   scene.add(hemi);
 
   const cx = (court.minX + court.maxX) / 2;
@@ -114,7 +113,7 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
   sun.shadow.radius = STYLE.shadowRadius;
   scene.add(sun, sun.target);
 
-  const sky = createSky(STYLE.skyRadius);
+  const sky = createSky(venue.sky, venue.fill.skyRadius);
   scene.add(sky.mesh);
 
   const dir = new Vector3();
@@ -126,7 +125,7 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
 
   /** Points the sun along the baked direction and fits its ortho shadow box around the court rectangle. */
   function aimSun(): void {
-    dir.set(...BAKED_SUN.dir); // toward the sun
+    dir.set(...venue.sun.dir); // toward the sun
     sun.position.set(cx, 0, cz).addScaledVector(dir, STYLE.sunDistance);
     sky.setSunDirection(dir);
 
