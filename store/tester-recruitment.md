@@ -26,17 +26,16 @@ Reciprocity expected, with screenshot proof and specific feedback.
 
 **Title:** Pétanque: Boules & Petanca – real pétanque physics, need testers (will test back)
 
-> **App:** Pétanque: Boules & Petanca (Android, free)
-> **What it is:** A 3D pétanque game set in a Provençal village square. Pull back, aim and release to roll, lob or shoot. Play against the computer (3 levels), with a friend on the same phone, or in practice mode.
+> Hi! I'm a solo dev and I need testers for **Pétanque: Boules & Petanca**, a free 3D pétanque game for Android set in a Provençal village square. You pull back, aim and release to roll, lob or shoot your boule, and you can play the computer (three levels), a friend on the same phone, or just practise.
 >
-> **How to join:**
+> To join:
 > 1. Join the group: https://groups.google.com/g/petanque-testers
 > 2. Opt in: https://play.google.com/apps/testing/com.amunozo.petanque
 > 3. Install: https://play.google.com/store/apps/details?id=com.amunozo.petanque
 >
-> **Feedback I'm looking for:** Do the throws feel right? Is shooting too easy or too hard? Is the computer on medium a fair opponent? Is anything in the menus unclear?
+> I'd love to know whether the throws feel right, whether shooting is too easy or too hard, and whether the computer on medium is a fair opponent. If anything in the menus confuses you, tell me that too.
 >
-> I'll test your app back. Leave your link and I'll reply with a screenshot and real feedback, not just "nice app."
+> I'll test your app back: leave your link and I'll reply with a screenshot and real feedback, not just "nice app."
 
 ## 2. r/AndroidClosedTesting  [ ]
 Rules: free-form; never mention or link other subreddits. Norm: `[Test4Test]` and link exchange.
@@ -56,15 +55,11 @@ Rules: tester requests only in that thread; state category, test type,
 requirements, duration, feedback method, relationship. No incentives, no
 test exchanges, no review/rating requests.
 
-> **App:** Pétanque: Boules & Petanca, my own app (solo developer)
-> **Category:** Game, sports
-> **Test type:** Closed testing
-> **Requirements:** Android 5.0+, no account needed
-> **Duration/activity:** Stay opted in for 14 days; an occasional game helps
-> **What it does:** 3D pétanque against the computer or a friend on the same phone, with roll, lob and shoot throws
-> **Feedback wanted:** How the throws feel, the AI difficulty, anything unclear
-> **How to join:** Join https://groups.google.com/g/petanque-testers, then opt in at https://play.google.com/apps/testing/com.amunozo.petanque
-> **Feedback via:** a reply here or a DM
+> Solo dev here, looking for testers for my own game, **Pétanque: Boules & Petanca** (Game, Sports). It's a 3D pétanque game where you roll, lob or shoot against the computer or a friend on the same phone.
+>
+> It's a closed test: join https://groups.google.com/g/petanque-testers, then opt in at https://play.google.com/apps/testing/com.amunozo.petanque. Any phone with Android 5.0 or later works, and there's no sign-up inside the game. Please stay opted in for 14 days; a game now and then helps.
+>
+> I'd like feedback on how the throws feel, the computer's difficulty and anything that's unclear. Reply here or send me a DM.
 
 ## 4. r/playmygame  [ ]
 Rules: free and playable now, direct link, template, description ≥100 words,
