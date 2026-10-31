@@ -161,6 +161,7 @@ tell the owner exactly what to change in Play Console *before* it goes live:
    2026-10-29: recruitment posts drafted for 7 more communities (Reddit subs,
    itch.io, FR/ES Facebook groups), each following that community's rules:
    `store/tester-recruitment.md` (tick each one as posted).
+   2026-10-31: owner posted in 4 subreddits; waiting for testers.
    Rules research: `docs/research/tester-community-rules-2026-10-29.md`.
 4. Optional: native-speaker check of FR/IT/PT (and ES "mano", "Ordenador").
 
