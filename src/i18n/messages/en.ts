@@ -8,7 +8,6 @@ import type { Message } from '../types';
 export const en = {
   // ---- start menu ----
   'menu.aria': 'Main menu',
-  'menu.tagline': 'Boules in the village square',
   'menu.pick': 'Tap a game to start',
   'menu.practice.title': 'Practice',
   'menu.practice.sub': 'Throw at the jack, on your own',

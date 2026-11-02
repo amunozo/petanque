@@ -3,7 +3,6 @@ import type { Catalogue } from '../types';
 
 export const fr: Catalogue = {
   'menu.aria': 'Menu principal',
-  'menu.tagline': 'Les boules sur la place du village',
   'menu.pick': 'Touchez un mode de jeu pour commencer',
   'menu.practice.title': 'Entraînement',
   'menu.practice.sub': 'Visez le cochonnet, en solo',

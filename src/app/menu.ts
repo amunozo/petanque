@@ -155,9 +155,8 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   const logo = el('div', 'mn-logo');
   logo.setAttribute('aria-hidden', 'true');
   logo.append(el('i', 'mn-ball mn-ball-a'), el('i', 'mn-ball mn-jack'), el('i', 'mn-ball mn-ball-b'));
-  const tagline = el('div', 'mn-tagline');
   const head = el('div', 'mn-head');
-  head.append(logo, el('h1', 'mn-title', 'Pétanque'), tagline);
+  head.append(logo, el('h1', 'mn-title', 'Pétanque'));
 
   const practice = choice('mn-practice', ['j', 'a']);
   const match = choice('mn-match', ['a', 'b']);
@@ -214,7 +213,6 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
 
   const relabel = (): void => {
     root.setAttribute('aria-label', t('menu.aria'));
-    tagline.textContent = t('menu.tagline');
     pick.textContent = t('menu.pick');
     practice.title.textContent = t('menu.practice.title');
     practice.sub.textContent = t('menu.practice.sub');

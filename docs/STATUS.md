@@ -1,6 +1,6 @@
 # Project status & handoff
 
-Last updated: 2026-10-29 (tester recruitment posts drafted: store/tester-recruitment.md; LIVE: portal mode; LIVE: tappable menu with vs computer first, camera returns behind the circle after each throw, iPhone-Safari-only Add-to-Home-Screen hint). Read this first in a new session, together with
+Last updated: 2026-11-02 (LIVE v0.6.0: second court "Alps" with a Provence | Alps picker on the menu and in online rooms; menu tagline removed). Earlier: 2026-10-29 (tester recruitment posts drafted: store/tester-recruitment.md; portal mode; tappable menu). Read this first in a new session, together with
 `CLAUDE.md`. Work happens on branch `ccr-5ca53e30-ms79ka` (the repo's only
 code branch; `gh-pages` is the deploy output).
 
@@ -183,23 +183,22 @@ setting. Preview: https://petanque.amunozo.com/exp/exp-landing/ — built
 counterintuitive… more complicated and less fun". Classic slingshot controls
 stay. Branch kept for reference only; do not merge or revive without the
 owner asking.
-In progress: **`exp-derborence`** (started 2026-10-31) — second, purely visual,
-experimental venue recreating the real court at Derborence (Valais) from the
-owner's photos: log-framed gravel court, limestone rocks, dark Valais chalet
-("1920"), spruces + autumn larches, big boulder, cliffs. No people/tarps.
-Player-facing court picker (2026-11-02, uncommitted): menu card "Match length + Court"
-(Provence / Alps, swatches; `src/app/venuePicker.ts`, saved pref; picking switches the
-scene behind the menu; `src/app/venueSwitch.ts` shows "Loading court…" after 250 ms:
-label row + spinner swatch in the menu, a pill under ⋯ in game; matches never wait for
-the art). Online: host picks the court in the sheet, lobby reads "Quick · 7 · Alps",
-the invite line names it (`src/app/venueText.ts`); back on the menu the player's own
-court returns. `?venue=` still overrides at boot (dev). Short-phone menu tightened
-(≤680 px: title 42 px, top padding clears the language pills; emblem hides with the
-online row up to 960 px).
-Plumbing committed fdae5d1: `art/lib/venues.py` + `npm run art -- --venue
-derborence …` (outputs in `public/models/derborence/`, excluded from the PWA
-precache), `src/render/venues.ts` holds every per-venue render constant.
-Art is being made by an Opus subagent in `art/assets/derborence/`. Not pushed yet.
+LIVE 2026-11-02 (v0.6.0): **second court "Alps"** (venue id `derborence`; never shown
+as "Derborence"), inspired by the real court at Derborence (Valais): log-framed gravel
+court, limestone rocks, dark Valais chalet, spruces + autumn larches, big boulder,
+layered limestone cliffs. Flat valley-shade light on the court (owner: better for
+play), sun only on the mountains. Menu card "Match length + Court" (Provence/Provenza/
+Provença | Alps; `src/app/venuePicker.ts`, saved pref; picking switches the scene live via
+`PitchScene.setVenue`; "Loading court…" after 250 ms; matches never wait for the art).
+Online: the room creator picks, the joiner gets it (`venue` in POST /rooms, RoomState,
+snapshot and RoomInfo; additive, PROTOCOL_VERSION unchanged, missing = village); lobby
+"Quick · 7 · Alps". Alps art (~6.4 MB, `public/models/derborence/`) is NOT precached:
+downloaded on first pick, then StaleWhileRevalidate cache `venue-derborence`. Menu
+tagline removed (owner). Art pipeline: `npm run art -- --venue derborence …`
+(art/README.md). Release checklist: no new personal data (court id only), Play
+declarations and privacy page unchanged. Open: mountains could be warmer/more
+contrast, big boulder pale, mid-distance spruces washed by fog; one-off +3 textures
+after switching venues (does not grow).
 Online play: server DEPLOYED 2026-10-08 at
 https://petanque-server.amunozo-gamedev.workers.dev (GitHub secrets
 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID; deploy-server.yml deploys on

@@ -3,7 +3,6 @@ import type { Catalogue } from '../types';
 
 export const es: Catalogue = {
   'menu.aria': 'Menú principal',
-  'menu.tagline': 'Petanca en la plaza del pueblo',
   'menu.pick': 'Toca un modo de juego para empezar',
   'menu.practice.title': 'Práctica',
   'menu.practice.sub': 'Lanza al boliche, tú solo',
@@ -22,7 +21,7 @@ export const es: Catalogue = {
   'length.quick': 'Rápida',
   'length.standard': 'Estándar',
   'venue.label': 'Pista',
-  'venue.village': 'Provence',
+  'venue.village': 'Provenza',
   'venue.derborence': 'Alpes',
   'venue.loading': 'Cargando la pista…',
   'lang.label': 'Idioma',

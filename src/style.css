@@ -1489,17 +1489,6 @@ a.hud-item {
     0 6px 0 #a83b10,
     0 10px 18px rgba(38, 33, 48, 0.45);
 }
-.mn-tagline {
-  margin-top: 6px;
-  padding: 4px 12px;
-  border-radius: var(--r-pill);
-  background: var(--glass);
-  box-shadow: var(--shadow-sm);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.3px;
-  color: var(--ink-2);
-}
 .mn-buttons {
   display: flex;
   flex-direction: column;
@@ -1915,9 +1904,6 @@ body.is-dialog .tn-root {
     width: 12px;
     height: 12px;
   }
-  .mn-tagline {
-    display: none;
-  }
   .mn-btn {
     min-height: 56px;
     padding-top: 7px;
@@ -2041,7 +2027,6 @@ body.is-dialog .tn-root {
    (960 px: with the court row, long French/Portuguese titles need the emblem's room on ~915 px phones.) */
 @media (max-height: 960px) {
   .mn-root.has-online .mn-logo,
-  .mn-root.has-online.has-rejoin .mn-tagline,
   .mn-root.has-online.has-rejoin .mn-pick {
     display: none;
   }

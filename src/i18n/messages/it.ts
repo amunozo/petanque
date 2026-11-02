@@ -3,7 +3,6 @@ import type { Catalogue } from '../types';
 
 export const it: Catalogue = {
   'menu.aria': 'Menu principale',
-  'menu.tagline': 'Bocce nella piazza del paese',
   'menu.pick': 'Tocca una modalità per iniziare',
   'menu.practice.title': 'Allenamento',
   'menu.practice.sub': 'Lancia verso il pallino, da solo',
@@ -22,7 +21,7 @@ export const it: Catalogue = {
   'length.quick': 'Veloce',
   'length.standard': 'Standard',
   'venue.label': 'Campo',
-  'venue.village': 'Provence',
+  'venue.village': 'Provenza',
   'venue.derborence': 'Alpi',
   'venue.loading': 'Caricamento del campo…',
   'lang.label': 'Lingua',
