@@ -7,6 +7,8 @@
  * fitted tightly around the court and stays crisp. Tone mapping, saturation grade, sun colour
  * temperature / intensity, fill, shadow darkness, ambient occlusion, ground grain, exposure and fog
  * density are read live from config.look. The sun direction is not tunable: it must match the bake.
+ * A venue with `shade` (Derborence) turns the sun into a soft high key from the sky and drops the
+ * baked sun shadows and bounce: the court lies in the valley's shade, evenly lit.
  */
 import {
   ACESFilmicToneMapping,
@@ -126,8 +128,15 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
   /** Points the sun along the baked direction and fits its ortho shadow box around the court rectangle. */
   function aimSun(): void {
     dir.set(...venue.sun.dir); // toward the sun
-    sun.position.set(cx, 0, cz).addScaledVector(dir, STYLE.sunDistance);
     sky.setSunDirection(dir);
+    const shade = venue.shade;
+    if (shade) {
+      // valley shade: the directional light is a soft high key from the sky, not the sun
+      const el = (shade.keyElevationDeg * Math.PI) / 180;
+      const az = (shade.keyAzimuthDeg * Math.PI) / 180;
+      dir.set(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+    }
+    sun.position.set(cx, 0, cz).addScaledVector(dir, STYLE.sunDistance);
 
     // Light-space basis: the shadow camera looks along -dir.
     right.crossVectors(dir.clone().negate(), worldUp).normalize();
@@ -167,15 +176,17 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
         lastTemp = look.sunTempK;
         kelvinToColor(lastTemp, sun.color);
       }
-      sun.intensity = look.sunIntensity;
-      sun.shadow.intensity = look.shadowStrength;
-      setBakeStrength(look.shadowStrength, look.aoStrength);
-      setBounceStrength(look.bounceStrength);
+      const shade = venue.shade;
+      sun.intensity = look.sunIntensity * (shade ? shade.key : 1);
+      sun.shadow.intensity = look.shadowStrength * (shade ? shade.bouleShadow : 1);
+      // valley shade: no baked sun shadows / bounce (the sun does not reach the clearing), AO stays
+      setBakeStrength(shade ? 0 : look.shadowStrength, look.aoStrength * (shade ? shade.ao : 1));
+      setBounceStrength(shade ? 0 : look.bounceStrength);
       setGroundDetail(STYLE.grainTileA, STYLE.grainTileB, look.groundGrain);
-      hemi.intensity = look.fillIntensity;
+      hemi.intensity = look.fillIntensity * (shade ? shade.fill : 1);
       const curve = look.toneMapping in TONE_MAPPINGS ? look.toneMapping : 'neutral';
       renderer.toneMapping = TONE_MAPPINGS[curve]; // three recompiles the affected programs on change
-      renderer.toneMappingExposure = look.exposure * STYLE.toneGain[curve];
+      renderer.toneMappingExposure = look.exposure * (venue.shade ? venue.shade.exposure : 1) * STYLE.toneGain[curve];
       setGradeSaturation(look.saturation);
       fog.density = look.fogDensity;
       sky.follow(camera);

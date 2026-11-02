@@ -142,9 +142,9 @@ HEX_DERBORENCE = {
     "d_leaf_brown": "#9a7442",
     "d_leaf_red": "#b0482f",
     # Forest floor
-    "d_soil": "#6c5e4c",
+    "d_soil": "#695e51",
     "d_soil_dark": "#4f4538",
-    "d_litter": "#7b6a56",         # needle litter
+    "d_litter": "#77695a",         # needle litter
     "d_grass_dry": "#9a9067",
     "d_grass": "#82814f",
     "d_grass_green": "#6f7a42",
@@ -171,8 +171,8 @@ HEX_DERBORENCE = {
     "d_chalet_grey": "#5e5349",
     "d_stone_wall": "#c6c3ba",     # whitewashed / pale stone foundation
     "d_stone_wall_dark": "#9a968c",
-    "d_shutter": "#c39a5c",        # pale honey shutters
-    "d_shutter_dark": "#9f7a45",
+    "d_shutter": "#a98d68",        # pale honey shutters
+    "d_shutter_dark": "#7f6849",
     "d_plank": "#c8aa77",          # newer planks (bench)
     "d_roof": "#403d3b",
     "d_roof_edge": "#56524e",
@@ -192,12 +192,16 @@ HEX_DERBORENCE = {
     "d_bark_pine_grey": "#7b766e",
     "d_bark_deep": "#3c332d",
     # Backdrop (pre-lit and pre-hazed: drawn unlit)
-    "d_cliff_lit": "#dfbd8e",      # pale limestone in warm evening light
-    "d_cliff_lit_pale": "#eedac0",
-    "d_cliff_shade": "#8d97a6",    # the same rock in the valley's shade, hazed blue
-    "d_cliff_dark": "#7d8899",
+    "d_cliff_lit": "#d6bf98",      # pale limestone in warm evening light
+    "d_cliff_lit_pale": "#e4ddd0",
+    "d_cliff_shade": "#7f8a9a",    # the same rock in the valley's shade, hazed blue
+    "d_cliff_dark": "#687385",
     "d_scree": "#b4b2ad",
-    "d_forest_far": "#2f3d35",     # far spruce slopes in shade, hazed
+    "d_grass_far": "#a88a55",      # tawny autumn grass on the slopes and ledges below the cliffs
+    "d_grass_far_dry": "#b99d6a",
+    "d_snow": "#f3efe6",           # fresh dusting, in the low sun
+    "d_snow_shade": "#c9d3e0",
+    "d_forest_far": "#26332c",     # far spruce slopes in shade, hazed
     "d_forest_far_lit": "#6f7449",
     "d_larch_far": "#b3954f",
     "d_sky_horizon": "#d5e0ea",    # keep in sync with src/render/venues.ts (derborence sky.horizon)

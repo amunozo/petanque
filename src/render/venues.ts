@@ -83,11 +83,23 @@ export interface Venue {
   /** Hemisphere fill (sky / ground colours) and the radius of the sky dome (m). */
   fill: { hemiSky: number; hemiGround: number; skyRadius: number };
   /**
-   * Forest shade on the instanced trees (src/render/bakedLight.ts): their sun light follows the baked
-   * ground shade low on the tree, fading to full sun between fadeFrom..fadeTo m up; `foliage` is the
-   * weight on the needle / leaf cards (0..1). Absent = trees in full sun (open squares).
+   * Valley-shade lighting (src/render/lighting.ts): the court lies in the mountain's shadow, lit by a
+   * soft sky from above instead of the sun. The directional light becomes a mild high key from
+   * `keyElevationDeg` / `keyAzimuthDeg` (deg, same convention as the sun) at `key` x look.sunIntensity,
+   * with no baked sun shadows (the lightmaps' ambient occlusion still applies) and no baked bounce;
+   * `fill` scales look.fillIntensity, `exposure` look.exposure, `bouleShadow` the boules' real-time
+   * shadow darkness, `ao` look.aoStrength (the sky fill carries the scene here, so full baked AO reads
+   * too dark). The sun (sky glow, the pre-lit backdrop) keeps the baked direction. Absent = sunlit.
    */
-  treeShade?: { fadeFrom: number; fadeTo: number; foliage: number };
+  shade?: {
+    keyElevationDeg: number;
+    keyAzimuthDeg: number;
+    key: number;
+    fill: number;
+    exposure: number;
+    bouleShadow: number;
+    ao: number;
+  };
   /** Plain court / ground planes shown until the venue's court loads (or if it fails). */
   fallback: { court: number; ground: number };
 }
@@ -137,8 +149,8 @@ const VILLAGE: Venue = {
  * An alpine forest court: the petanque court at Derborence (Valais) on a late October afternoon.
  * Grey gravel framed by weathered logs and limestone stones, spruces and golden larches around, a
  * log chalet up the bank behind the far end and the cirque's limestone cliffs beyond (art/assets/
- * derborence/, art/lib/layout_derborence.py). Cooler sky and fill than the village: the clearing is
- * mostly in shade, with the low sun raking through the trees.
+ * derborence/, art/lib/layout_derborence.py). The clearing lies in the valley's shade (`shade`: soft
+ * sky light, no sun or tree shadows on the court); only the cliffs beyond catch the low sun.
  */
 const DERBORENCE: Venue = {
   id: 'derborence',
@@ -172,8 +184,8 @@ const DERBORENCE: Venue = {
   groundAlbedo: [0.31, 0.29, 0.25],
   // clear, pale alpine blue; the horizon matches art/lib/palette.py "d_sky_horizon"
   sky: {
-    zenith: 0x5a8acb,
-    mid: 0x8fb4da,
+    zenith: 0x3f72c4,
+    mid: 0x74a2d6,
     horizon: 0xd5e0ea,
     glow: 0xffe4c0,
     hazeBand: 0.14,
@@ -181,8 +193,9 @@ const DERBORENCE: Venue = {
   },
   // cool sky fill in the shade, darker forest-floor bounce
   fill: { hemiSky: 0xb8c7da, hemiGround: 0x8a7f6c, skyRadius: 70 },
-  // dense stand: trunks and low branches sit in the canopy's shade, the crown tops in the low sun
-  treeShade: { fadeFrom: 3, fadeTo: 14, foliage: 0.75 },
+  // the clearing lies in the valley's shade (only the cliffs behind catch the low sun): even sky
+  // light, no tree-shadow blotches on the court
+  shade: { keyElevationDeg: 62, keyAzimuthDeg: -30, key: 0.3, fill: 1.25, exposure: 1.0, bouleShadow: 0.55, ao: 0.65 },
   fallback: { court: 0xa19e97, ground: 0x6c5e4c },
 };
 

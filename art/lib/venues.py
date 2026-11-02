@@ -56,6 +56,11 @@ class Venue:
     # Palette entries of the bake's flat ground / court receivers (the albedo they bounce light with).
     ground_albedo: str = "earth"
     court_albedo: str = "dust"
+    # Atlas sun visibility of texels the sun cannot reach even without shadows (faces turned away
+    # from it). 1.0 keeps them "unshadowed" (flat-shaded faces: the game's N.L is 0 there anyway);
+    # 0.0 puts them in shade, needed where custom normals bend a turned-away face toward the sun
+    # (derborence's soft-shaded stones), which would otherwise light up as a bright wedge.
+    atlas_unlit_vis: float = 1.0
 
     def models_dir(self) -> str:
         return os.path.join(ROOT, self.models)
@@ -109,6 +114,7 @@ DERBORENCE = Venue(
     court_ground=("court_gravel", "court_surround", "court_litter"),
     ground_albedo="d_soil",
     court_albedo="d_gravel",
+    atlas_unlit_vis=0.0,
 )
 
 VENUES = {v.id: v for v in (VILLAGE, DERBORENCE)}

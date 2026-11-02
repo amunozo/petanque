@@ -112,7 +112,7 @@ def build_walls(m: MeshData, rng: Rng) -> None:
     for wi, (f, L) in enumerate(zip(walls, lengths)):
         gable = wi in (0, 2)
         # foundation: pale stone blocks in rough courses over darker mortar
-        f.quad(m, 0.0, -SINK, L, FOUND, -0.015, scale(P["d_stone_wall_dark"], 0.8))
+        f.quad(m, 0.0, -SINK, L, FOUND, -0.015, scale(P["d_stone_wall_dark"], 0.62))
         y = -SINK
         row = 0
         while y < FOUND - 0.02:
@@ -122,9 +122,11 @@ def build_walls(m: MeshData, rng: Rng) -> None:
                 w = rng.uniform(0.3, 0.62)
                 s0, s1 = max(0.0, s + 0.012), min(L, s + w - 0.012)
                 if s1 - s0 > 0.05:
-                    c = mix(P["d_stone_wall"], P["d_stone_wall_dark"], rng.random() * 0.55)
-                    c = mix(c, P["d_rock"], rng.random() * 0.25)
-                    f.quad(m, s0, y + 0.012, s1, y + h - 0.012, rng.uniform(0.0, 0.025), scale(c, 1 + rng.jitter(0.05)))
+                    # calm, weathered grey limestone: low per-block variation, a slow tonal drift
+                    drift = fbm(s * 0.5, y * 0.8, wi * 3.0, SEED + 21, 2)
+                    c = mix(P["d_stone_wall"], P["d_stone_wall_dark"], 0.2 + 0.3 * drift + rng.random() * 0.12)
+                    c = mix(c, P["d_rock"], 0.15 + rng.random() * 0.08)
+                    f.quad(m, s0, y + 0.012, s1, y + h - 0.012, rng.uniform(0.008, 0.02), scale(c, 1 + rng.jitter(0.02)))
                 s += w
             y += h
             row += 1
@@ -211,11 +213,19 @@ def shutter(m: MeshData, f: Frame, s0, y0, w, h, rng: Rng, louvres: bool = True)
     if louvres:
         ym = y0 + h * 0.48
         n = max(4, int((y0 + h - fr - ym) / 0.07))
+        f.quad(m, s0 + fr, ym, s0 + w - fr, y0 + h - fr, 0.03, dark)  # dark slot behind the slats
         for k in range(n):
             ya = ym + (y0 + h - fr - ym) * k / n
             yb = ym + (y0 + h - fr - ym) * (k + 1) / n
-            f.quad(m, s0 + fr, ya, s0 + w - fr, ya + (yb - ya) * 0.45, 0.047, dark)
-            f.quad(m, s0 + fr, ya + (yb - ya) * 0.45, s0 + w - fr, yb, 0.05, scale(base, 1.12))
+            # each slat tilted out and down (its top tucked in): the light shades every slat
+            i = [m.add_vert(f.p(ss_, yy, oo)) for ss_, yy, oo in
+                 ((s0 + fr, ya + (yb - ya) * 0.12, 0.062), (s0 + w - fr, ya + (yb - ya) * 0.12, 0.062),
+                  (s0 + w - fr, yb + (yb - ya) * 0.15, 0.036), (s0 + fr, yb + (yb - ya) * 0.15, 0.036))]
+            m.add_face(tuple(i), scale(base, 1.05))
+            i = [m.add_vert(f.p(ss_, yy, oo)) for ss_, yy, oo in
+                 ((s0 + fr, ya + (yb - ya) * 0.12, 0.036), (s0 + w - fr, ya + (yb - ya) * 0.12, 0.036),
+                  (s0 + w - fr, ya + (yb - ya) * 0.12, 0.062), (s0 + fr, ya + (yb - ya) * 0.12, 0.062))]
+            m.add_face(tuple(i), scale(base, 0.7))
         top_lower = ym - 0.02
     else:
         top_lower = y0 + h - fr
@@ -277,17 +287,22 @@ def build_gable_details(m: MeshData, rng: Rng) -> None:
             f.box(m, x + x0 * dw, yb + 0.05 + y0 * dh / 2, x + max(x1 * dw, x0 * dw + 0.02), yb + 0.05 + y1 * dh / 2,
                   0.08, 0.087, scale(P["d_white"], 0.88))
         x += dw + 0.06
-    # a wooden bench on the terrace along the foundation (pale, newer planks)
-    plank = P["d_plank"]
+    # a wooden bench on the terrace along the foundation: newer larch planks, already silvering, on
+    # four sturdy legs dug into the terrace, its backrest on posts against the stone base
+    plank = mix(P["d_plank"], P["d_log_grey"], 0.4)
+    leg = scale(mix(P["d_plank"], P["d_chalet_grey"], 0.6), 0.9)
     b0, b1 = sc - 1.25, sc + 1.25
     for k in range(2):  # seat planks
-        f.box(m, b0, 0.42, b1, 0.47, 0.08 + 0.17 * k, 0.24 + 0.17 * k, scale(plank, 0.95 + 0.08 * k),
-              top=scale(plank, 1.08))
-    for xx in (b0 + 0.15, b1 - 0.2):  # legs
-        f.box(m, xx, 0.0, xx + 0.06, 0.42, 0.12, 0.38, scale(plank, 0.8))
-    for k in range(3):  # backrest boards against the foundation
-        f.box(m, b0, 0.5 + 0.16 * k, b1, 0.64 + 0.16 * k, 0.02, 0.05, scale(plank, 0.92 + 0.06 * (k % 2)),
-              top=scale(plank, 1.1))
+        f.box(m, b0, 0.42, b1, 0.47, 0.09 + 0.17 * k, 0.25 + 0.17 * k, scale(plank, 0.95 + 0.06 * k),
+              top=scale(plank, 1.06))
+    f.box(m, b0 + 0.05, 0.36, b1 - 0.05, 0.42, 0.12, 0.38, scale(leg, 0.8))  # rail under the seat
+    for xx in (b0 + 0.12, b1 - 0.19):
+        for z0 in (0.1, 0.32):  # legs, sunk into the terrace
+            f.box(m, xx, -0.25, xx + 0.07, 0.42, z0, z0 + 0.07, leg)
+        f.box(m, xx, 0.0, xx + 0.07, 1.0, 0.025, 0.08, leg)  # backrest posts against the base
+    for k in range(3):  # backrest boards on the posts
+        f.box(m, b0, 0.52 + 0.15 * k, b1, 0.64 + 0.15 * k, 0.08, 0.11, scale(plank, 0.92 + 0.05 * (k % 2)),
+              top=scale(plank, 1.06))
 
 
 def build_side_details(m: MeshData, rng: Rng) -> None:

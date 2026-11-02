@@ -145,7 +145,8 @@ def build_wall(m: MeshData, rng: Rng) -> None:
 
 
 def build_steps(m: MeshData, wood: NMesh, rng: Rng) -> None:
-    """Stone treads with half-sunk log nosings, foot of the bank -> terrace."""
+    """Stone treads on riser stones, with cheek stones either side and half-sunk log nosings, foot of
+    the bank -> terrace."""
     sx, sw, n = site.STEPS["x"], site.STEPS["w"], site.STEPS["n"]
     zf = site.bank_foot(sx)
     run = site.BANK_RUN / n
@@ -159,6 +160,14 @@ def build_steps(m: MeshData, wood: NMesh, rng: Rng) -> None:
             px = sx - sw / 2 + w * (p + 0.5) + rng.jitter(0.04)
             add_stone(m, (px, top - 0.09, z_front - run * 0.55), (w * 0.52, 0.1, run * 0.5), rng.jitter(5.0), rng,
                       tilt=0.02, moss=0.2, lichen=0.2, block=True)
+        # riser stones under the front edge, down into the slope (the tread rests on them), and a
+        # cheek stone either side holding the step into the bank
+        rise = site.BANK_H / n
+        add_stone(m, (sx, top - 0.1 - rise * 0.5, z_front - 0.07), (sw * 0.5, rise * 0.5 + 0.08, 0.1), rng.jitter(2.0),
+                  rng, tilt=0.01, moss=0.15, lichen=0.2, block=True, base="d_rock_dark")
+        for side in (-1, 1):
+            add_stone(m, (sx + side * (sw / 2 + 0.13), top - 0.1, z_front - run * 0.5),
+                      (0.14, 0.17, run * 0.55), rng.jitter(4.0), rng, tilt=0.03, moss=0.3, lichen=0.2, block=True)
         # log nosing at the front edge of the tread, mostly sunk
         add_log(wood, (sx - sw / 2 - 0.08, top - 0.06, z_front + 0.02),
                 (sx + sw / 2 + 0.08, top - 0.05, z_front + 0.02), 0.075, SEED + 50 + k, sides=10, seg_len=0.35,
@@ -168,7 +177,7 @@ def build_steps(m: MeshData, wood: NMesh, rng: Rng) -> None:
         for k in (1, 4):
             z = zf - k * run - 0.1
             add_stone(m, (sx + dx + rng.jitter(0.08), site.ground_y(sx + dx, z) + 0.05, z), (0.28, 0.2, 0.25),
-                      rng.uniform(0, 360), rng, n=14, boxy=2.6, moss=0.4)
+                      rng.uniform(0, 360), rng, n=14, boxy=2.6, moss=0.2, base="d_rock_light")
 
 
 def build_slope_rocks(m: MeshData, rng: Rng) -> None:
@@ -188,7 +197,8 @@ def build_slope_rocks(m: MeshData, rng: Rng) -> None:
         r = rng.uniform(0.12, 0.32) if rng.random() < 0.85 else rng.uniform(0.35, 0.55)
         y = site.ground_y(x, z)
         add_stone(m, (x, y + r * 0.3, z), (r, r * rng.uniform(0.5, 0.75), r * rng.uniform(0.7, 1.0)),
-                  rng.uniform(0, 360), rng, n=rng.randrange(12, 17), boxy=rng.uniform(2.2, 3.4), moss=0.5)
+                  rng.uniform(0, 360), rng, n=rng.randrange(12, 17), boxy=rng.uniform(2.2, 3.4), moss=0.2, lichen=0.3,
+                  base="d_rock_light")  # pale like the wall: half-buried, they get little sky
         n += 1
 
 

@@ -322,7 +322,10 @@ def bake_scene(assets: dict, venue: venues.Venue, export_fn, quality: float = 1.
 
     for i, name in enumerate(("ground_light", atlas)):
         lit, flat, ao = results["lit"][i], results["flat"][i], results["ao"][i]
-        vis = np.where(flat > 1e-3, lit / np.maximum(flat, 1e-3), 1.0)
+        # texels the sun cannot reach even unshadowed: open floor (ground map), or the venue's choice
+        # for turned-away faces in the atlas (see Venue.atlas_unlit_vis)
+        unlit = 1.0 if i == 0 else venue.atlas_unlit_vis
+        vis = np.where(flat > 1e-3, lit / np.maximum(flat, 1e-3), unlit)
         # light denoise (the penumbrae are wider than this); AO is low-frequency, blurred more
         vis = _blur(np.clip(vis, 0, 1), 1.1 if i == 0 else 0.7)
         ao = _blur(np.clip(ao, 0, 1), 2.5 if i == 0 else 1.0)

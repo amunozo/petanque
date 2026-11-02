@@ -37,7 +37,7 @@ PREVIEW = {
     "views": [
         ("far", (0.5, 1.6, -6.0), (0.5, 0.4, -11.0), 34),
         ("side", (0.5, 1.5, -2.0), (3.0, 0.5, -6.0), 34),
-        ("shed", (-3.0, 2.0, 0.5), (-7.0, 1.0, -3.6), 34),
+        ("shed", (-3.0, 2.0, 0.5), (-6.9, 1.0, -4.0), 34),
         ("bbq", (1.5, 1.6, -9.0), (4.0, 0.6, -12.6), 34),
     ],
     "context": ["court", "terrain", "boulders"],
@@ -261,19 +261,28 @@ def shed(m: MeshData, rng: Rng) -> None:
     oh, ohz, t = 0.25, 0.28, 0.06
     slope = RISE / (W / 2)
     ridge = Hw + RISE + 0.05
-    roof = mix(P["d_roof"], P["d_chalet_grey"], 0.35)
+    # weathered grey board shingles in overlapping rows: each row's lower edge stands proud of the
+    # next, so every row turns a little more to the sky and casts a thin dark lip (the light models it)
+    roof = mix(P["d_log_grey"], P["d_chalet_grey"], 0.45)
+    lip = 0.03
     for side in (-1, 1):
-        rows = 5
+        rows = 6
         for r in range(rows):
             t0, t1 = r / rows, (r + 1) / rows
             x0 = side * (W / 2 + oh) * t0
             x1 = side * (W / 2 + oh) * t1
-            y0, y1 = ridge - slope * abs(x0), ridge - slope * abs(x1)
-            c = scale(roof, 1.0 + (0.05 if r % 2 else -0.04) + rng.jitter(0.03))
+            y0, y1 = ridge - slope * abs(x0), ridge - slope * abs(x1) + lip
+            c = scale(roof, 1.0 + rng.jitter(0.05))
             q = [(x0, y0, -D / 2 - ohz), (x0, y0, D / 2 + ohz), (x1, y1, D / 2 + ohz), (x1, y1, -D / 2 - ohz)]
             if side < 0:
                 q = [q[0], q[3], q[2], q[1]]
             lm.add_face(tuple(lm.add_vert(v) for v in q), c)
+            # the row's butt edge (facing down the slope)
+            e = [(x1, y1, -D / 2 - ohz), (x1, y1, D / 2 + ohz), (x1, y1 - lip - 0.004, D / 2 + ohz),
+                 (x1, y1 - lip - 0.004, -D / 2 - ohz)]
+            if side < 0:
+                e = list(reversed(e))
+            lm.add_face(tuple(lm.add_vert(v) for v in e), scale(c, 0.62))
             lm.add_face(tuple(lm.add_vert((v[0], v[1] - t, v[2])) for v in reversed(q)), scale(P["d_chalet"], 0.75))
         xe = side * (W / 2 + oh)
         ye = ridge - slope * (W / 2 + oh)
@@ -286,8 +295,9 @@ def shed(m: MeshData, rng: Rng) -> None:
             ny, nxx = abs(ny), nxx * side * -1
             hw = 0.06
             sgn = 1.0 if zz > 0 else -1.0
-            corners = [(p0[0], p0[1] + 0.02), (p1[0], p1[1] + 0.02), (p1[0], p1[1] - t - 0.06), (p0[0], p0[1] - t - 0.06)]
-            front = [(cx_, cy_, zz + sgn * 0.025) for cx_, cy_ in corners]
+            # deep enough to hide the shingle rows' stepped ends
+            corners = [(p0[0], p0[1] + 0.07), (p1[0], p1[1] + 0.07), (p1[0], p1[1] - t - 0.07), (p0[0], p0[1] - t - 0.07)]
+            front = [(cx_, cy_, zz + sgn * 0.035) for cx_, cy_ in corners]
             back = [(cx_, cy_, zz - sgn * 0.01) for cx_, cy_ in corners]
             # wind the gable-side face outward (+z face counter-clockwise seen from +z)
             def wind(q, outward_z):
@@ -298,7 +308,7 @@ def shed(m: MeshData, rng: Rng) -> None:
             lm.add_face(tuple(lm.add_vert(v) for v in wind(front, sgn)), post)
             lm.add_face(tuple(lm.add_vert(v) for v in wind(back, -sgn)), post)
     # ridge cap
-    lm.append(box(0.0, ridge + 0.02, 0.0, 0.14, 0.05, D + 2 * ohz + 0.04, scale(roof, 0.85)))
+    lm.append(box(0.0, ridge + 0.03, 0.0, 0.16, 0.06, D + 2 * ohz + 0.04, scale(roof, 0.8), top_color=scale(roof, 0.95)))
     x, z = site.SHED
     y = site.ground_y(x, z) + 0.12
     m.append(place(lm, (x, y, z), 0.0))

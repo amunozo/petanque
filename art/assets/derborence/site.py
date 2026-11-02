@@ -44,7 +44,7 @@ STEPS = {"x": -2.9, "w": 1.35, "n": 7}   # centre x, width and count of the step
 PINE = (3.15, -7.7)              # the big pine with the floodlight (instanced, see layout_derborence)
 BOULDER = (8.0, -11.9)           # the huge limestone block
 BBQ = (3.15, -12.35)             # dry-stone barbecue / table at the foot of the bank, right
-SHED = (-7.2, -3.6)              # small wooden shed (door toward the court, +X)
+SHED = (-6.95, -4.05)            # small wooden shed (door toward the court, +X), clear of the larch at (-6.8, -1.8)
 
 
 def _ss(a: float, b: float, x: float) -> float:
