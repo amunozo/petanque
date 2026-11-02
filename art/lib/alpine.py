@@ -117,26 +117,63 @@ def block_points(rng: Rng, radii, chamfer: float = 0.22, jitter: float = 0.1):
     return pts
 
 
-def rock_color(rng: Rng, ny: float, y: float, base: str = "d_rock", moss: float = 0.0, lichen: float = 0.15,
-               x: float = 0.0, z: float = 0.0) -> Color:
-    """Bluish-grey limestone: lighter, weathered tops; darker, damp undersides; lichen / moss spots."""
+def stone_base(rng: Rng, base: str = "d_rock") -> Color:
+    """One stone's own limestone tone (picked once per stone, so its faces read as one material)."""
     c = mix(P[base], rng.pick([P["d_rock_light"], P["d_rock_dark"], P["d_rock_warm"], P["d_rock"]]),
-            rng.uniform(0.1, 0.55))
-    c = mix(c, P["d_rock_light"], ss(0.3, 0.95, ny) * 0.3)
-    c = mix(c, P["d_rock_dark"], ss(-0.1, -0.8, ny) * 0.55)
-    if rng.random() < lichen:
-        c = mix(c, P["d_lichen"], rng.uniform(0.3, 0.7))
+            rng.uniform(0.1, 0.45))
+    return scale(c, 1.0 + rng.jitter(0.05))
+
+
+def rock_color(rng: Rng, ny: float, y: float, base: Color, moss: float = 0.0, lichen: float = 0.15,
+               x: float = 0.0, z: float = 0.0, seed: int = 0) -> Color:
+    """
+    Bluish-grey limestone around the stone's own tone `base`: gently paler weathered tops, slightly
+    darker damp undersides, lichen / moss in spatially coherent patches (noise, not per face). The
+    per-face variation is kept tiny: the lighting, not the albedo, should model the facets.
+    """
+    c = mix(base, P["d_rock_light"], ss(0.3, 0.95, ny) * 0.15)
+    c = mix(c, P["d_rock_dark"], ss(-0.1, -0.8, ny) * 0.25)
+    if lichen > 0:
+        lz = fbm(x * 5.0, y * 5.0, z * 5.0, seed + 31, 2)
+        c = mix(c, P["d_lichen"], ss(0.62, 0.78, lz) * min(1.0, lichen * 2.5) * 0.5)
     if moss > 0 and ny > 0.1:
         mz = fbm(x * 2.0, y * 2.0, z * 2.0, 77, 2)
-        c = mix(c, mix(P["d_moss"], P["d_moss_dark"], rng.random()), ss(0.45, 0.6, mz) * moss)
-    return scale(c, 1.0 + rng.jitter(0.06))
+        c = mix(c, mix(P["d_moss"], P["d_moss_dark"], ss(0.4, 0.7, fbm(x * 6.0, y * 6.0, z * 6.0, 78, 2))),
+                ss(0.45, 0.6, mz) * moss * ss(0.1, 0.5, ny))
+    return scale(c, 1.0 + rng.jitter(0.02))
+
+
+def _burn_face(rng: Rng, ny: float, moss: float, lichen: float) -> None:
+    """The draws the first art pass made per stone face (keeps the asset's random sequence)."""
+    rng.pick([0, 1, 2, 3])
+    rng.uniform(0.1, 0.55)
+    if rng.random() < lichen:
+        rng.uniform(0.3, 0.7)
+    if moss > 0 and ny > 0.1:
+        rng.random()
+    rng.jitter(0.06)
+
+
+def corner_normals(m: MeshData) -> dict:
+    """Per-face corner normals (game coords) of a MeshData, by face index: softened stone shading.
+    weld() carries them over and stone_object() writes them as custom split normals."""
+    d = m.__dict__.get("corner_normals")
+    if d is None:
+        d = m.__dict__["corner_normals"] = {}
+    return d
+
+
+def _blend_n(fn, sn, k: float):
+    return norm((fn[0] * (1 - k) + sn[0] * k, fn[1] * (1 - k) + sn[1] * k, fn[2] * (1 - k) + sn[2] * k))
 
 
 def add_stone(m: MeshData, centre, radii, yaw_deg: float, rng: Rng, n: int = 14, boxy: float = 3.0,
               tilt: float = 0.15, base: str = "d_rock", moss: float = 0.0, lichen: float = 0.15,
-              flat_base: float = 0.35, block: bool = False) -> None:
-    """An angular limestone stone (flat shaded, per-face colours) centred at `centre`; `block`: a
-    squared building stone (walls, steps) instead of a field stone."""
+              flat_base: float = 0.35, block: bool = False, soft: float | None = None) -> None:
+    """An angular limestone stone (faceted, one tone per stone) centred at `centre`; `block`: a
+    squared building stone (walls, steps) instead of a field stone. `soft` (0..1, default 0.6 for
+    field stones, 0.4 for blocks): how far the shading normals bend toward the stone's rounded
+    (ellipsoid) normal, so the sun lights the stone as one volume instead of a jumble of facets."""
     pts = block_points(rng, radii) if block else stone_points(rng, radii, n, boxy, flat_base)
     a = math.radians(yaw_deg)
     ca, sa = math.cos(a), math.sin(a)
@@ -146,31 +183,45 @@ def add_stone(m: MeshData, centre, radii, yaw_deg: float, rng: Rng, n: int = 14,
         # small tilt, then yaw, then translate
         y2 = y + x * tx + z * tz
         out.append((centre[0] + x * ca + z * sa, centre[1] + y2, centre[2] - x * sa + z * ca))
+    k = soft if soft is not None else (0.4 if block else 0.6)
+    # colours from a private generator: the shared `rng` is drawn exactly as before (_burn_face), so
+    # every later random placement of the asset stays where it was
+    seed = (int(round(centre[0] * 1000)) * 73856093) ^ (int(round(centre[1] * 1000)) * 19349663) ^ \
+        (int(round(centre[2] * 1000)) * 83492791)
+    crng = Rng(seed & 0x7FFFFFFF)
+    tone = stone_base(crng, base)
+    rxz2 = max(1e-4, ((radii[0] + radii[2]) / 2) ** 2)
+    ry2 = max(1e-4, radii[1] ** 2)
+    cn = corner_normals(m)
     for f in hull(out):
         idx = tuple(m.add_vert(v) for v in f)
         fi = len(m.faces)
         m.add_face(idx, (0.5, 0.5, 0.5))
         nrm = m.face_normal(fi)
         c = m.face_center(fi)
-        m.colors[fi] = rock_color(rng, nrm[1], c[1] - centre[1], base, moss, lichen, c[0], c[2])
+        _burn_face(rng, nrm[1], moss, lichen)
+        m.colors[fi] = rock_color(crng, nrm[1], c[1] - centre[1], tone, moss, lichen, c[0], c[2], seed & 0xFFFF)
+        if k > 0:
+            cn[fi] = [_blend_n(nrm, norm(((v[0] - centre[0]) / rxz2, (v[1] - centre[1]) / ry2,
+                                           (v[2] - centre[2]) / rxz2)), k) for v in f]
 
 
 # --- logs -----------------------------------------------------------------------------------
 
 def log_color(seed: int, along: float, ang: float, col_k: int, sides: int, up: float, crack: float,
               ground_y: float) -> Color:
-    """Silver-grey weathered log: fine dark checks along the grain, bleached top, darker, mossy foot."""
+    """Silver-grey weathered log: soft darker checks along the grain, bleached top, darker, mossy foot.
+    Kept low in contrast (the faces are thin strips: strong per-strip tones read as stripes)."""
     grain = value_noise(col_k * 1.0, along * 0.9, 0.0, seed + 3)
     fine = value_noise(col_k * 1.0 + 0.5, along * 2.7, 3.0, seed + 4)
     streak = fbm(col_k * 0.45, along * 0.3, 0.0, seed + 5, 2)
-    c = mix(P["d_log"], P["d_log_grey"], ss(0.35, 0.7, streak) * 0.9)
-    c = mix(c, P["d_log_light"], ss(0.25, 0.9, up) * 0.35)                  # sun-bleached top
-    c = mix(c, P["d_log_dark"], ss(0.5, 0.78, grain) * 0.85)                # dark grain lines / checks
-    c = mix(c, P["d_log_crack"], ss(0.8, 0.95, fine) * 0.45)
-    c = mix(c, P["d_log_light"], ss(0.3, 0.08, grain) * 0.4 * ss(-0.2, 0.5, up))
-    c = mix(c, P["d_log_dark"], ss(0.15, -0.6, up) * 0.6)                   # shaded, damp underside
-    c = mix(c, P["d_moss_dark"], ss(0.0, -0.7, up) * 0.35 * ss(0.4, 0.7, fbm(along, col_k * 0.3, 1, seed + 9, 2)))
-    c = mix(c, P["d_log_crack"], crack)
+    c = mix(P["d_log"], P["d_log_grey"], ss(0.35, 0.7, streak) * 0.7)
+    c = mix(c, P["d_log_light"], ss(0.25, 0.9, up) * 0.25)                  # sun-bleached top
+    c = mix(c, P["d_log_dark"], ss(0.55, 0.85, grain) * 0.5)                # darker grain lines / checks
+    c = mix(c, P["d_log_crack"], ss(0.85, 0.97, fine) * 0.35)
+    c = mix(c, P["d_log_dark"], ss(0.15, -0.6, up) * 0.4)                   # shaded, damp underside
+    c = mix(c, P["d_moss_dark"], ss(0.0, -0.7, up) * 0.3 * ss(0.4, 0.7, fbm(along, col_k * 0.3, 1, seed + 9, 2)))
+    c = mix(c, P["d_log_crack"], crack * 0.8)
     return c
 
 
@@ -310,11 +361,12 @@ def add_tuft(m: MeshData, normals: list, x: float, y: float, z: float, rng: Rng,
 
 def add_boulder(m: MeshData, centre, radii, yaw_deg: float, rng: Rng, n: int = 40, boxy: float = 4.0,
                 cuts: int = 2, rough: float = 0.04, moss: float = 0.5, seed: int = 0, sink: float = 0.15,
-                base: str = "d_rock") -> None:
+                base: str = "d_rock", soft: float = 0.7) -> None:
     """
     A big angular limestone block: convex hull of a boxy point cloud, its faces subdivided and
     roughened with noise, flat shaded. Colours per small face: pale bluish grey, darker vertical
     water streaks on steep faces, lichen, moss on the up-facing parts, darker toward the ground.
+    `soft`: shading normals bent toward the smooth vertex normals (one lit volume, facets kept subtle).
     """
     pts = stone_points(rng, radii, n, boxy, flat_base=0.9)
     a = math.radians(yaw_deg)
@@ -339,6 +391,7 @@ def add_boulder(m: MeshData, centre, radii, yaw_deg: float, rng: Rng, n: int = 4
         v.co += nrm * (k * rough * size * 2.0)
     bm.normal_update()
     cx, cy, cz = centre
+    cn = corner_normals(m)
     for f in bm.faces:
         idx = tuple(m.add_vert((cx + v.co.x, cy + v.co.y - sink * radii[1], cz + v.co.z)) for v in f.verts)
         nrm = f.normal
@@ -348,13 +401,17 @@ def add_boulder(m: MeshData, centre, radii, yaw_deg: float, rng: Rng, n: int = 4
         col = mix(col, P["d_rock_warm"], ss(0.5, 0.75, fbm(wx * 0.3, wy * 0.3, wz * 0.3, seed + 2, 2)) * 0.35)
         streak = fbm(wx * 2.5 + wz * 2.5, wy * 0.25, 0.0, seed + 3, 2)
         steep = 1.0 - abs(nrm.y)
-        col = mix(col, P["d_rock_dark"], ss(0.55, 0.75, streak) * 0.6 * steep)
-        col = mix(col, P["d_lichen"], ss(0.7, 0.85, fbm(wx * 1.7, wy * 1.7, wz * 1.7, seed + 4, 2)) * 0.5)
+        col = mix(col, P["d_rock_dark"], ss(0.55, 0.8, streak) * 0.35 * steep)
+        col = mix(col, P["d_lichen"], ss(0.7, 0.85, fbm(wx * 1.7, wy * 1.7, wz * 1.7, seed + 4, 2)) * 0.35)
         mz = fbm(wx * 0.9, wy * 0.9, wz * 0.9, seed + 5, 3)
         mcol = mix(P["d_moss"], P["d_moss_dark"], ss(0.5, 0.7, mz))
         col = mix(col, mcol, ss(0.15, 0.6, nrm.y) * ss(0.4, 0.62, mz) * moss)
-        col = mix(col, P["d_rock_dark"], ss(radii[1] * 0.4, -radii[1] * 0.3, c0.y) * 0.45)
-        m.add_face(idx, scale(col, 1.0 + rng.jitter(0.05)))
+        col = mix(col, P["d_rock_dark"], ss(radii[1] * 0.4, -radii[1] * 0.3, c0.y) * 0.3)
+        fi = len(m.faces)
+        m.add_face(idx, scale(col, 1.0 + rng.jitter(0.05) * 0.4))
+        if soft > 0:
+            fn = (nrm.x, nrm.y, nrm.z)
+            cn[fi] = [_blend_n(fn, (v.normal.x, v.normal.y, v.normal.z), soft) for v in f.verts]
     bm.free()
 
 
@@ -371,22 +428,63 @@ def weld(m: MeshData, eps: float = 1e-4) -> MeshData:
         if key not in index:
             index[key] = out.add_vert(v)
         remap.append(index[key])
+    cn = m.__dict__.get("corner_normals") or {}
+    ocn = corner_normals(out) if cn else {}
     for fi, (f, c) in enumerate(zip(m.faces, m.colors)):
         g = []
-        for i in f:
+        ns = []
+        for k, i in enumerate(f):
             j = remap[i]
             if j not in g:
                 g.append(j)
+                if fi in cn:
+                    ns.append(cn[fi][k])
         if len(g) >= 3:
+            if fi in cn:
+                ocn[len(out.faces)] = ns
             out.add_face(tuple(g), c, smooth=fi in m.smooth)
     return out
 
 
-def to_object_flat(nm: "NMesh", name: str, material, eps: float = 1e-4):
+def stone_object(m: MeshData, name: str, material):
+    """
+    A flat-coloured MeshData with stones (add_stone / add_boulder) as a welded Blender object whose
+    stone faces carry their softened corner normals as custom split normals (other faces keep their
+    flat normal). Flat shading stays in the colours and the silhouette; the light reads per stone.
+    Triangulated, keeping the custom normals.
+    """
+    from .mesh import to_object
+    from .modifiers import triangulate
+
+    w = weld(m)
+    obj = to_object(w, name, material)
+    cn = w.__dict__.get("corner_normals") or {}
+    me = obj.data
+    # start from Blender's own corner normals (flat faces: the face normal; faces marked smooth:
+    # averaged), then bend the stone faces' corners
+    loops: list = [tuple(c.vector) for c in me.corner_normals]
+    for poly in me.polygons:
+        ns = cn.get(poly.index)
+        if ns is None:
+            continue
+        for k, li in enumerate(poly.loop_indices):
+            if k < len(ns):
+                n = ns[k]
+                loops[li] = (n[0], -n[2], n[1])
+    for poly in me.polygons:
+        poly.use_smooth = True
+    me.normals_split_custom_set(loops)
+    mod = triangulate(obj)
+    mod.keep_custom_normals = True
+    return obj
+
+
+def to_object_flat(nm: "NMesh", name: str, material, eps: float = 1e-4, blend: float = 0.0):
     """
     An NMesh (flat colour per face on smooth custom normals) as a Blender object with welded
     vertices (one lightmap island per surface, not per face): vertices merge where both position and
-    normal agree, and the colour attribute is written per face corner.
+    normal agree, and the colour attribute is written per face corner. `blend` (0..1) mixes each
+    corner's colour toward the average of the faces sharing that vertex (soft grain, no stripes).
     """
     from .mesh import to_object
 
@@ -412,9 +510,21 @@ def to_object_flat(nm: "NMesh", name: str, material, eps: float = 1e-4):
             face_cols.append(c)
     obj = to_object(m, name, material, normals=normals)
     attr = obj.data.color_attributes["Col"]
+    avg = None
+    if blend > 0:
+        acc = [[0.0, 0.0, 0.0, 0] for _ in m.verts]
+        for f, c in zip(m.faces, face_cols):
+            for i in f:
+                a = acc[i]
+                a[0] += c[0]
+                a[1] += c[1]
+                a[2] += c[2]
+                a[3] += 1
+        avg = [(a[0] / a[3], a[1] / a[3], a[2] / a[3]) if a[3] else (1.0, 1.0, 1.0) for a in acc]
     flat: list[float] = []
     for poly, c in zip(obj.data.polygons, face_cols):
-        for _ in range(poly.loop_total):
-            flat.extend((c[0], c[1], c[2], 1.0))
+        for vi in poly.vertices:
+            cc = mix(c, avg[vi], blend) if avg is not None else c
+            flat.extend((cc[0], cc[1], cc[2], 1.0))
     attr.data.foreach_set("color", flat)
     return obj

@@ -35,6 +35,16 @@ import {
 import { gradeShader } from './grade';
 import { VENUES, type Venue, type VenueTextures } from './venues';
 
+/**
+ * Forest shade on the instanced trees (venues with `treeShade`): their wood and needle cards are not
+ * in the lightmaps, so in a dense stand they would stay in full sun while the ground and everything
+ * around them lies in the canopy's shade. Low on the tree, the sun term follows the baked ground
+ * sun visibility just beside the fragment toward the sun (rays through the same canopy), fading to
+ * full sun between fadeFrom..fadeTo m up (the crowns' sunlit tops). z = weight on the needle cards.
+ */
+const treeShade = { value: new Vector3() };
+let treeShadeOn = false;
+
 /** Shared uniforms (one write updates every patched material). x = sun shadow strength, y = AO strength. */
 const strength = { value: { x: 1, y: 1 } as { x: number; y: number } };
 const groundMap: { value: Texture } = { value: whiteTexture() };
@@ -66,6 +76,8 @@ const detail = { value: new Vector3(0, 0, 0) };
  * lightmaps were baked with exactly these values.
  */
 export function configureBakedLight(venue: Venue): void {
+  treeShadeOn = venue.treeShade !== undefined;
+  if (venue.treeShade) treeShade.value.set(venue.treeShade.fadeFrom, venue.treeShade.fadeTo, venue.treeShade.foliage);
   rect.value.set(venue.groundLightRect.x0, venue.groundLightRect.z0, venue.groundLightRect.size);
   courtRect.value.set(venue.courtLightRect.x0, venue.courtLightRect.z0, venue.courtLightRect.w, venue.courtLightRect.d);
   sunDir.value.set(...venue.sun.dir);
@@ -260,6 +272,51 @@ const SAMPLE = /* glsl */ `
 #endif
 `;
 
+const TREE_SHADE_VERTEX = /* glsl */ `
+#ifdef USE_INSTANCING
+  vTreeWorld = ( modelMatrix * instanceMatrix * vec4( transformed, 1.0 ) ).xyz;
+#else
+  vTreeWorld = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
+#endif
+`;
+
+const TREE_SHADE_UNIFORMS = /* glsl */ `
+uniform sampler2D uBakeMap;
+uniform vec3 uBakeRect;
+uniform vec2 uBakeStrength;
+uniform vec3 uTreeShade;
+uniform vec3 uTreeSunDir;
+varying vec3 vTreeWorld;
+`;
+
+/** Multiplies the direct (sun) light by the forest shade (see treeShade); `weight` 1 = wood. */
+const treeShadeFragment = (weight: string): string => /* glsl */ `
+  {
+    vec2 tsDir = normalize( uTreeSunDir.xz + vec2( 1e-5 ) );
+    vec2 tsXZ = vTreeWorld.xz + tsDir * 0.5;
+    vec2 tsUv = vec2( ( tsXZ.x - uBakeRect.x ) / uBakeRect.z, 1.0 - ( tsXZ.y - uBakeRect.y ) / uBakeRect.z );
+    vec2 tsEdge = min( tsUv, 1.0 - tsUv );
+    float tsVis = mix( 1.0, texture2D( uBakeMap, clamp( tsUv, 0.0, 1.0 ) ).r, step( 0.0, min( tsEdge.x, tsEdge.y ) ) );
+    float tsW = ( 1.0 - smoothstep( uTreeShade.x, uTreeShade.y, vTreeWorld.y ) ) * ${weight} * uBakeStrength.x;
+    reflectedLight.directDiffuse *= mix( 1.0, tsVis, tsW );
+  }
+`;
+
+/** Adds the forest-shade term to a tree material's shader (only when the venue asks for it). */
+function patchTreeShade(shader: WebGLProgramParametersWithUniforms, weight: string): void {
+  shader.uniforms.uBakeMap = groundMap;
+  shader.uniforms.uBakeRect = rect;
+  shader.uniforms.uBakeStrength = strength;
+  shader.uniforms.uTreeShade = treeShade;
+  shader.uniforms.uTreeSunDir = sunDir;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nvarying vec3 vTreeWorld;')
+    .replace('#include <project_vertex>', `#include <project_vertex>\n${TREE_SHADE_VERTEX}`);
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>\n${TREE_SHADE_UNIFORMS}`)
+    .replace('#include <aomap_fragment>', `${treeShadeFragment(weight)}\n#include <aomap_fragment>`);
+}
+
 export type BakeKind = 'ground' | 'atlas';
 
 /**
@@ -381,9 +438,10 @@ export function woodMaterial<M extends Material>(material: M): M {
         '#include <aomap_fragment>',
         'reflectedLight.indirectDiffuse += groundFill( normal, diffuseColor.rgb, 0.75, vec3( 0.04 ) );\n#include <aomap_fragment>',
       );
+    if (treeShadeOn) patchTreeShade(shader, '1.0');
     gradeShader(shader);
   };
-  material.customProgramCacheKey = () => 'wood-v2';
+  material.customProgramCacheKey = () => (treeShadeOn ? 'wood-v2-shade' : 'wood-v2');
   return material;
 }
 
@@ -397,8 +455,9 @@ export function foliageMaterial<M extends Material>(material: M): M {
       '#include <normal_fragment_begin>',
       ShaderChunk.normal_fragment_begin.replace('normal *= faceDirection;', ''),
     );
+    if (treeShadeOn) patchTreeShade(shader, 'uTreeShade.z');
     gradeShader(shader);
   };
-  material.customProgramCacheKey = () => 'foliage-v1';
+  material.customProgramCacheKey = () => (treeShadeOn ? 'foliage-v1-shade' : 'foliage-v1');
   return material;
 }

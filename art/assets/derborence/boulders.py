@@ -6,7 +6,7 @@ and a few stones scattered in the forest floor. Angular convex blocks, subdivide
 """
 from __future__ import annotations
 
-from lib.alpine import add_boulder, add_stone, weld
+from lib.alpine import add_boulder, add_stone, weld, stone_object
 from lib.materials import palette_material
 from lib.mesh import MeshData, to_object
 from lib.modifiers import triangulate
@@ -64,6 +64,5 @@ def build():
         radii = (r, r * rng.uniform(0.45, 0.75), r * rng.uniform(0.6, 1.0))
         add_stone(m, (x, site.ground_y(x, z) + r * 0.05, z), radii, rng.uniform(0, 360), rng, n=12, boxy=2.6, moss=0.3)
         n += 1
-    o = to_object(weld(m), "boulders", palette_material())
-    triangulate(o)
+    o = stone_object(m, "boulders", palette_material())
     return [o]

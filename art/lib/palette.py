@@ -160,10 +160,10 @@ HEX_DERBORENCE = {
     "d_log_crack": "#38352f",
     "d_log_end": "#b5a88f",
     # Limestone (bluish grey, angular)
-    "d_rock": "#9da4aa",
-    "d_rock_light": "#b5babd",
-    "d_rock_dark": "#68707a",
-    "d_rock_warm": "#a5a199",
+    "d_rock": "#90969a",
+    "d_rock_light": "#a6aaac",
+    "d_rock_dark": "#646a71",
+    "d_rock_warm": "#9a968e",
     "d_lichen": "#a3a585",
     # Chalet (Valais blockbau)
     "d_chalet": "#4b3d32",

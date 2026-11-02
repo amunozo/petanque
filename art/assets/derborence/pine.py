@@ -11,11 +11,9 @@ it points at the court).
 from __future__ import annotations
 
 import math
-import os
 
-from lib import venues
 from lib.alpine import NMesh, VMesh, add, norm, ss
-from lib.conifer import TILES, Cards, conifer_atlas, crown_normal, tube, tube_flat
+from lib.conifer import TILES, Cards, conifer_atlas_files, crown_normal, tube, tube_flat
 from lib.materials import leaf_material, palette_material
 from lib.mesh import to_object
 from lib.modifiers import triangulate
@@ -166,8 +164,7 @@ def _smooth_normals(vm: VMesh, out: list, base: int) -> None:
 
 
 def build():
-    leaf_path = os.path.join(venues.models_dir(), "leaves.png")
-    conifer_atlas(leaf_path)
+    leaf_path = conifer_atlas_files()
     mat = palette_material()
     lmat = leaf_material(leaf_path)
     trunk, wood, cards = build_pine()

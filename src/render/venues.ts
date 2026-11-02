@@ -82,6 +82,12 @@ export interface Venue {
   sky: SkyStyle;
   /** Hemisphere fill (sky / ground colours) and the radius of the sky dome (m). */
   fill: { hemiSky: number; hemiGround: number; skyRadius: number };
+  /**
+   * Forest shade on the instanced trees (src/render/bakedLight.ts): their sun light follows the baked
+   * ground shade low on the tree, fading to full sun between fadeFrom..fadeTo m up; `foliage` is the
+   * weight on the needle / leaf cards (0..1). Absent = trees in full sun (open squares).
+   */
+  treeShade?: { fadeFrom: number; fadeTo: number; foliage: number };
   /** Plain court / ground planes shown until the venue's court loads (or if it fails). */
   fallback: { court: number; ground: number };
 }
@@ -157,7 +163,7 @@ const DERBORENCE: Venue = {
     groundBounce: 'ground_bounce.webp',
     atlasBounce: 'derborence_bounce.webp',
     groundDetail: 'ground_detail.png',
-    leaves: 'leaves.png',
+    leaves: 'leaves.webp',
   },
   sun: DERBORENCE_SUN,
   groundLightRect: DERBORENCE_GROUND_LIGHT_RECT,
@@ -175,6 +181,8 @@ const DERBORENCE: Venue = {
   },
   // cool sky fill in the shade, darker forest-floor bounce
   fill: { hemiSky: 0xb8c7da, hemiGround: 0x8a7f6c, skyRadius: 70 },
+  // dense stand: trunks and low branches sit in the canopy's shade, the crown tops in the low sun
+  treeShade: { fadeFrom: 3, fadeTo: 14, foliage: 0.75 },
   fallback: { court: 0xa19e97, ground: 0x6c5e4c },
 };
 

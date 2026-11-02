@@ -5,7 +5,7 @@ props.glb (derborence): the clearing's furniture, all weathered wood and dry sto
   - the dry-stone barbecue / table with a big slab on top, at the foot of the bank (right)
   - the small plank shed with its wooden barrel on a cradle (left of the court)
   - a pile of two big logs in front of the huge boulder, a low dry-stone wall on the left,
-    a few old cut stumps and exposed roots
+    a few old cut stumps
 Two objects on the lightmap atlas: `props` (flat shaded: stone, planks, stumps) and `props_wood`
 (round logs: flat-coloured grain on smooth normals, lib/alpine.add_log).
 """
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 
-from lib.alpine import NMesh, add_log, add_stone, to_object_flat, weld
+from lib.alpine import NMesh, add_log, add_stone, to_object_flat, weld, stone_object
 from lib.building import place
 from lib.materials import palette_material
 from lib.mesh import MeshData, box, to_object
@@ -32,16 +32,6 @@ SPLIT_STUMP = (2.9, -4.35)
 LOG_PILE = ((4.4, -9.75), (8.9, -10.5))
 STUMPS = [(-3.8, -7.2, 0.26), (6.0, 6.3, 0.3), (-8.4, 1.2, 0.24), (8.2, -4.0, 0.22)]
 LOW_WALL = ((-10.8, -11.4), (-9.7, -5.4))
-ROOTS = [
-    # from a tree base (x, z) toward (dx, dz), length, radius
-    (site.PINE[0], site.PINE[1], -0.9, 0.5, 1.6, 0.09),
-    (site.PINE[0], site.PINE[1], -0.5, -0.9, 1.3, 0.08),
-    (site.PINE[0], site.PINE[1], 0.8, 0.6, 1.4, 0.08),
-    (-6.4, 3.4, 0.9, -0.3, 1.5, 0.07),
-    (-6.4, 3.4, 0.4, 0.9, 1.2, 0.06),
-    (6.0, 1.4, -0.95, 0.2, 1.4, 0.07),
-    (-6.8, -1.8, 0.9, 0.4, 1.3, 0.06),
-]
 
 PREVIEW = {
     "views": [
@@ -173,57 +163,142 @@ def bbq(m: MeshData, rng: Rng) -> None:
               moss=0.25, lichen=0.4, flat_base=1.0)
 
 
+def _plank_tone(rng: Rng, k: float = 0.0):
+    """Weathered larch plank: the chalet's dark brown, a little silvered, small variation per plank."""
+    c = mix(P["d_chalet"], P["d_chalet_grey"], 0.25 + rng.random() * 0.25)
+    return scale(c, 1.0 + rng.jitter(0.05) + k)
+
+
+def _brace(lm: MeshData, p0, p1, t: float, w: float, depth: float, nx: float, col) -> None:
+    """A flat board from p0 to p1 (x = const plane facing +x by `nx`), proud of the surface by `depth`:
+    its face plus the four thin edges."""
+    dy, dz = p1[1] - p0[1], p1[2] - p0[2]
+    ln = math.hypot(dy, dz) or 1.0
+    oy, oz = -dz / ln * w / 2, dy / ln * w / 2
+    x0, x1 = t, t + nx * depth
+    a = [(x0, p0[1] - oy, p0[2] - oz), (x0, p1[1] - oy, p1[2] - oz), (x0, p1[1] + oy, p1[2] + oz),
+         (x0, p0[1] + oy, p0[2] + oz)]
+    f = [(x1, v[1], v[2]) for v in a]
+    face = [f[0], f[1], f[2], f[3]] if nx < 0 else [f[3], f[2], f[1], f[0]]
+    lm.add_face(tuple(lm.add_vert(v) for v in face), col)
+    edge = scale(col, 0.85)
+    for i in range(4):
+        j = (i + 1) % 4
+        q = [a[i], a[j], f[j], f[i]] if nx < 0 else [a[j], a[i], f[i], f[j]]
+        lm.add_face(tuple(lm.add_vert(v) for v in q), edge)
+
+
 def shed(m: MeshData, rng: Rng) -> None:
-    """Small plank shed (2.0 x 1.5 m) on stone pads, door toward the court (+X), shingled gable roof."""
+    """
+    Small Valais wood shed (1.5 x 2.1 m) on stone pads, door toward the court (+X): dark weathered
+    larch board-and-batten walls on a sill beam with corner posts, a framed plank door with a Z brace
+    and iron strap hinges, and a gable roof of boards with thick verges and fascias.
+    """
     lm = MeshData()
     W, D, Hw = 1.5, 2.1, 1.75   # local: x = width (door side faces +x), z = depth
-    plank = [P["d_chalet_grey"], P["d_log_grey"], P["d_log_dark"], P["d_chalet"]]
-    # walls: vertical planks on four sides
+    RISE = 0.55
+
+    def roof_h(xx: float) -> float:
+        return Hw + RISE * (1 - abs(xx) / (W / 2))
+
+    # walls: vertical boards, a thin batten over every joint (a little relief, dark slits between)
     sides = [((W / 2, 0.0, -D / 2), (0.0, 0.0, 1.0), D, (1.0, 0.0, 0.0)),    # +x front (door)
              ((-W / 2, 0.0, D / 2), (0.0, 0.0, -1.0), D, (-1.0, 0.0, 0.0)),  # -x back
              ((W / 2, 0.0, D / 2), (-1.0, 0.0, 0.0), W, (0.0, 0.0, 1.0)),    # +z
              ((-W / 2, 0.0, -D / 2), (1.0, 0.0, 0.0), W, (0.0, 0.0, -1.0))]  # -z
+    batten = scale(mix(P["d_chalet"], P["d_chalet_dark"], 0.3), 1.0)
     for o, u, L, n in sides:
-        k = 0
         s = 0.0
         while s < L - 1e-6:
-            pw = min(rng.uniform(0.14, 0.2), L - s)
-            # gable walls (+-z) go up to the ridge
+            pw = min(rng.uniform(0.16, 0.21), L - s)
+            if L - s - pw < 0.08:
+                pw = L - s
             top0 = top1 = Hw
-            if abs(n[2]) > 0.5:
-                def roof_h(t):
-                    xx = o[0] + u[0] * t
-                    return Hw + 0.55 * (1 - abs(xx) / (W / 2))
-                top0, top1 = roof_h(s), roof_h(s + pw)
-            c = scale(mix(rng.pick(plank), P["d_log"], rng.random() * 0.3), 1.0 + rng.jitter(0.06))
+            if abs(n[2]) > 0.5:  # gable walls go up to the roof
+                top0, top1 = roof_h(o[0] + u[0] * s), roof_h(o[0] + u[0] * (s + pw))
+            c = _plank_tone(rng)
             p0 = (o[0] + u[0] * s, -0.1, o[2] + u[2] * s)
             p1 = (o[0] + u[0] * (s + pw), -0.1, o[2] + u[2] * (s + pw))
             q = [p1, p0, (p0[0], top0, p0[2]), (p1[0], top1, p1[2])]  # outward
             lm.add_face(tuple(lm.add_vert(v) for v in q), c)
             s += pw
-            k += 1
-    # door on the +x side (darker planks, a frame, iron hinges)
-    lm.append(box(W / 2 + 0.02, 0.85, -0.1, 0.04, 1.5, 0.8, scale(P["d_chalet_dark"], 1.1)))
-    lm.append(box(W / 2 + 0.045, 1.12, -0.1, 0.012, 0.05, 0.6, P["iron"]))
-    lm.append(box(W / 2 + 0.045, 0.45, -0.1, 0.012, 0.05, 0.6, P["iron"]))
-    # roof: two planes of shingles (rows of darker / lighter wood), overhanging
-    oh = 0.25
-    ridge = Hw + 0.55 + 0.05
+            if 0.02 < s < L - 0.02:
+                bx, bz = o[0] + u[0] * s + n[0] * 0.012, o[2] + u[2] * s + n[2] * 0.012
+                top = min(top0, top1) if abs(n[2]) > 0.5 else Hw
+                hb = top + 0.02
+                lm.append(box(bx, hb / 2 - 0.05, bz, 0.024 if abs(n[0]) > 0.5 else 0.045, hb + 0.1,
+                              0.045 if abs(n[0]) > 0.5 else 0.024, batten))
+    # sill beam and corner posts (a shade darker: they frame the volume)
+    post = scale(mix(P["d_chalet"], P["d_chalet_dark"], 0.45), 1.0)
+    for sx_ in (-1, 1):
+        for sz_ in (-1, 1):
+            lm.append(box(sx_ * (W / 2 + 0.01), Hw / 2 - 0.05, sz_ * (D / 2 + 0.01), 0.1, Hw + 0.1, 0.1, post))
+    lm.append(box(W / 2 + 0.02, 0.0, 0.0, 0.07, 0.12, D + 0.1, post))
+    lm.append(box(-W / 2 - 0.02, 0.0, 0.0, 0.07, 0.12, D + 0.1, post))
+    lm.append(box(0.0, 0.0, D / 2 + 0.02, W + 0.1, 0.12, 0.07, post))
+    lm.append(box(0.0, 0.0, -D / 2 - 0.02, W + 0.1, 0.12, 0.07, post))
+    # door (+x): pale silvered frame boards around a slightly paler plank leaf with a Z brace
+    dz0, dw, dh = -0.1, 0.78, 1.5
+    frame = mix(P["d_log_grey"], P["d_chalet_grey"], 0.4)
+    leaf = mix(P["d_chalet_grey"], P["d_shutter_dark"], 0.3)
+    fx = W / 2 + 0.03
+    lm.append(box(fx, 0.05 + dh + 0.05, dz0, 0.05, 0.1, dw + 0.2, frame))                 # lintel
+    for sgn in (-1, 1):
+        lm.append(box(fx, (dh + 0.1) / 2, dz0 + sgn * (dw / 2 + 0.05), 0.05, dh + 0.1, 0.1, frame))  # jambs
+    nb = 5
+    for k in range(nb):
+        z0 = dz0 - dw / 2 + dw * k / nb
+        c = scale(leaf, 1.0 + rng.jitter(0.05))
+        lm.append(box(W / 2 + 0.02, 0.05 + dh / 2, z0 + dw / nb / 2, 0.03, dh - 0.02, dw / nb - 0.008, c))
+    brace = scale(leaf, 1.12)
+    for yy in (0.3, 1.3):
+        _brace(lm, (0, yy, dz0 - dw / 2 + 0.05), (0, yy, dz0 + dw / 2 - 0.05), W / 2 + 0.035, 0.11, 0.02, 1.0, brace)
+    _brace(lm, (0, 0.33, dz0 + dw / 2 - 0.1), (0, 1.27, dz0 - dw / 2 + 0.1), W / 2 + 0.035, 0.1, 0.018, 1.0, brace)
+    for yy in (0.3, 1.3):  # strap hinges on the brace boards
+        lm.append(box(W / 2 + 0.06, yy, dz0 - dw / 2 + 0.22, 0.012, 0.04, 0.4, P["iron"]))
+    lm.append(box(W / 2 + 0.06, 0.82, dz0 + dw / 2 - 0.1, 0.02, 0.05, 0.05, P["iron"]))  # latch
+    # roof: board planes with a real thickness, verge boards on the gables, fascia at the eaves
+    oh, ohz, t = 0.25, 0.28, 0.06
+    slope = RISE / (W / 2)
+    ridge = Hw + RISE + 0.05
+    roof = mix(P["d_roof"], P["d_chalet_grey"], 0.35)
     for side in (-1, 1):
-        rows = 6
+        rows = 5
         for r in range(rows):
             t0, t1 = r / rows, (r + 1) / rows
-            x0 = side * (W / 2 + oh) * (1 - t0)
-            x1 = side * (W / 2 + oh) * (1 - t1)
-            y0 = ridge - 0.55 * (1 + oh / (W / 2)) * (1 - t0) - 0.0
-            y1 = ridge - 0.55 * (1 + oh / (W / 2)) * (1 - t1)
-            c = scale(mix(P["d_roof"], P["d_chalet_grey"], 0.5 + 0.3 * rng.random()), 1.0 + (0.08 if r % 2 else -0.04))
-            q = [(x0, y0, -D / 2 - oh), (x0, y0, D / 2 + oh), (x1, y1, D / 2 + oh), (x1, y1, -D / 2 - oh)]
-            if side > 0:
+            x0 = side * (W / 2 + oh) * t0
+            x1 = side * (W / 2 + oh) * t1
+            y0, y1 = ridge - slope * abs(x0), ridge - slope * abs(x1)
+            c = scale(roof, 1.0 + (0.05 if r % 2 else -0.04) + rng.jitter(0.03))
+            q = [(x0, y0, -D / 2 - ohz), (x0, y0, D / 2 + ohz), (x1, y1, D / 2 + ohz), (x1, y1, -D / 2 - ohz)]
+            if side < 0:
                 q = [q[0], q[3], q[2], q[1]]
             lm.add_face(tuple(lm.add_vert(v) for v in q), c)
-            # underside
-            lm.add_face(tuple(lm.add_vert((v[0], v[1] - 0.04, v[2])) for v in reversed(q)), scale(P["d_chalet"], 0.7))
+            lm.add_face(tuple(lm.add_vert((v[0], v[1] - t, v[2])) for v in reversed(q)), scale(P["d_chalet"], 0.75))
+        xe = side * (W / 2 + oh)
+        ye = ridge - slope * (W / 2 + oh)
+        # fascia (eave edge) and the verge boards along both gables
+        lm.append(box(xe, ye - t / 2 - 0.01, 0.0, 0.035, t + 0.05, D + 2 * ohz + 0.02, post))
+        for zz in (-D / 2 - ohz, D / 2 + ohz):
+            p0, p1 = (0.0, ridge + 0.005, 0.0), (xe, ye, 0.0)
+            ln = math.hypot(p1[0], p1[1] - p0[1])
+            ny, nxx = (p1[0] - p0[0]) / ln, -(p1[1] - p0[1]) / ln  # board's "up" in the gable plane
+            ny, nxx = abs(ny), nxx * side * -1
+            hw = 0.06
+            sgn = 1.0 if zz > 0 else -1.0
+            corners = [(p0[0], p0[1] + 0.02), (p1[0], p1[1] + 0.02), (p1[0], p1[1] - t - 0.06), (p0[0], p0[1] - t - 0.06)]
+            front = [(cx_, cy_, zz + sgn * 0.025) for cx_, cy_ in corners]
+            back = [(cx_, cy_, zz - sgn * 0.01) for cx_, cy_ in corners]
+            # wind the gable-side face outward (+z face counter-clockwise seen from +z)
+            def wind(q, outward_z):
+                e1 = (q[1][0] - q[0][0], q[1][1] - q[0][1])
+                e2 = (q[2][0] - q[0][0], q[2][1] - q[0][1])
+                cz_ = e1[0] * e2[1] - e1[1] * e2[0]
+                return q if (cz_ > 0) == (outward_z > 0) else list(reversed(q))
+            lm.add_face(tuple(lm.add_vert(v) for v in wind(front, sgn)), post)
+            lm.add_face(tuple(lm.add_vert(v) for v in wind(back, -sgn)), post)
+    # ridge cap
+    lm.append(box(0.0, ridge + 0.02, 0.0, 0.14, 0.05, D + 2 * ohz + 0.04, scale(roof, 0.85)))
     x, z = site.SHED
     y = site.ground_y(x, z) + 0.12
     m.append(place(lm, (x, y, z), 0.0))
@@ -234,36 +309,42 @@ def shed(m: MeshData, rng: Rng) -> None:
 
 
 def barrel(m: MeshData, rng: Rng) -> None:
-    """Wooden barrel lying on its side on a little cradle beside the shed (axis along Z)."""
-    x, z = site.SHED[0] + 1.2, site.SHED[1] + 1.55
+    """Wooden barrel lying on its side on a little cradle beside the shed (axis along Z), resting in it."""
+    x, z = site.SHED[0] + 1.2, site.SHED[1] + 1.45
     y = site.ground_y(x, z)
-    R, L, n = 0.36, 0.95, 14
-    cy = y + 0.3 + R
-    rings = 7
+    R, L, n = 0.27, 0.74, 16
+    cradle_top = 0.3       # top of the cross beams above the ground
+    beam_dz = 0.2
+    t_beam = 0.5 + beam_dz / L
+    r_beam = R * (0.86 + 0.14 * math.sin(math.pi * t_beam))
+    cy = y + cradle_top + r_beam * 0.93  # sits a little into the beams' notches
+    rings = 8
     verts = []
     for i in range(rings + 1):
         t = i / rings
         rr = R * (0.86 + 0.14 * math.sin(math.pi * t))
         zz = z - L / 2 + L * t
-        verts.append([(x + rr * math.cos(math.tau * k / n), cy + rr * math.sin(math.tau * k / n), zz)
+        verts.append([(x + rr * math.cos(math.tau * (k + 0.5) / n), cy + rr * math.sin(math.tau * (k + 0.5) / n), zz)
                       for k in range(n)])
-    staves = [scale(mix(P["d_chalet"], P["d_chalet_grey"], rng.random() * 0.6), 1.0 + rng.jitter(0.08))
-              for _ in range(n)]
+    oak = mix(P["d_chalet"], P["d_bark_larch"], 0.45)
+    staves = [scale(mix(oak, P["d_chalet_grey"], rng.random() * 0.25), 1.0 + rng.jitter(0.04)) for _ in range(n)]
     for i in range(rings):
-        hoop = i in (0, 1, rings - 2, rings - 1) and (i in (1, rings - 2))
+        hoop = i in (1, rings - 2)
         for k in range(n):
             k2 = (k + 1) % n
-            c = scale(P["iron"], 1.2) if hoop else staves[k]
+            c = scale(P["iron"], 1.35) if hoop else staves[k]
             q = [verts[i][k], verts[i][k2], verts[i + 1][k2], verts[i + 1][k]]
-            m.add_face(tuple(m.add_vert(v) for v in q), c)
+            m.add_face(tuple(m.add_vert(v) for v in q), c, smooth=not hoop)
     for i, flip in ((0, True), (rings, False)):
         q = verts[i] if not flip else list(reversed(verts[i]))
-        m.add_face(tuple(m.add_vert(v) for v in q), scale(P["d_chalet"], 1.15))
-    # cradle: two cross beams on legs
-    for dz in (-0.3, 0.3):
-        m.append(box(x, y + 0.24, z + dz, 0.9, 0.1, 0.1, _wood(rng, "d_chalet_grey"), top_color=_wood(rng, "d_log")))
-        for dx in (-0.35, 0.35):
-            m.append(box(x + dx, y + 0.1, z + dz, 0.08, 0.36, 0.08, _wood(rng, "d_chalet_grey")))
+        m.add_face(tuple(m.add_vert(v) for v in q), scale(mix(oak, P["d_log_end"], 0.2), 0.9))
+    # cradle: two cross beams on legs, under the barrel
+    for dz in (-beam_dz, beam_dz):
+        m.append(box(x, y + cradle_top - 0.05, z + dz, 0.62, 0.1, 0.09, _wood(rng, "d_chalet_grey"),
+                     top_color=_wood(rng, "d_log_grey")))
+        for dx in (-0.24, 0.24):
+            m.append(box(x + dx, y + (cradle_top - 0.1) / 2 - 0.04, z + dz, 0.08, cradle_top - 0.02, 0.08,
+                         _wood(rng, "d_chalet_grey")))
 
 
 def low_wall(m: MeshData, rng: Rng) -> None:
@@ -305,19 +386,10 @@ def build():
             taper=0.12)
     add_log(wood, (ax + 0.3, ya + 0.4, az - 0.05), (bx - 0.4, ya + 0.48, bz - 0.04), 0.21, SEED + 4, sides=16,
             seg_len=0.4, arc=(-60.0, 240.0), cracks=4, taper=0.1)
-    # exposed roots running out from the tree bases, half buried
-    for x, z, dx, dz, L, r in ROOTS:
-        ln = math.hypot(dx, dz)
-        dx, dz = dx / ln, dz / ln
-        p0 = (x + dx * 0.35, site.ground_y(x, z) + r * 0.2, z + dz * 0.35)
-        p1 = (x + dx * (0.35 + L), site.ground_y(x + dx * L, z + dz * L) - r * 0.4, z + dz * (0.35 + L))
-        add_log(wood, p0, p1, r, SEED + int(L * 100), sides=8, seg_len=0.25, arc=(0.0, 180.0), cracks=0, taper=0.65,
-                cap_a=False, tint=("d_root", 0.55))
     objs = []
-    o = to_object(weld(m), "props", palette_material())
-    triangulate(o)
+    o = stone_object(m, "props", palette_material())
     objs.append(o)
-    o = to_object_flat(wood, "props_wood", palette_material())
+    o = to_object_flat(wood, "props_wood", palette_material(), blend=0.5)
     triangulate(o)
     objs.append(o)
     return objs

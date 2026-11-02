@@ -8,17 +8,15 @@ Variants (trunk base at the origin; the game instances them at layout_derborence
   spruce_f  far, low detail: a solid stack of jagged tiers (no cards), for the ring of forest
 Each detailed variant is `spruce_<v>` (trunk, a few bare lower twigs, and a dark inner core cone
 that keeps the crown dense and its shadow solid) + `spruce_<v>_leaves` (alpha-tested spray cards
-from the venue's leaves.png, lib/conifer.py: per branch a flat-ish spray and a hanging curtain,
+from the venue's leaf atlas, lib/conifer.py: per branch a flat-ish spray and a hanging curtain,
 drooping toward the tip; conical normals; tint x occlusion in the vertex colours).
 """
 from __future__ import annotations
 
 import math
-import os
 
-from lib import venues
 from lib.alpine import VMesh, add, norm, ss
-from lib.conifer import TILES, Cards, bark_spruce, conifer_atlas, crown_normal, tube
+from lib.conifer import TILES, Cards, bark_spruce, conifer_atlas_files, crown_normal, tube
 from lib.materials import leaf_material, palette_material
 from lib.mesh import to_object
 from lib.modifiers import triangulate
@@ -158,8 +156,7 @@ def build_far(v: dict) -> VMesh:
 
 
 def build():
-    leaf_path = os.path.join(venues.models_dir(), "leaves.png")
-    conifer_atlas(leaf_path)
+    leaf_path = conifer_atlas_files()
     mat = palette_material()
     lmat = leaf_material(leaf_path)
     objs = []

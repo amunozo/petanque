@@ -155,8 +155,17 @@ def build_walls(m: MeshData, rng: Rng) -> None:
                     r_top = min(sb, L - a1) if sb >= L - a1 - 1e-6 else sb
                     _course_trap(m, f, sa, sb, l_top, r_top, y, y1, col)
                 else:
-                    f.quad(m, sa, y + 0.035, sb, y1, 0.0, col)
-                    f.quad(m, sa, y, sb, y + 0.035, -0.02, scale(col, 0.5))   # shadowed groove
+                    # squared log with eased edges: a face, an upper bevel turned to the sky and a
+                    # lower one turned down (the light models each course), over a shadowed groove
+                    yb, yt = y + 0.035, y1
+                    f.quad(m, sa, yb + 0.03, sb, yt - 0.035, 0.0, col)
+                    i = [m.add_vert(f.p(ss_, yy, oo)) for ss_, yy, oo in
+                         ((sa, yt - 0.035, 0.0), (sb, yt - 0.035, 0.0), (sb, yt, -0.022), (sa, yt, -0.022))]
+                    m.add_face(tuple(i), scale(col, 1.04))
+                    i = [m.add_vert(f.p(ss_, yy, oo)) for ss_, yy, oo in
+                         ((sa, yb, -0.018), (sb, yb, -0.018), (sb, yb + 0.03, 0.0), (sa, yb + 0.03, 0.0))]
+                    m.add_face(tuple(i), scale(col, 0.92))
+                    f.quad(m, sa, y, sb, yb, -0.024, scale(col, 0.5))   # shadowed groove
             y = y1
             c_i += 1
         # corner log ends (alternate courses run along this wall and stick out past its ends)

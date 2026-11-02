@@ -2,7 +2,8 @@
 Conifers of the alpine venue (spruce, larch, pine): a needle-spray atlas for their alpha-tested
 cards, and the wood / card builders the three tree scripts share.
 
-Atlas (conifer_atlas, written as the venue's leaves.png, RGBA, 2x2 tiles, sRGB):
+Atlas (conifer_atlas; conifer_atlas_files() writes it as the venue's leaves.webp for the game and a
+leaves.png beside the .blend files for Blender; RGBA 1024, 2x2 tiles, sRGB):
   tile 0  Norway spruce spray, dark green (branchlets combed out along a twig)
   tile 1  spruce spray with paler new growth (sunlit outer tips)
   tile 2  larch spray in autumn gold (short needle rosettes along the twig)
@@ -35,6 +36,7 @@ class _Canvas:
 
     def seg(self, p0, p1, w: float, col) -> None:
         """Anti-aliased line of width w (px) from p0 to p1 (px, y down), painted over."""
+        w = w * self.n / 512  # widths are authored for the 512 px (supersampled) tile of the first pass
         x0, y0 = p0
         x1, y1 = p1
         pad = w + 1.5
@@ -85,7 +87,7 @@ def _spruce_tile(cv: _Canvas, rng: np.random.Generator, light: bool) -> None:
     for (px, py), (ex, ey), frac in shoots + [(pts[0], pts[-1], 0.0)]:
         L = math.hypot(ex - px, ey - py)
         dirx, diry = (ex - px) / L, (ey - py) / L
-        m = int(L / 1.6)
+        m = int(L / (1.6 * n / 512))
         for i in range(m):
             t = (i + rng.uniform(0, 1)) / m
             cx, cy = px + (ex - px) * t, py + (ey - py) * t
@@ -150,11 +152,11 @@ def _pine_tile(cv: _Canvas, rng: np.random.Generator) -> None:
             ang = rng.uniform(-math.pi, math.pi)
             nl = n * rng.uniform(0.08, 0.16)
             col = greens[int(rng.integers(len(greens)))] * rng.uniform(0.85, 1.15)
-            ox, oy = ex + rng.uniform(-6, 6), ey + rng.uniform(-6, 6)
+            ox, oy = ex + rng.uniform(-6, 6) * n / 512, ey + rng.uniform(-6, 6) * n / 512
             cv.seg((ox, oy), (ox + nl * math.cos(ang), oy + nl * math.sin(ang)), 2.8, col)
 
 
-def conifer_atlas(path: str, size: int = 512, seed: int = 41) -> None:
+def conifer_atlas(path: str, size: int = 1024, seed: int = 41) -> None:
     rng = np.random.default_rng(seed)
     ss_ = 2
     T = size // 2 * ss_
@@ -181,7 +183,28 @@ def conifer_atlas(path: str, size: int = 512, seed: int = 41) -> None:
             mean = (col[sl] * aa).sum(axis=(0, 1)) / max(float(aa.sum()), 1e-4)
             col[sl] = np.where(aa > 0.02, col[sl], mean)
     img = np.concatenate([np.clip(col, 0, 1), a], axis=-1)
-    Image.fromarray((img * 255 + 0.5).astype(np.uint8), "RGBA").save(path, optimize=True)
+    out_img = Image.fromarray((img * 255 + 0.5).astype(np.uint8), "RGBA")
+    if path.endswith(".webp"):  # lossy colour, lossless alpha: a third of the PNG's size
+        out_img.save(path, quality=90, method=6, alpha_quality=100)
+    else:
+        out_img.save(path, optimize=True)
+
+
+def conifer_atlas_files() -> str:
+    """
+    Writes the atlas twice: leaves.webp in the venue's models dir (what the game loads: a third of the
+    PNG's size) and leaves.png next to the .blend files, which the Blender leaf material and the bake
+    use (Cycles mis-reads the WebP's alpha for indirect light: the cards reflect ~30x too much bounce).
+    Returns the PNG's path (for leaf_material).
+    """
+    import os
+
+    from . import venues
+
+    png = os.path.join(venues.current().blend_dir(), "leaves.png")
+    conifer_atlas(png)
+    Image.open(png).save(os.path.join(venues.models_dir(), "leaves.webp"), quality=90, method=6, alpha_quality=100)
+    return png
 
 
 # --- wood ---------------------------------------------------------------------------------

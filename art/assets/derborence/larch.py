@@ -12,11 +12,9 @@ its shadow stay light and dappled.
 from __future__ import annotations
 
 import math
-import os
 
-from lib import venues
 from lib.alpine import VMesh, add, norm, ss
-from lib.conifer import TILES, Cards, conifer_atlas, crown_normal, tube
+from lib.conifer import TILES, Cards, conifer_atlas_files, crown_normal, tube
 from lib.materials import leaf_material, palette_material
 from lib.mesh import to_object
 from lib.modifiers import triangulate
@@ -114,8 +112,7 @@ def build_variant(v: dict):
 
 
 def build():
-    leaf_path = os.path.join(venues.models_dir(), "leaves.png")
-    conifer_atlas(leaf_path)
+    leaf_path = conifer_atlas_files()
     mat = palette_material()
     lmat = leaf_material(leaf_path)
     objs = []

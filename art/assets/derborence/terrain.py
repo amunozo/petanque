@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 
-from lib.alpine import NMesh, add_log, add_stone, ss, to_object_flat, weld
+from lib.alpine import NMesh, add_log, add_stone, ss, to_object_flat, weld, stone_object
 from lib.materials import palette_material
 from lib.mesh import MeshData, to_object
 from lib.modifiers import triangulate
@@ -243,10 +243,9 @@ def build():
     build_steps(stones, wood, Rng(SEED + 2))
     build_slope_rocks(stones, Rng(SEED + 3))
     build_ferns(stones, Rng(SEED + 4))
-    o = to_object(weld(stones), "terrain_stones", mat)
-    triangulate(o)
+    o = stone_object(stones, "terrain_stones", mat)
     objs.append(o)
-    o = to_object_flat(wood, "terrain_wood", mat)
+    o = to_object_flat(wood, "terrain_wood", mat, blend=0.5)
     triangulate(o)
     objs.append(o)
     return objs

@@ -67,6 +67,11 @@ The game picks the venue from the URL: `?venue=derborence` (`src/app/venue.ts` -
 `src/render/venues.ts`, URL only, no UI). Missing glbs / lightmaps are warned about and skipped, so the
 venue renders its fallback court + sky until the art lands.
 
+Derborence specifics: its conifer leaf atlas ships as `models/derborence/leaves.webp` (the Blender
+material and the bake read the PNG copy in `blend/derborence/leaves.png`: Cycles mis-reads WebP alpha in
+the bounce pass), and its stones (`lib/alpine.py`) carry soft custom normals (`stone_object()`), so each
+stone shades as one volume.
+
 Adding a venue: `art/assets/<id>/__init__.py` + its scripts, `lib/layout_<id>.py` (same public shape as
 `lib/layout.py`), a record in `lib/venues.py`, and the matching record in `src/render/venues.ts`.
 

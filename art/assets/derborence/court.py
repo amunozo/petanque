@@ -19,7 +19,7 @@ import math
 import os
 
 from lib import venues
-from lib.alpine import NMesh, add_leaf, add_log, add_stone, add_tuft, ss, to_object_flat, weld
+from lib.alpine import NMesh, add_leaf, add_log, add_stone, add_tuft, ss, to_object_flat, weld, stone_object
 from lib.materials import palette_material
 from lib.mesh import MeshData, to_object
 from lib.modifiers import triangulate
@@ -57,7 +57,7 @@ def needle_density(x: float, z: float) -> float:
     dend = min(z - z0, z1 - z)
     edge = ss(0.9, 0.0, dside) * 0.75 + ss(1.4, 0.0, dend) * 0.7
     corner = ss(2.2, 0.3, math.hypot(min(dside, 2.5), min(dend, 2.5))) * 0.6
-    far = ss(-5.5, -9.4, z) * 0.45 + ss(3.0, 5.4, z) * 0.35
+    far = ss(-6.5, -9.4, z) * 0.2 + ss(3.0, 5.4, z) * 0.3
     patches = ss(0.48, 0.72, fbm(x * 0.55 + 3.0, z * 0.22, 0, SEED + 1, 3)) * 0.75
     d = edge + corner + far + patches
     # the worn grey lane down the middle, where the boules land and roll
@@ -76,8 +76,8 @@ def gravel_color(x: float, z: float, rng: Rng):
         cover = ss(0.0, 0.5, nd + (fine - 0.5) * 0.7) * min(1.0, nd * 1.6)
         tone = fbm(x * 1.4, z * 1.4, 1.0, SEED + 9, 2)
         needles = mix(P["d_needles"], P["d_needles_gold"], ss(0.45, 0.7, tone))
-        needles = mix(needles, P["d_needles_dark"], ss(0.45, 0.25, tone) * 0.6)
-        c = mix(c, needles, cover * 0.85)
+        needles = mix(needles, P["d_needles_dark"], ss(0.45, 0.25, tone) * 0.3)
+        c = mix(c, needles, cover * 0.75)
     # damp, darker gravel along the logs (their shade and the needles' tannin)
     dside = min(x - ARENA["min_x"], ARENA["max_x"] - x, z - ARENA["min_z"], ARENA["max_z"] - z)
     c = scale(c, 1.0 - 0.08 * ss(0.35, 0.0, dside))
@@ -334,10 +334,9 @@ def build():
     triangulate(o)
     objs.append(o)
     logs = build_logs()
-    o = to_object_flat(logs, "court_logs", mat)
+    o = to_object_flat(logs, "court_logs", mat, blend=0.5)
     triangulate(o)
     objs.append(o)
-    o = to_object(weld(rocks), "court_rocks", mat)
-    triangulate(o)
+    o = stone_object(rocks, "court_rocks", mat)
     objs.append(o)
     return objs
