@@ -3,9 +3,10 @@
  * lightmaps and layout (art/lib/venues.py, which also writes the generated layout TS read here),
  * plus the look constants that go with its art (sky, fill, fallback ground).
  *
- * The venue is chosen once at boot from the URL (src/app/venue.ts, `?venue=derborence`) and passed
- * into createPitchScene, which threads it through lighting / scenery / baked light. The court
- * itself (physics arena, src/tuning/config.ts) is the same for every venue.
+ * The venue is chosen at boot from the URL (src/app/venue.ts, `?venue=derborence`) and can be
+ * switched at runtime (PitchScene.setVenue): either way it is passed into lighting / scenery / baked
+ * light, which read every value from here instead of hard-coding one. The court itself (physics
+ * arena, src/tuning/config.ts) is the same for every venue.
  *
  * Every value here is venue-specific data only: the village entries are exactly the constants that
  * used to live in scenery.ts / lighting.ts / sky.ts / bakedLight.ts.

@@ -4,7 +4,8 @@
  * the boules, jack and aiming overlays are still primitives built here. The pitch is built
  * once from config.physics.arena / throw origin (the arena is the same for every venue: the
  * surrounding world is the venue's, src/render/venues.ts); everything else (camera, preview toggles,
- * ball radii, look) is read live.
+ * ball radii, look) is read live. The venue itself can be switched at runtime (setVenue): the
+ * scenery, sky, lights and lightmaps are replaced, the latest switch winning.
  */
 import {
   BufferAttribute,
@@ -36,9 +37,10 @@ import type { GameConfig } from '../tuning/config';
 import { bakedDynamicMaterial, configureBakedLight, setContactOccluders } from './bakedLight';
 import { createCameraRig, type CameraFocus, type CameraMode } from './cameraRig';
 import { createDevStats } from './devStats';
+import { createLatestLoad } from './latestLoad';
 import { createLighting } from './lighting';
 import { RESOLUTION, initialScaleState, pixelRatioFor, stepScale } from './resolution';
-import { loadScenery } from './scenery';
+import { loadScenery, type SceneryHandle } from './scenery';
 import { VENUES, type VenueId } from './venues';
 
 /** Look-and-feel constants of the placeholder art (not game feel). */
@@ -123,6 +125,16 @@ export interface PitchScene {
   setJackZone(zone: JackZoneView | null): void;
   /** Screen position (CSS px from the canvas's top-left) of a world point with the current camera; null when behind the camera. For DOM overlays (measuring lines, effects). */
   project(p: Vec3): { x: number; y: number } | null;
+  /**
+   * Switches the venue (court scenery, sky, lights and lightmaps) and resolves when it is fully
+   * loaded. The current id is a no-op that resolves at once; of rapid calls only the last one
+   * counts (the earlier loads are disposed, and their promises still settle).
+   */
+  setVenue(id: VenueId): Promise<void>;
+  /** The venue in place: the current one, or the boot venue while the first switch is loading. */
+  venue(): VenueId;
+  /** Resolves when the current venue's scenery and lightmaps have loaded (or failed). Never rejects. */
+  ready(): Promise<void>;
 }
 
 /** Grey metal with two dark grooves and two dark patches, so rolling spin is visible. */
@@ -153,8 +165,6 @@ function makeBouleTexture(): CanvasTexture {
 export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => GameConfig, venueId: VenueId): PitchScene {
   const cfg0 = getConfig();
   const arena = cfg0.physics.arena;
-  // The venue (the world around the court) is chosen once, at boot; the court and physics are shared.
-  const venue = VENUES[venueId];
 
   const renderer = new WebGLRenderer({ canvas, antialias: true });
   // Adaptive render resolution (resolution.ts): a fullscreen desktop window is far over the pixel
@@ -163,9 +173,19 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
   const scene = new Scene();
   const camera = new PerspectiveCamera(cfg0.camera.fovDeg, 1, 0.05, 90);
   const rig = createCameraRig(camera, getConfig);
-  configureBakedLight(venue); // the baked lightmaps, sun and bounce range are the venue's
-  const lighting = createLighting(scene, renderer, getConfig, arena, venue);
-  loadScenery(scene, arena, venue);
+  const lighting = createLighting(scene, renderer, getConfig, arena, VENUES[venueId]);
+
+  /** Loads everything a venue consists of: baked-light uniforms, sky, lights, lightmaps, scenery. */
+  const loadVenue = (id: VenueId): SceneryHandle => {
+    const venue = VENUES[id];
+    configureBakedLight(venue); // the baked lightmaps, sun and bounce range are the venue's
+    lighting.setVenue(venue); // the sky dome, the sun aim, fog and fill too
+    return loadScenery(scene, arena, venue);
+  };
+  // Latest switch wins: an older load is disposed before the next one starts, so it can never add
+  // its scenery or lightmaps to the new venue. Boot counts as the first switch.
+  const venues = createLatestLoad<VenueId>();
+  venues.set(venueId, loadVenue);
   const devStats = createDevStats(renderer);
 
   // Throwing circle at the throw origin
@@ -574,5 +594,8 @@ export function createPitchScene(canvas: HTMLCanvasElement, getConfig: () => Gam
       if (projected.z > 1) return null;
       return { x: (projected.x * 0.5 + 0.5) * canvas.clientWidth, y: (-projected.y * 0.5 + 0.5) * canvas.clientHeight };
     },
+    setVenue: (id) => venues.set(id, loadVenue),
+    venue: () => venues.current() ?? venueId,
+    ready: () => venues.ready(),
   };
 }

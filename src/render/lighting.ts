@@ -23,6 +23,7 @@ import {
   SRGBColorSpace,
   Scene,
   Vector3,
+  type Material,
   type PerspectiveCamera,
   type ToneMapping,
   type WebGLRenderer,
@@ -73,6 +74,8 @@ export interface CourtBounds {
 export interface Lighting {
   /** Call once per frame before rendering. */
   update(camera: PerspectiveCamera): void;
+  /** Switches the venue's sky dome (the old one is disposed), sun, fill, fog and background. */
+  setVenue(venue: Venue): void;
 }
 
 /**
@@ -89,7 +92,10 @@ export function kelvinToColor(kelvin: number, out: Color): Color {
 }
 
 export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig: () => GameConfig, court: CourtBounds,
-                               venue: Venue): Lighting {
+                               bootVenue: Venue): Lighting {
+  // The venue's look can change at runtime (setVenue): everything below reads this variable, never a
+  // captured copy, so update() and the sun keep following the current venue.
+  let venue = bootVenue;
   renderer.toneMapping = NeutralToneMapping;
   renderer.shadowMap.enabled = true;
   setBakedAnisotropy(renderer.capabilities.getMaxAnisotropy());
@@ -115,7 +121,7 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
   sun.shadow.radius = STYLE.shadowRadius;
   scene.add(sun, sun.target);
 
-  const sky = createSky(venue.sky, venue.fill.skyRadius);
+  let sky = createSky(venue.sky, venue.fill.skyRadius);
   scene.add(sky.mesh);
 
   const dir = new Vector3();
@@ -169,6 +175,22 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
 
   aimSun();
 
+  /** Swaps the venue's look in place: sky dome, sun aim, fill colours, fog and background. */
+  function setVenue(next: Venue): void {
+    if (next === venue) return;
+    venue = next;
+    horizon.set(next.sky.horizon); // also the scene background (this object)
+    fog.color.copy(horizon);
+    hemi.color.set(next.fill.hemiSky);
+    hemi.groundColor.set(next.fill.hemiGround);
+    scene.remove(sky.mesh);
+    sky.mesh.geometry.dispose();
+    (sky.mesh.material as Material).dispose();
+    sky = createSky(next.sky, next.fill.skyRadius);
+    scene.add(sky.mesh);
+    aimSun();
+  }
+
   return {
     update(camera) {
       const { look } = getConfig();
@@ -191,5 +213,6 @@ export function createLighting(scene: Scene, renderer: WebGLRenderer, getConfig:
       fog.density = look.fogDensity;
       sky.follow(camera);
     },
+    setVenue,
   };
 }

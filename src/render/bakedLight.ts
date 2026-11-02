@@ -37,11 +37,17 @@ import { VENUES, type Venue, type VenueTextures } from './venues';
 
 /** Shared uniforms (one write updates every patched material). x = sun shadow strength, y = AO strength. */
 const strength = { value: { x: 1, y: 1 } as { x: number; y: number } };
-const groundMap: { value: Texture } = { value: whiteTexture() };
-const villageMap: { value: Texture } = { value: whiteTexture() };
-const courtMap: { value: Texture } = { value: whiteTexture() };
-const groundBounce: { value: Texture } = { value: blackTexture() };
-const villageBounce: { value: Texture } = { value: blackTexture() };
+/**
+ * Neutral values while a venue's lightmaps are missing (boot, or the moment a venue switch starts):
+ * white = fully sunlit / no occlusion, black = no baked bounce, grey = no ground grain. They are
+ * shared, never disposed, so they can always go back into the slots.
+ */
+const NEUTRAL = { white: whiteTexture(), black: blackTexture(), grey: greyTexture() };
+const groundMap: { value: Texture } = { value: NEUTRAL.white };
+const villageMap: { value: Texture } = { value: NEUTRAL.white };
+const courtMap: { value: Texture } = { value: NEUTRAL.white };
+const groundBounce: { value: Texture } = { value: NEUTRAL.black };
+const villageBounce: { value: Texture } = { value: NEUTRAL.black };
 /** Scale of the baked bounce light (look.bounceStrength). */
 const bounceStrength = { value: 1 };
 /** Decode range of the bounce maps (keep in sync with BOUNCE_MAX in art/lib/bake.py, shared by all venues). */
@@ -55,15 +61,15 @@ let maxAnisotropy = 4;
 export function setBakedAnisotropy(n: number): void {
   maxAnisotropy = Math.max(1, n);
 }
-const detailMap: { value: Texture } = { value: greyTexture() };
+const detailMap: { value: Texture } = { value: NEUTRAL.grey };
 const rect = { value: new Vector3() };
 const sunDir = { value: new Vector3() };
 /** Ground grain: tile sizes (m) of the two detail samples and the strength (0 = off). */
 const detail = { value: new Vector3(0, 0, 0) };
 /**
  * Initialises the shared baked-light uniforms (lightmap rectangles, sun, ground albedo, bounce range)
- * from the venue. Called once at boot (createPitchScene): the venue is chosen once, and its
- * lightmaps were baked with exactly these values.
+ * from the venue. Called at boot and again on every venue switch (src/render/pitchScene.ts): every
+ * venue's lightmaps were baked with exactly these values, so the mapping has to follow the venue.
  */
 export function configureBakedLight(venue: Venue): void {
   rect.value.set(venue.groundLightRect.x0, venue.groundLightRect.z0, venue.groundLightRect.size);
@@ -123,35 +129,90 @@ export function setGroundDetail(tileA: number, tileB: number, amount: number): v
   detail.value.set(1 / Math.max(tileA, 1e-3), 1 / Math.max(tileB, 1e-3), amount);
 }
 
+/** One shared uniform slot, the venue file that fills it and what it holds until that file is in. */
+interface BakeSlot {
+  slot: { value: Texture };
+  neutral: Texture;
+  repeat: boolean;
+  mips: boolean;
+  file: keyof VenueTextures;
+}
+
+const BAKED_SLOTS: readonly BakeSlot[] = [
+  { slot: groundMap, neutral: NEUTRAL.white, repeat: false, mips: true, file: 'groundLight' },
+  { slot: courtMap, neutral: NEUTRAL.white, repeat: false, mips: true, file: 'courtLight' },
+  { slot: groundBounce, neutral: NEUTRAL.black, repeat: false, mips: true, file: 'groundBounce' },
+  { slot: villageBounce, neutral: NEUTRAL.black, repeat: false, mips: false, file: 'atlasBounce' },
+  { slot: villageMap, neutral: NEUTRAL.white, repeat: false, mips: false, file: 'atlasLight' },
+  { slot: detailMap, neutral: NEUTRAL.grey, repeat: true, mips: true, file: 'groundDetail' },
+];
+
+/** The textures a load installed (the neutral placeholders never are), so only they get disposed. */
+const installed = new Map<{ value: Texture }, Texture>();
+/** Bumped by every load and by disposal: a load whose generation is gone drops what arrives. */
+let generation = 0;
+
+/** Back to the neutral placeholders, disposing the venue textures currently installed. */
+function restoreNeutral(): void {
+  for (const s of BAKED_SLOTS) {
+    const previous = installed.get(s.slot);
+    if (!previous) continue;
+    s.slot.value = s.neutral;
+    previous.dispose();
+    installed.delete(s.slot);
+  }
+}
+
+export interface BakedTextures {
+  /** Resolves when every map has loaded or failed (never rejects), or at once if disposed. */
+  ready: Promise<void>;
+  /** Frees this load's textures (if still installed) and puts the neutral values back. */
+  dispose(): void;
+}
+
 /**
  * Loads the venue's lightmaps and the ground grain (all linear data; mipmapped, no flip: glTF UV
- * convention). A missing file is warned about, and the surfaces it lights stay unshadowed / ungrained.
+ * convention) into the shared slots, starting from the neutral values so the new scenery is never
+ * lit by the previous venue's lightmaps. A missing file is warned about, and the surfaces it lights
+ * stay unshadowed / ungrained. Only the latest call's textures are kept: a superseded load drops
+ * and disposes whatever arrives late, and disposing it frees the textures it installed.
  */
-export function loadBakedTextures(url: (file: string) => string, textures: VenueTextures): void {
+export function loadBakedTextures(url: (file: string) => string, textures: VenueTextures): BakedTextures {
+  const mine = ++generation;
+  restoreNeutral(); // the previous venue's maps would light this one wrongly
+  const stale = (): boolean => mine !== generation;
   const loader = new TextureLoader();
-  // The atlas skips mipmaps: smaller mips would bleed between its many small UV islands.
-  const load = (file: string, slot: { value: Texture }, repeat: boolean, mips = true): void => {
-    loader
-      .loadAsync(url(file))
-      .then((t) => {
-        t.colorSpace = NoColorSpace;
-        t.flipY = false;
-        t.minFilter = mips ? LinearMipmapLinearFilter : LinearFilter;
-        t.generateMipmaps = mips;
-        t.magFilter = LinearFilter;
-        t.anisotropy = maxAnisotropy;
-        if (repeat) t.wrapS = t.wrapT = RepeatWrapping;
-        t.needsUpdate = true;
-        slot.value = t;
-      })
-      .catch((err: unknown) => console.warn(`${file} failed to load (scenery stays unshadowed)`, err));
+  const pending = BAKED_SLOTS.map(
+    (s) =>
+      loader
+        .loadAsync(url(textures[s.file]))
+        .then((t) => {
+          if (stale()) {
+            t.dispose(); // superseded while loading: never reaches a material
+            return;
+          }
+          t.colorSpace = NoColorSpace;
+          t.flipY = false;
+          t.minFilter = s.mips ? LinearMipmapLinearFilter : LinearFilter;
+          t.generateMipmaps = s.mips;
+          t.magFilter = LinearFilter;
+          t.anisotropy = maxAnisotropy;
+          if (s.repeat) t.wrapS = t.wrapT = RepeatWrapping;
+          t.needsUpdate = true;
+          installed.get(s.slot)?.dispose();
+          s.slot.value = t;
+          installed.set(s.slot, t);
+        })
+        .catch((err: unknown) => console.warn(`${textures[s.file]} failed to load (scenery stays unshadowed)`, err)),
+  );
+  return {
+    ready: Promise.all(pending).then(() => undefined),
+    dispose() {
+      if (stale()) return; // a newer load owns the slots now
+      generation++;
+      restoreNeutral();
+    },
   };
-  load(textures.groundLight, groundMap, false);
-  load(textures.courtLight, courtMap, false);
-  load(textures.groundBounce, groundBounce, false);
-  load(textures.atlasBounce, villageBounce, false, false);
-  load(textures.atlasLight, villageMap, false, false);
-  load(textures.groundDetail, detailMap, true);
 }
 
 /**
