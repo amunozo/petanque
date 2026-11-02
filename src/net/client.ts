@@ -16,6 +16,7 @@
 import type { ThrowIntent } from '../engine';
 import type { MatchLength } from '../games/petanque/matchLength';
 import { CONFIG_HASH } from './fingerprint';
+import { DEFAULT_VENUE, isVenueId, type VenueId } from './venueId';
 import {
   FATAL_CLOSE_CODES,
   PING_TEXT,
@@ -85,6 +86,8 @@ export interface RoomInfo {
   code: string;
   phase: RoomSnapshot['phase'];
   length: MatchLength;
+  /** The court the host picked; a server that does not know about venues means the village. */
+  venue: VenueId;
   /** Seats taken (0..2). */
   players: number;
 }
@@ -111,8 +114,8 @@ export interface NetClientOptions {
 }
 
 export interface NetClient {
-  /** POST /rooms -> the new room code. Throws on network/server errors. */
-  createRoom(length?: MatchLength): Promise<string>;
+  /** POST /rooms -> the new room code (`venue` = the court the host picked). Throws on network/server errors. */
+  createRoom(length?: MatchLength, venue?: VenueId): Promise<string>;
   /** GET /rooms/:code -> lobby info, or null when the room does not exist. */
   roomInfo(code: string): Promise<RoomInfo | null>;
   /** Opens (and keeps open) the room socket; the first message is `hello`. */
@@ -258,7 +261,8 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
 
   const deadline = (graceMs: number | null): number | null => (graceMs === null ? null : Date.now() + graceMs);
   function setRoom(next: RoomSnapshot): void {
-    room = next;
+    // A snapshot from a server that predates venues carries none: play it on the village.
+    room = isVenueId(next.venue) ? next : { ...next, venue: DEFAULT_VENUE };
     grace = { A: deadline(next.players.A?.graceMs ?? null), B: deadline(next.players.B?.graceMs ?? null) };
   }
 
@@ -359,8 +363,9 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
   }
 
   return {
-    async createRoom(length: MatchLength = 'standard') {
-      const res = await http('/rooms', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ length }) });
+    async createRoom(length: MatchLength = 'standard', venue: VenueId = DEFAULT_VENUE) {
+      const payload = isVenueId(venue) ? { length, venue } : { length };
+      const res = await http('/rooms', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error(`createRoom failed: HTTP ${res.status}`);
       const body = (await res.json()) as { code?: unknown };
       const c = normalizeRoomCode(body.code);
@@ -373,7 +378,9 @@ export function createNetClient(opts: NetClientOptions = {}): NetClient {
       const res = await http(`/rooms/${c}`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`roomInfo failed: HTTP ${res.status}`);
-      return (await res.json()) as RoomInfo;
+      const body = (await res.json()) as RoomInfo;
+      // A server that predates venues sends none: the village (an unknown id from the future too).
+      return { ...body, venue: isVenueId(body.venue) ? body.venue : DEFAULT_VENUE };
     },
     connect(raw: string, nick: string) {
       const c = normalizeRoomCode(raw);

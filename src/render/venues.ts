@@ -18,7 +18,10 @@ import {
   INSTANCED as DERBORENCE_INSTANCED,
 } from './bakedLayoutDerborence';
 
-export type VenueId = 'village' | 'derborence';
+import type { VenueId } from '../net/venueId';
+
+/** The ids live in a pure module (src/net/venueId.ts) so the server can validate one without three.js. */
+export type { VenueId };
 
 /** Sky dome colours (sRGB display colours: the sky is not tone-mapped) and its gradient bands. */
 export interface SkyStyle {

@@ -3,6 +3,8 @@
 export * from './protocol';
 export { CONFIG_HASH, configFingerprint } from './fingerprint';
 export { replayThrowWorld } from './replay';
+export { DEFAULT_VENUE, VENUE_IDS, isVenueId } from './venueId';
+export type { VenueId } from './venueId';
 export { INVITE_BASE_URL, ONLINE_PARAM, ROOM_PARAM, inviteLink, roomCodeFromSearch, shareContent } from './invite';
 export type { ShareContent } from './invite';
 export {

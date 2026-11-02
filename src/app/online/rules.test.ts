@@ -94,6 +94,7 @@ describe('reconnect countdown and forfeit', () => {
       code: 'K7M9P',
       phase: 'matchOver',
       length: 'quick',
+      venue: 'village',
       seq: 3,
       matchNumber: 1,
       players: { A: null, B: null },
@@ -121,7 +122,7 @@ describe('seats and names', () => {
 
 describe('rejoinDecision', () => {
   const active = { code: 'K7M9P', nickname: 'Ana', opponent: 'Bo' };
-  const info = (phase: 'lobby' | 'playing' | 'matchOver') => ({ code: 'K7M9P', phase, length: 'quick' as const, players: 2 });
+  const info = (phase: 'lobby' | 'playing' | 'matchOver') => ({ code: 'K7M9P', phase, length: 'quick' as const, venue: 'village' as const, players: 2 });
   it('offers a live room, forgets a finished or gone one, waits when unreachable', () => {
     expect(rejoinDecision(active, info('playing'))).toBe('offer');
     expect(rejoinDecision(active, info('lobby'))).toBe('offer');
@@ -134,7 +135,7 @@ describe('rejoinDecision', () => {
 
 describe('rejoinCard', () => {
   const active = { code: 'K7M9P', nickname: 'Ana', opponent: 'Bo' };
-  const info = (phase: 'lobby' | 'playing' | 'matchOver') => ({ code: 'K7M9P', phase, length: 'quick' as const, players: 2 });
+  const info = (phase: 'lobby' | 'playing' | 'matchOver') => ({ code: 'K7M9P', phase, length: 'quick' as const, venue: 'village' as const, players: 2 });
   it('shows a live room, hides a finished, expired or unsaved one, leaves it alone when the server is unreachable', () => {
     expect(rejoinCard(active, info('playing'))).toBe('show');
     expect(rejoinCard(active, info('lobby'))).toBe('show');

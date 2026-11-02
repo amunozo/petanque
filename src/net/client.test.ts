@@ -41,6 +41,7 @@ const snapshot = (over: Partial<RoomSnapshot> = {}): RoomSnapshot => ({
   code: 'K7M9P',
   phase: 'lobby',
   length: 'standard',
+  venue: 'village',
   seq: 0,
   matchNumber: 0,
   players: { A: { nickname: 'Ana', connected: true, left: false, graceMs: null }, B: null },
@@ -180,5 +181,59 @@ describe('net client', () => {
     s.recv({ type: 'throwResult', seq: 4, record, rest: [], match: after }); // missed seq 3
     expect(results).toEqual([match, null]);
     expect(c.room?.seq).toBe(4);
+  });
+
+  describe('venues', () => {
+    /** A client whose HTTP calls are answered by `answer` (and recorded). */
+    const httpClient = (answer: (path: string) => { status: number; body: unknown }) => {
+      const calls: { path: string; init: RequestInit }[] = [];
+      const c = createNetClient({
+        serverUrl: 'https://example.test',
+        storage: memStorage(),
+        fetchImpl: ((path: string, init: RequestInit = {}) => {
+          calls.push({ path, init });
+          const { status, body } = answer(path);
+          return Promise.resolve(new Response(JSON.stringify(body), { status }));
+        }) as unknown as typeof fetch,
+      });
+      return { c, calls };
+    };
+
+    it('sends the venue when creating a room (the village by default)', async () => {
+      const { c, calls } = httpClient(() => ({ status: 201, body: { code: 'K7M9P' } }));
+      expect(await c.createRoom('quick', 'derborence')).toBe('K7M9P');
+      expect(await c.createRoom('standard')).toBe('K7M9P');
+      expect(calls.map((x) => JSON.parse(String(x.init.body)))).toEqual([
+        { length: 'quick', venue: 'derborence' },
+        { length: 'standard', venue: 'village' },
+      ]);
+    });
+
+    it('parses the venue of a room info, and defaults to the village when it is absent or unknown', async () => {
+      const infos: unknown[] = [
+        { code: 'K7M9P', phase: 'lobby', length: 'quick', venue: 'derborence', players: 1 },
+        { code: 'K7M9P', phase: 'lobby', length: 'quick', players: 0 }, // older server
+        { code: 'K7M9P', phase: 'lobby', length: 'quick', venue: 'atlantis', players: 0 },
+      ];
+      let i = 0;
+      const { c } = httpClient(() => ({ status: 200, body: infos[i++] }));
+      expect((await c.roomInfo('K7M9P'))?.venue).toBe('derborence');
+      expect((await c.roomInfo('K7M9P'))?.venue).toBe('village');
+      expect((await c.roomInfo('K7M9P'))?.venue).toBe('village');
+    });
+
+    it('mirrors the venue of a welcome, and plays an older server\'s snapshot on the village', () => {
+      const c = make();
+      c.connect('K7M9P', 'Ana');
+      const s = sockets[0]!;
+      s.open();
+      s.recv({ type: 'welcome', protocolVersion: PROTOCOL_VERSION, configHash: CONFIG_HASH, seat: 'A', room: snapshot({ venue: 'derborence' }) });
+      expect(c.room?.venue).toBe('derborence');
+      // An old server sends no venue at all (the field is additive, no protocol bump).
+      const old = snapshot();
+      delete (old as { venue?: unknown }).venue;
+      s.recv({ type: 'roomState', room: old });
+      expect(c.room?.venue).toBe('village');
+    });
   });
 });

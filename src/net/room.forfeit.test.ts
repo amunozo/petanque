@@ -201,6 +201,7 @@ describe('room forfeit: restore after a restart', () => {
     const room = playing();
     const old = JSON.parse(JSON.stringify(room)) as Record<string, unknown> & { seats: Record<string, Record<string, unknown>> };
     delete old['outcome'];
+    delete old['venue']; // rooms stored before the court was selectable
     delete old.seats['A']?.['graceUntil'];
     delete old.seats['B']?.['graceUntil'];
     expect(restoreRoom(old as unknown as RoomState, ['A', 'B'], at(T0)).room).toEqual(room);

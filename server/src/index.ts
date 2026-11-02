@@ -1,21 +1,22 @@
 /**
  * petanque-server: HTTP routes in front of the per-room Durable Objects.
  *
- *   POST /rooms              {length?: 'quick'|'standard'} -> 201 {code}
- *   GET  /rooms/:code        -> 200 {code, phase, length, players} | 404
+ *   POST /rooms              {length?: 'quick'|'standard', venue?: 'village'|'derborence'} -> 201 {code}
+ *   GET  /rooms/:code        -> 200 {code, phase, length, venue, players} | 404
  *   GET  /rooms/:code/ws     -> WebSocket upgrade into the room
  *   GET  /health             -> {ok, protocolVersion, configHash}
  */
 import { isMatchLength } from '../../src/games/petanque/matchLength';
 import { CONFIG_HASH } from '../../src/net/fingerprint';
 import { PROTOCOL_VERSION, normalizeRoomCode } from '../../src/net/protocol';
+import { DEFAULT_VENUE, isVenueId, type VenueId } from '../../src/net/venueId';
 import { SERVER_CONFIG } from './config';
 import { corsHeaders, isAllowedOrigin, json, randomRoomCode } from './http';
 import type { Env } from './roomObject';
 
 export { Room } from './roomObject';
 
-/** Largest accepted POST /rooms body (bytes). */
+/** Largest accepted POST /rooms body (bytes): `{"length":"standard","venue":"derborence"}` is under 50. */
 const MAX_CREATE_BODY = 256;
 
 async function createRoom(request: Request, env: Env, cors: Record<string, string>): Promise<Response> {
@@ -24,12 +25,16 @@ async function createRoom(request: Request, env: Env, cors: Record<string, strin
   const text = await request.text();
   if (text.length > MAX_CREATE_BODY) return json({ error: 'tooLarge' }, 413, cors);
   let length: 'quick' | 'standard' = 'standard';
+  // An unknown or missing venue is the village (old clients send none at all).
+  let venue: VenueId = DEFAULT_VENUE;
   if (text.trim() !== '') {
     try {
       const body: unknown = JSON.parse(text);
       const l = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['length'] : undefined;
       if (l !== undefined && !isMatchLength(l)) return json({ error: 'badLength' }, 400, cors);
       if (l !== undefined) length = l;
+      const v = typeof body === 'object' && body !== null ? (body as Record<string, unknown>)['venue'] : undefined;
+      if (isVenueId(v)) venue = v;
     } catch {
       return json({ error: 'badJson' }, 400, cors);
     }
@@ -37,7 +42,7 @@ async function createRoom(request: Request, env: Env, cors: Record<string, strin
   for (let i = 0; i < SERVER_CONFIG.createAttempts; i++) {
     const code = randomRoomCode();
     const stub = env.ROOMS.get(env.ROOMS.idFromName(code));
-    if (await stub.init(code, length)) return json({ code }, 201, cors);
+    if (await stub.init(code, length, venue)) return json({ code }, 201, cors);
   }
   return json({ error: 'busy' }, 503, cors);
 }

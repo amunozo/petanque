@@ -11,6 +11,7 @@ import {
   createRoomState,
   joinRoom as joinAt,
   roomMessage as messageAt,
+  roomSnapshot,
   seatDisconnected as disconnectAt,
   type Entropy,
   type RoomClock,
@@ -246,5 +247,25 @@ describe('room: refereeing', () => {
     roomMessage(room, 'A', { type: 'leave' }, ENTROPY);
     seatDisconnected(room, 'B');
     expect(JSON.stringify(room)).toBe(frozen);
+  });
+});
+
+describe('room: venue', () => {
+  it("stores the creator's court and puts it in every snapshot", () => {
+    const room = createRoomState(CODE, 'standard', 'derborence');
+    expect(room.venue).toBe('derborence');
+    expect(roomSnapshot(room, T0).venue).toBe('derborence');
+    const r1 = joinRoom(room, hello(TOKENS.a, 'Ana'), ENTROPY);
+    const welcome = msgs(r1, 'self')[0];
+    expect(welcome?.type === 'welcome' && welcome.room.venue).toBe('derborence');
+    const r2 = joinRoom(r1.room, hello(TOKENS.b, 'Bob'), ENTROPY);
+    const started = msgs(r2, 'all')[0];
+    expect(started?.type === 'matchStarted' && started.room.venue).toBe('derborence');
+    expect(r2.room.venue).toBe('derborence'); // never changed by joining or playing
+  });
+
+  it('is the village when none is picked', () => {
+    expect(createRoomState(CODE, 'standard').venue).toBe('village');
+    expect(roomSnapshot(createRoomState(CODE, 'quick'), T0).venue).toBe('village');
   });
 });

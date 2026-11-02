@@ -2,6 +2,7 @@
 import type { AiDifficulty } from '../games/petanque/aiTypes';
 import { isLang, type Lang } from '../i18n';
 import { DEFAULT_MATCH_LENGTH, isMatchLength, type MatchLength } from './matchLength';
+import { DEFAULT_VENUE, isVenueId, type VenueId } from '../net/venueId';
 
 const DIFFICULTY_KEY = 'petanque.aiDifficulty';
 export const DIFFICULTIES: readonly AiDifficulty[] = ['easy', 'medium', 'hard'];
@@ -39,6 +40,26 @@ export function loadMatchLength(): MatchLength {
 export function saveMatchLength(l: MatchLength): void {
   try {
     localStorage.setItem(MATCH_LENGTH_KEY, l);
+  } catch {
+    /* storage blocked */
+  }
+}
+
+const VENUE_KEY = 'petanque.venue';
+
+/** The court the player picked last time (the village until they pick another one). */
+export function loadVenue(): VenueId {
+  try {
+    const v = localStorage.getItem(VENUE_KEY);
+    return isVenueId(v) ? v : DEFAULT_VENUE;
+  } catch {
+    return DEFAULT_VENUE;
+  }
+}
+
+export function saveVenue(v: VenueId): void {
+  try {
+    localStorage.setItem(VENUE_KEY, v);
   } catch {
     /* storage blocked */
   }

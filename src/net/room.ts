@@ -36,6 +36,7 @@ import type { MatchState } from '../games/petanque/matchTypes';
 import { defaultConfig } from '../tuning/config';
 import { cloneDeep } from '../tuning/paths';
 import { CONFIG_HASH } from './fingerprint';
+import { DEFAULT_VENUE, isVenueId, type VenueId } from './venueId';
 import {
   CLOSE_CODES,
   PROTOCOL_VERSION,
@@ -79,6 +80,8 @@ export interface SeatState {
 export interface RoomState {
   code: string;
   length: MatchLength;
+  /** The court both players see (picked when the room is created). Rooms stored before it existed load as the village. */
+  venue: VenueId;
   phase: RoomPhase;
   seq: number;
   matchNumber: number;
@@ -127,10 +130,11 @@ export interface RoomResult {
 
 const other = (s: Seat): Seat => (s === 'A' ? 'B' : 'A');
 
-export function createRoomState(code: string, length: MatchLength): RoomState {
+export function createRoomState(code: string, length: MatchLength, venue: VenueId = DEFAULT_VENUE): RoomState {
   return {
     code,
     length,
+    venue,
     phase: 'lobby',
     seq: 0,
     matchNumber: 0,
@@ -154,6 +158,7 @@ export function roomSnapshot(room: RoomState, now: number): RoomSnapshot {
     code: room.code,
     phase: room.phase,
     length: room.length,
+    venue: room.venue,
     seq: room.seq,
     matchNumber: room.matchNumber,
     players: { A: player(room.seats.A), B: player(room.seats.B) },
@@ -253,8 +258,20 @@ export function roomAlarm(room: RoomState, clock: RoomClock): RoomResult {
 export function restoreRoom(stored: RoomState, liveSeats: readonly (Seat | null)[], clock: RoomClock): RoomResult {
   const fill = (st: SeatState | null): SeatState | null => (st && st.graceUntil === undefined ? { ...st, graceUntil: null } : st);
   let room: RoomState = stored;
-  if (stored.outcome === undefined || stored.abandonAt === undefined || fill(stored.seats.A) !== stored.seats.A || fill(stored.seats.B) !== stored.seats.B) {
-    room = { ...stored, outcome: stored.outcome ?? null, abandonAt: stored.abandonAt ?? null, seats: { A: fill(stored.seats.A), B: fill(stored.seats.B) } };
+  if (
+    !isVenueId(stored.venue) ||
+    stored.outcome === undefined ||
+    stored.abandonAt === undefined ||
+    fill(stored.seats.A) !== stored.seats.A ||
+    fill(stored.seats.B) !== stored.seats.B
+  ) {
+    room = {
+      ...stored,
+      venue: isVenueId(stored.venue) ? stored.venue : DEFAULT_VENUE,
+      outcome: stored.outcome ?? null,
+      abandonAt: stored.abandonAt ?? null,
+      seats: { A: fill(stored.seats.A), B: fill(stored.seats.B) },
+    };
   }
   const stale = SEATS.filter((s) => room.seats[s]?.connected === true && !liveSeats.includes(s));
   const seats = { ...room.seats };

@@ -11,6 +11,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { MatchLength } from '../../src/games/petanque/matchLength';
 import { CLOSE_CODES, PING_TEXT, PONG_TEXT, encode, parseClientMessage, type ErrorCode, type Seat, type ServerMessage } from '../../src/net/protocol';
+import { DEFAULT_VENUE, isVenueId, type VenueId } from '../../src/net/venueId';
 import {
   createRoomState,
   isAbandoned,
@@ -39,6 +40,8 @@ export interface RoomInfo {
   code: string;
   phase: RoomState['phase'];
   length: MatchLength;
+  /** The court the host picked (rooms stored before venues existed are the village). */
+  venue: VenueId;
   players: number;
 }
 
@@ -109,16 +112,22 @@ export class Room extends DurableObject<Env> {
   // ---- RPC from the Worker -----------------------------------------------------------
 
   /** Creates the room under this code; false if the code is already in use. */
-  async init(code: string, length: MatchLength): Promise<boolean> {
+  async init(code: string, length: MatchLength, venue: VenueId = DEFAULT_VENUE): Promise<boolean> {
     if (this.room) return false;
-    await this.commit(createRoomState(code, length));
+    await this.commit(createRoomState(code, length, isVenueId(venue) ? venue : DEFAULT_VENUE));
     return true;
   }
 
   async info(): Promise<RoomInfo | null> {
     const r = this.room;
     if (!r || isAbandoned(r, Date.now())) return null; // abandoned: gone, even if the alarm has not run yet
-    return { code: r.code, phase: r.phase, length: r.length, players: (r.seats.A ? 1 : 0) + (r.seats.B ? 1 : 0) };
+    return {
+      code: r.code,
+      phase: r.phase,
+      length: r.length,
+      venue: isVenueId(r.venue) ? r.venue : DEFAULT_VENUE, // a room stored before venues existed
+      players: (r.seats.A ? 1 : 0) + (r.seats.B ? 1 : 0),
+    };
   }
 
   // ---- WebSocket upgrade --------------------------------------------------------------

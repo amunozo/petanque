@@ -22,10 +22,19 @@
  *
  * Bump PROTOCOL_VERSION whenever a message shape OR the behaviour of the
  * engine/rules changes (the config fingerprint only covers config numbers).
+ *
+ * Additive OPTIONAL fields that an older peer can ignore do NOT need a bump:
+ * `RoomSnapshot.venue` / `RoomInfo.venue` / the POST /rooms `venue` key (the
+ * court picked by the room creator) are like that. An old client ignores the
+ * field (and plays its own default venue), an old server ignores the body key
+ * (and every room is the village), and a missing `venue` in a snapshot or a
+ * room info means 'village'. A version check would make old and new clients
+ * unable to play together for nothing.
  */
 import type { Body, Loft, ThrowIntent } from '../engine';
 import type { MatchState, TeamId, ThrowRecord } from '../games/petanque/matchTypes';
 import type { MatchLength } from '../games/petanque/matchLength';
+import type { VenueId } from './venueId';
 
 export const PROTOCOL_VERSION = 3;
 
@@ -101,6 +110,8 @@ export interface RoomSnapshot {
   code: string;
   phase: RoomPhase;
   length: MatchLength;
+  /** The court the room creator picked; a snapshot without it (older server) is the village. */
+  venue: VenueId;
   /** Match revision: +1 on matchStarted, throwResult and endStarted. A `throw` must quote it. */
   seq: number;
   /** 0 before the first match; +1 per match (rematches). */

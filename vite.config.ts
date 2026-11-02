@@ -24,13 +24,28 @@ export default defineConfig({
       manifest: false,
       workbox: {
         // App shell, hashed JS/CSS chunks (incl. the AI worker), fonts, 3D models, icons, privacy page.
-        // A venue whose art is still missing (models/derborence/) is loaded from the network on
-        // request only: never precached (the files may not exist yet).
+        // The second venue's art (models/derborence/) is NOT precached: most players never pick it, and
+        // its files may not exist yet. It is cached on first use instead (runtimeCaching below), so once
+        // a player has loaded that court it works offline too. The village art stays in the precache.
         globPatterns: ['**/*.{js,css,html,woff2,glb,png,webp,svg,webmanifest}'],
         globIgnores: ['**/.well-known/**', '**/models/derborence/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         clientsClaim: true, // the first load is controlled right away, so offline works without a second visit
+        // Venue art loaded on demand (see globIgnores): stale-while-revalidate, so later visits load from
+        // the cache (offline too) while a re-exported model (same file name, no hash) still reaches the
+        // player on the visit after. The pattern matches the path only, so it works from
+        // any base path (the site also runs frozen under /v/<version>/ and /exp/<name>/).
+        runtimeCaching: [
+          {
+            urlPattern: /\/models\/derborence\//,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'venue-derborence',
+              expiration: { maxEntries: 40 },
+            },
+          },
+        ],
         // `?source=pwa`, `?mode=ai&seed=…` etc. still hit the precached page.
         ignoreURLParametersMatching: [/.*/],
         navigateFallback: 'index.html',

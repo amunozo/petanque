@@ -1,12 +1,12 @@
 /**
- * Venue of the 3D scene (src/render/venues.ts), picked from `?venue=` at boot. Experimental: URL
- * only (no UI, no saved choice, no i18n string); anything but a known id is the village.
+ * Venue of the 3D scene (src/render/venues.ts), picked from `?venue=` and/or the saved preference
+ * (src/app/prefs.ts, the court picker). Precedence: a valid `?venue=` wins (dev/testing), then the
+ * saved preference, then the village. Anything unknown is ignored.
  */
-import type { VenueId } from '../render/venues';
+import { DEFAULT_VENUE, isVenueId, type VenueId } from '../net/venueId';
 
-const KNOWN: readonly VenueId[] = ['village', 'derborence'];
-
-export function resolveVenue(params: URLSearchParams): VenueId {
+export function resolveVenue(params: URLSearchParams, saved?: VenueId | null): VenueId {
   const wanted = params.get('venue');
-  return KNOWN.find((id) => id === wanted) ?? 'village';
+  if (isVenueId(wanted)) return wanted;
+  return isVenueId(saved) ? saved : DEFAULT_VENUE;
 }

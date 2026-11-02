@@ -7,7 +7,7 @@
  */
 import { pointsFor } from '../../games/petanque';
 import { t, type MessageKey } from '../../i18n';
-import { CLOSE_CODES, createNetClient, ROOM_PARAM, roomCodeFromSearch, shareContent, type ErrorCode, type RoomSnapshot } from '../../net';
+import { CLOSE_CODES, createNetClient, DEFAULT_VENUE, isVenueId, ROOM_PARAM, roomCodeFromSearch, shareContent, type ErrorCode, type RoomSnapshot, type VenueId } from '../../net';
 import { defaultConfig } from '../../tuning';
 import type { AppContext, Mode } from '../context';
 import type { MatchCore } from '../matchCore';
@@ -33,12 +33,20 @@ export interface OnlineFlowDeps {
   goMenu(): void;
   /** versionMismatch: start the PWA update (apply a waiting version, or look for one). */
   update(): void;
+  /**
+   * The court of the room we just got into: from the welcome snapshot (both players) or from the room
+   * info of an invite (the joiner, before the socket opens), always before the match scene is built.
+   * The UI uses it to build that venue's scene; a missing/unknown id is reported as 'village'.
+   */
+  onVenue?(venue: VenueId): void;
 }
 
 export interface OnlineFlow {
   readonly mode: OnlineMatch;
   /** The sheet, the lobby or a message is up (the game ignores gestures meanwhile). */
   isOpen(): boolean;
+  /** The court of the current room (the village until a welcome/room info says otherwise). */
+  venue(): VenueId;
   /** Start-up: an invite link (`?room=`) opens the join sheet; otherwise maybe offer "Rejoin". */
   start(): void;
   /** The menu was (re)shown: ask the server again whether the saved room is still worth rejoining. */
@@ -72,6 +80,8 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   let started = false;
   /** The nickname this device is using in the current room (to save the room again after a rematch starts). */
   let roomNickname = '';
+  /** The court of the room we are in (the village until the server says otherwise). */
+  let roomVenue: VenueId = DEFAULT_VENUE;
   /** Only the newest rejoin check may touch the menu. */
   let checkId = 0;
 
@@ -128,6 +138,15 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     d.enterMode(mode);
   }
 
+  /**
+   * Keeps the room's court and hands it to the UI. Whatever the message carried (a missing or unknown
+   * id from an older/newer peer) is the village.
+   */
+  function rememberVenue(v: unknown): void {
+    roomVenue = isVenueId(v) ? v : DEFAULT_VENUE;
+    d.onVenue?.(roomVenue);
+  }
+
   /** Keeps the other player's nickname with the saved room (for "Rejoin your match vs …"). */
   function rememberOpponent(room: RoomSnapshot): void {
     const active = loadActiveRoom();
@@ -153,19 +172,20 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     client.connect(code, nickname);
   }
 
-  async function host(nickname: string, length: MatchLength): Promise<void> {
+  async function host(nickname: string, length: MatchLength, venue: VenueId = DEFAULT_VENUE): Promise<void> {
     saveNickname(nickname);
     if (offline()) return notice('offline');
     stage = 'connecting';
     lobby.showConnecting();
     let code: string;
     try {
-      code = await client.createRoom(length);
+      code = await client.createRoom(length, venue);
     } catch {
       if (stage === 'connecting') fail(offline() ? 'offline' : 'server');
       return;
     }
     if (stage !== 'connecting') return; // cancelled meanwhile
+    rememberVenue(venue); // the court the server just stored (the welcome confirms it)
     track('online-room-created');
     roomNickname = nickname;
     saveActiveRoom({ code, nickname, opponent: null });
@@ -185,6 +205,8 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
       if (loadActiveRoom()?.code === code) clearActiveRoom();
       return notice('notFound');
     }
+    // The joiner knows the court before the match scene is built (the creator chose it).
+    rememberVenue(info.venue);
     const active = loadActiveRoom();
     if (active?.code === info.code) return join(info.code, active.nickname); // our own match: rejoin
     if (info.phase !== 'lobby') return notice('full');
@@ -249,6 +271,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   client.on('welcome', (ev) => {
     keepRoom(ev.room);
     rememberOpponent(ev.room);
+    rememberVenue(ev.room.venue);
     if (stage === 'match' || stage === 'idle') return;
     if (ev.room.phase === 'lobby') {
       stage = 'lobby';
@@ -295,6 +318,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   return {
     mode,
     isOpen: () => sheet.isOpen() || lobby.isOpen() || noticeUp,
+    venue: () => roomVenue,
     refresh() {
       if (started && stage === 'idle') void checkRejoin();
     },

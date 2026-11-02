@@ -40,7 +40,9 @@ describe.skipIf(!URL_)('worker smoke (needs wrangler dev)', () => {
     const b = client();
     const code = await a.createRoom('quick');
     expect(code).toMatch(/^[2-9A-Z]{5}$/);
-    expect(await b.roomInfo(code)).toEqual({ code, phase: 'lobby', length: 'quick', players: 0 });
+    expect(await b.roomInfo(code)).toEqual({ code, phase: 'lobby', length: 'quick', venue: 'village', players: 0 });
+    const alpine = await a.createRoom('standard', 'derborence');
+    expect((await b.roomInfo(alpine))?.venue).toBe('derborence');
     expect(await b.roomInfo('ZZZZZ')).toBeNull();
 
     const aWelcome = next(a, 'welcome');
