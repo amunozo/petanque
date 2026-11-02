@@ -26,7 +26,7 @@ import { createMatchCore } from './matchCore';
 import { createMatchMode, setup2p, setupVsComputer } from './matchMode';
 import { createMeasureOverlay } from './measure';
 import { confirmDialog, createMenu } from './menu';
-import { hasSeenHowTo, isDifficulty, loadDifficulty, loadLang, loadMatchLength, markHowToSeen } from './prefs';
+import { hasSeenHowTo, isDifficulty, loadDifficulty, loadLang, loadMatchLength, loadVenue, markHowToSeen } from './prefs';
 import { createPracticeMode } from './practiceMode';
 import { currentPortal } from './portal';
 import { registerServiceWorker } from './pwa';
@@ -34,6 +34,7 @@ import { createTouchHint } from './touchHint';
 import { playShotEffects } from './shotEffects';
 import { createUpdateToast } from './updateToast';
 import { resolveVenue } from './venue';
+import { createVenueSwitch } from './venueSwitch';
 import { configuredServerUrl, defaultServerUrl, INVITE_BASE_URL, ROOM_PARAM } from '../net';
 import { createOnlineFlow, type OnlineFlow } from './online/flow';
 import { stripRoomParam } from './online/rules';
@@ -69,7 +70,9 @@ document.documentElement.classList.toggle('is-dev', devMode);
 const store = createConfigStore(defaultConfig, { schema: tuningSchema, ...(devMode ? {} : { storage: null }) });
 const cfg = store.config;
 
-const scene = createPitchScene(canvas, () => store.config, resolveVenue(params));
+// The court: `?venue=` (dev) beats the player's saved choice. Every local mode plays on the scene's court.
+const bootVenue = resolveVenue(params, loadVenue());
+const scene = createPitchScene(canvas, () => store.config, bootVenue);
 // Overlays drawn over the 3D view (under the HUD): measuring lines, dust bursts.
 const project = (p: Parameters<typeof scene.project>[0]) => scene.project(p);
 const fx = createFx(app, canvas, project, hudRoot);
@@ -77,6 +80,19 @@ const measure = createMeasureOverlay(app, project, hudRoot);
 const hud = createHud(hudRoot, __BUILD_ID__);
 const matchHud = createMatchHud(hudRoot);
 const menu = createMenu(app, __BUILD_ID__, () => ({ quick: pointsFor('quick', cfg), standard: pointsFor('standard', cfg) }));
+// Picking a court in the menu switches the scene behind it at once; matches never wait for the art (venueSwitch.ts).
+const venues = createVenueSwitch(scene, hudRoot);
+venues.onLoading((loading) => {
+  menu.setVenueLoading(loading);
+  online?.setVenueLoading(loading);
+});
+venues.track(scene.ready());
+/** The court the menu shows behind it: the boot court, then the player's picks (an online room may switch away meanwhile). */
+let menuVenue = bootVenue;
+menu.onVenue((v) => {
+  menuVenue = v;
+  venues.set(v);
+});
 const touchHint = createTouchHint(app);
 const iosHint = createIosHintCard(app); // iPhone Safari only; shows on the menu after a finished game (iosHint.ts)
 const haptics = createHaptics(() => cfg.controls.haptics);
@@ -162,6 +178,12 @@ const online: OnlineFlow | null = serverUrl
       enterMode: (m) => enterMode(m),
       goMenu: () => goMenu(),
       update: () => updates.applyOrCheck(),
+      // The room's court (the creator picked it), before the match scene is built; the menu's own choice comes back in goMenu().
+      onVenue: (v) => venues.set(v),
+      previewVenue: (v) => {
+        menuVenue = v;
+        venues.set(v);
+      },
     })
   : null;
 
@@ -210,6 +232,7 @@ function goMenu(): void {
   scene.setCameraMode('aim');
   fx.clear();
   menu.show();
+  venues.set(menuVenue); // the player's own court again (an online room may have used another)
   iosHint.menuShown();
   online?.refresh(); // is the saved online match still there?
   refreshInput();

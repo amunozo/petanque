@@ -13,6 +13,7 @@ import type { AppContext, Mode } from '../context';
 import type { MatchCore } from '../matchCore';
 import { track } from '../analytics';
 import type { MatchLength } from '../matchLength';
+import { roomDetailText } from '../venueText';
 import { noticeDialog, type LengthPoints, type Menu } from '../menu';
 import { createOnlineMatch, type OnlineMatch } from './match';
 import { otherSeat, rejoinCard, rejoinDecision, shouldRecheckRejoin, stripRoomParam } from './rules';
@@ -39,6 +40,8 @@ export interface OnlineFlowDeps {
    * The UI uses it to build that venue's scene; a missing/unknown id is reported as 'village'.
    */
   onVenue?(venue: VenueId): void;
+  /** The host picked a court in the sheet (already saved as the player's choice): show it behind the sheet. */
+  previewVenue?(venue: VenueId): void;
 }
 
 export interface OnlineFlow {
@@ -47,6 +50,8 @@ export interface OnlineFlow {
   isOpen(): boolean;
   /** The court of the current room (the village until a welcome/room info says otherwise). */
   venue(): VenueId;
+  /** "Loading court…" in the host sheet's court picker. */
+  setVenueLoading(loading: boolean): void;
   /** Start-up: an invite link (`?room=`) opens the join sheet; otherwise maybe offer "Rejoin". */
   start(): void;
   /** The menu was (re)shown: ask the server again whether the saved room is still worth rejoining. */
@@ -65,7 +70,6 @@ const NOTICE = {
 } as const satisfies Record<NoticeKind, readonly [MessageKey, MessageKey]>;
 const ERROR_NOTICE: Partial<Record<ErrorCode, NoticeKind>> = { roomNotFound: 'notFound', roomExpired: 'notFound', roomFull: 'full', versionMismatch: 'version' };
 
-const LENGTH_KEY = { quick: 'length.quick', standard: 'length.standard' } as const satisfies Record<MatchLength, MessageKey>;
 /** Points to win online: the server's (default) config, never the tuning. */
 const onlinePoints = (length: MatchLength): number => pointsFor(length, defaultConfig);
 const offline = (): boolean => typeof navigator !== 'undefined' && navigator.onLine === false;
@@ -73,7 +77,7 @@ const offline = (): boolean => typeof navigator !== 'undefined' && navigator.onL
 export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
   const { app } = d.ctx;
   const client = createNetClient({ serverUrl: d.serverUrl });
-  const sheet = createOnlineSheet(app, d.points);
+  const sheet = createOnlineSheet(app, d.points, (v) => d.previewVenue?.(v));
   const lobby = createLobby(app);
   let stage: 'idle' | 'connecting' | 'lobby' | 'match' = 'idle';
   let noticeUp = false;
@@ -205,18 +209,24 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
       if (loadActiveRoom()?.code === code) clearActiveRoom();
       return notice('notFound');
     }
-    // The joiner knows the court before the match scene is built (the creator chose it).
-    rememberVenue(info.venue);
+    // The joiner knows the court before the match scene is built (the creator chose it). It is applied
+    // only when we really join, so a declined invite leaves the menu's court behind the menu.
+    const venue = info.venue;
     const active = loadActiveRoom();
-    if (active?.code === info.code) return join(info.code, active.nickname); // our own match: rejoin
+    if (active?.code === info.code) {
+      rememberVenue(venue);
+      return join(info.code, active.nickname); // our own match: rejoin
+    }
     if (info.phase !== 'lobby') return notice('full');
     if (nickname) {
       track('online-joined');
+      rememberVenue(venue);
       return join(info.code, nickname);
     }
-    const r = await sheet.open({ code: info.code, points: onlinePoints(info.length) });
+    const r = await sheet.open({ code: info.code, points: onlinePoints(info.length), venue });
     if (r) {
       track('online-joined');
+      rememberVenue(venue);
       join(info.code, r.nickname);
     }
   }
@@ -225,7 +235,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     const r = await sheet.open(null);
     if (d.menu.isOpen()) d.menu.show(); // repaints the menu's length choice (shared with the sheet)
     if (!r) return;
-    if (r.kind === 'host') await host(r.nickname, r.length);
+    if (r.kind === 'host') await host(r.nickname, r.length, r.venue);
     else await openInvite(r.code, r.nickname);
   }
 
@@ -275,7 +285,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     if (stage === 'match' || stage === 'idle') return;
     if (ev.room.phase === 'lobby') {
       stage = 'lobby';
-      lobby.showRoom(ev.room.code, `${t(LENGTH_KEY[ev.room.length])} · ${onlinePoints(ev.room.length)}`);
+      lobby.showRoom(ev.room.code, roomDetailText(ev.room.length, onlinePoints(ev.room.length), roomVenue));
     } else enterMatch();
   });
   client.on('matchStarted', (ev) => {
@@ -319,6 +329,7 @@ export function createOnlineFlow(d: OnlineFlowDeps): OnlineFlow {
     mode,
     isOpen: () => sheet.isOpen() || lobby.isOpen() || noticeUp,
     venue: () => roomVenue,
+    setVenueLoading: (loading) => sheet.setVenueLoading(loading),
     refresh() {
       if (started && stage === 'idle') void checkRejoin();
     },

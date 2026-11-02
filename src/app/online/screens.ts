@@ -10,19 +10,26 @@ import { button, el, shieldPointer } from '../dom';
 import { icon } from '../icons';
 import type { MatchLength } from '../matchLength';
 import { lengthPicker, type LengthPoints } from '../menu';
+import type { VenueId } from '../../net/venueId';
+import { createVenuePicker } from '../venuePicker';
+import { venueName } from '../venueText';
 import { loadNickname, NICKNAME_MAX } from './storage';
 
-export type SheetResult = { kind: 'host'; nickname: string; length: MatchLength } | { kind: 'join'; nickname: string; code: string };
+export type SheetResult = { kind: 'host'; nickname: string; length: MatchLength; venue: VenueId } | { kind: 'join'; nickname: string; code: string };
 
 export interface GuestInvite {
   code: string;
   points: number;
+  /** The court the host picked (shown in the invite line). */
+  venue: VenueId;
 }
 
 export interface OnlineSheet {
   /** Host sheet (with "join with a code"), or the guest's sheet for an invite. Resolves null when closed. */
   open(invite: GuestInvite | null): Promise<SheetResult | null>;
   isOpen(): boolean;
+  /** "Loading court…" in the host's court picker. */
+  setVenueLoading(loading: boolean): void;
 }
 
 function field(labelKey: 'online.nickname' | 'online.code', input: HTMLInputElement): { wrap: HTMLElement; paint(): void } {
@@ -41,7 +48,7 @@ function textInput(cls: string, max: number): HTMLInputElement {
   return input;
 }
 
-export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): OnlineSheet {
+export function createOnlineSheet(parent: HTMLElement, points: LengthPoints, onVenue: (v: VenueId) => void): OnlineSheet {
   const root = el('div', 'ol-screen');
   root.hidden = true;
   root.setAttribute('role', 'dialog');
@@ -60,6 +67,8 @@ export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): On
   nick.enterKeyHint = 'go';
   const nickField = field('online.nickname', nick);
   const length = lengthPicker(points, () => undefined);
+  // The host picks the court (default: the saved choice); the friend plays on the same one.
+  const court = createVenuePicker(onVenue);
   const go = button('mh-btn mh-primary ol-go', '');
 
   const or = el('div', 'ol-or');
@@ -71,7 +80,7 @@ export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): On
   const joinRow = el('div', 'ol-join-row');
   joinRow.append(codeField.wrap, join);
 
-  box.append(close, title, sub, nickField.wrap, length.element, go, or, joinRow);
+  box.append(close, title, sub, nickField.wrap, length.element, court.element, go, or, joinRow);
   root.append(box);
   parent.append(root);
 
@@ -93,7 +102,7 @@ export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): On
     join.textContent = t('online.join');
     if (invite) {
       title.textContent = t('online.invited.title');
-      sub.textContent = t('online.invited.sub', { code: invite.code, points: invite.points });
+      sub.textContent = `${t('online.invited.sub', { code: invite.code, points: invite.points })} · ${venueName(invite.venue)}`;
       go.textContent = t('online.join');
     } else {
       title.textContent = t('online.title');
@@ -113,7 +122,7 @@ export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): On
     const n = nickname();
     if (!n) return;
     if (invite) finish({ kind: 'join', nickname: n, code: invite.code });
-    else finish({ kind: 'host', nickname: n, length: length.get() });
+    else finish({ kind: 'host', nickname: n, length: length.get(), venue: court.get() });
   };
   const submitCode = (): void => {
     const n = nickname();
@@ -149,6 +158,7 @@ export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): On
       code.value = '';
       root.classList.toggle('is-guest', inv !== null);
       length.refresh();
+      court.refresh();
       paint();
       paintState();
       root.hidden = false;
@@ -159,6 +169,7 @@ export function createOnlineSheet(parent: HTMLElement, points: LengthPoints): On
       });
     },
     isOpen: () => !root.hidden,
+    setVenueLoading: (loading) => court.setLoading(loading),
   };
 }
 

@@ -8,6 +8,8 @@ import { PRIVACY_URL } from './links';
 import { MATCH_LENGTHS, matchInfoText, type MatchLength } from './matchLength';
 import { DIFFICULTIES, loadDifficulty, loadMatchLength, saveDifficulty, saveMatchLength } from './prefs';
 import { paintMuteButton } from './soundIcon';
+import type { VenueId } from '../net/venueId';
+import { createVenuePicker } from './venuePicker';
 
 export interface Menu {
   show(): void;
@@ -32,6 +34,12 @@ export interface Menu {
   /** "Rejoin your match" at the top (an online match this device was in); null hides it. */
   setRejoin(offer: RejoinOffer | null): void;
   onRejoin(fn: () => void): void;
+  /** The court picked in the menu (the saved preference). */
+  venue(): VenueId;
+  /** The player picked another court (already saved): switch the scene behind the menu. */
+  onVenue(fn: (venue: VenueId) => void): void;
+  /** "Loading court…" next to the court picker. */
+  setVenueLoading(loading: boolean): void;
 }
 
 export interface RejoinOffer {
@@ -162,6 +170,11 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
     match.sub.textContent = matchInfoText(points()[length.get()]);
   };
   const length = lengthPicker(points, paintMatchInfo);
+  let venueFn: (v: VenueId) => void = () => undefined;
+  const court = createVenuePicker((v) => venueFn(v));
+  // Match length and court share one card under the mode rows (two compact rows, one surface).
+  const options = el('div', 'mn-options');
+  options.append(length.element, court.element);
   const online = choice('mn-online', ['a', 'j', 'b']);
   online.btn.hidden = true;
   const rejoin = choice('mn-rejoin', ['a', 'b']);
@@ -175,7 +188,7 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   // "Tap a game to start": first-time players must see at once that the rows below are buttons.
   const pick = el('div', 'mn-pick');
   const buttons = el('div', 'mn-buttons');
-  buttons.append(pick, rejoin.btn, vsBox, match.btn, practice.btn, online.btn, length.element);
+  buttons.append(pick, rejoin.btn, vsBox, match.btn, practice.btn, online.btn, options);
 
   const muteBtn = el('button', 'mn-mute');
   muteBtn.type = 'button';
@@ -242,6 +255,7 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
   return {
     show() {
       length.refresh();
+      court.refresh();
       paintMatchInfo();
       root.hidden = false;
       document.body.classList.add('is-menu');
@@ -292,6 +306,11 @@ export function createMenu(parent: HTMLElement, buildId: string, points: LengthP
     onRejoin(fn) {
       rejoinFn = fn;
     },
+    venue: () => court.get(),
+    onVenue(fn) {
+      venueFn = fn;
+    },
+    setVenueLoading: (loading) => court.setLoading(loading),
   };
 }
 

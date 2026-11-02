@@ -4,38 +4,35 @@
 Full project state lives in `docs/STATUS.md` — read it first.
 
 ## State of the project
-- Main game live at https://petanque.amunozo.com/. Typecheck clean; `npx vitest run`: 415 passed, 3 skipped (2026-11-02).
-- Derborence venue: plumbing fdae5d1, art pass f4bce69, lighting/polish 27932ba, selected only via `?venue=derborence`.
-- Second polish round (valley-shade light, new mountains, chalet/shed fixes) is **uncommitted**, awaiting the owner.
+- Main game live at https://petanque.amunozo.com/. `npm run typecheck` clean; `npx vitest run`: 432 passed, 3 skipped (2026-11-02).
+- Second court "Alps" (venue id `derborence`; player-facing name never "Derborence") is playable on branch `exp-derborence`, NOT pushed/released:
+  menu picker Provence | Alps (saved pref, live scene switch behind the menu), "Loading court…" indicator,
+  online: room creator picks, joiner gets it, lobby shows "Quick · 7 · Alps". Art ~6.4 MB, downloaded on first pick, then cached (StaleWhileRevalidate).
+- `?venue=derborence` still works as a dev override.
 
-## Done in the last session
-- 27932ba consistent stone lighting (soft normals, one tone per stone), rebuilt shed, conifer atlas 1024 webp.
-- (uncommitted) round 2, see Work in progress.
+## Done in the last session (2026-11-02)
+- f4bce69 / 27932ba / 8cb7d83 / 9683fd6: Derborence art passes (consistent stone light, valley-shade flat light, chalet/shed polish, layered mountains, no "1920").
+- 60e1874 plumbing (pref, room venue field without protocol bump, runtime caching, i18n); 74e967b runtime `setVenue`; next commit: menu/online UI.
 
-## Work in progress (uncommitted, branch exp-derborence)
-- Lighting: `Venue.shade` (src/render/venues.ts, lighting.ts): the clearing lies in the valley's shade.
-  The directional light becomes a soft high key (62 deg), baked sun shadows and bounce are off, AO stays.
-  No tree-shadow blotches on the court. `treeShade` removed. Village unchanged (opt-in per venue).
-- Bake: `Venue.atlas_unlit_vis` (art/lib/venues.py, bake.py; derborence 0.0): turned-away faces were
-  stored as "unshadowed" (1.0), and the soft stone normals lit them up as bright wedges.
-- Backdrop rewritten (art/assets/derborence/backdrop.py): stratified cliff band with buttresses and gullies,
-  grass/snow ledges, slopes with larches, two summits behind (tower + pyramid), aerial perspective. 451 KB.
-- Chalet: tilted louvres, muted shutters, grounded bench, calmer foundation; steps on risers + cheek stones;
-  pale bank stones. Shed moved to (-6.95, -4.05) clear of the larch, shingle-row roof in weathered grey.
-- Screenshots: `python3 shots.py <prefix> [views]` in the session scratchpad (Playwright; camera override).
+## Work in progress
+- None uncommitted after the UI commit.
 
 ## Next steps
-1. Owner reviews in-game; commit if approved.
-2. Possible: spruce card silhouettes; the backdrop's left/right flanks seen from wide angles.
+1. Owner tests the picker on the phone (dev server `npm run dev -- --host`).
+2. Release: merge `exp-derborence` → main, bump version, Release checklist in docs/STATUS.md, push (deploys site + server; server change is additive).
+3. Optional: tagline "Boules in the village square" on the Alps court; mountains warmer/more contrast; big boulder too pale; mid-distance spruces washed by fog.
+4. Optional: one-off +3 textures after switching venues (does not grow; render layer).
 
 ## Decisions made
-- Derborence is purely visual and URL-only; no UI/i18n until owner decides.
+- Court names Provence / Alps; picker on the main menu; online = room creator's court for both (no protocol bump, old clients fall back to Provence).
+- Alps art not precached (6.4 MB): downloaded on first pick; compress later if the app grows.
+- Matches start immediately while the court loads (fallback court is playable).
 - Visual/taste work goes to Opus subagents, not DeepSeek.
 - Stones keep faceted silhouettes but shade as one volume (soft normals) instead of per-face random tones.
 - Derborence court is in valley shade (owner, 2026-11-02): even light for gameplay, sun only on the mountains.
 
 ## Open questions for the owner
-- Is the softer stone/log look right, or should facets read a bit stronger?
+- Tagline on the Alps court? Release now?
 
 ## Gotchas
 - Derborence models are excluded from the PWA precache (vite.config.ts).

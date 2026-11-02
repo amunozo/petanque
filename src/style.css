@@ -1672,6 +1672,91 @@ a.hud-item {
   text-transform: uppercase;
   color: var(--ink-2);
 }
+/* Match length + court: one glass card, two compact rows (src/app/venuePicker.ts). */
+.mn-options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0;
+  border-radius: var(--r-lg);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-sm);
+}
+.mn-options .mn-length {
+  background: none;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.mn-options .mn-length + .mn-length {
+  padding-top: 0;
+}
+.mn-venue-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+/* "Loading court…": quiet, at the end of the label row, with a small spinner. */
+.mn-venue-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-2);
+}
+.mn-venue-loading::before,
+.vn-spinner {
+  content: '';
+  flex: none;
+  display: block;
+  width: 10px;
+  height: 10px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: vn-spin 0.8s linear infinite;
+}
+.mn-venue-loading[hidden] {
+  display: none;
+}
+@keyframes vn-spin {
+  to { transform: rotate(360deg); }
+}
+/* Court buttons: a small round swatch of each place (sky over warm sand / snow over pine) before the name. */
+.mn-venue-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.mn-venue-swatch {
+  flex: none;
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.85), 0 0 0 1px rgba(38, 33, 48, 0.18);
+}
+.mn-venue-village {
+  background: linear-gradient(#7fb8ec 0 45%, #e9b25f 45% 100%);
+}
+.mn-venue-derborence {
+  background: linear-gradient(160deg, #eef3f8 0 30%, #8a96a3 30% 52%, #2f6b45 52% 100%);
+}
+/* While the picked court loads, its swatch turns into a spinner (also where short phones hide the label row). */
+.mn-venue.is-loading .mn-seg-btn[aria-checked='true'] .mn-venue-swatch {
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  background: none;
+  box-shadow: none;
+  animation: vn-spin 0.8s linear infinite;
+}
 /* Segmented control (menu); matches the loft picker. */
 .mn-seg {
   display: flex;
@@ -1812,13 +1897,15 @@ body.is-dialog .tn-root {
 @media (max-height: 680px) {
   .mn-root {
     gap: 10px;
+    /* Keep the title clear of the language pills and the sound button (the content is centred below them). */
+    padding-top: calc(var(--safe-top) + 58px);
   }
   /* The emblem makes room for the language pill and longer translated titles. */
   .mn-logo {
     display: none;
   }
   .mn-title {
-    font-size: 46px;
+    font-size: 42px;
   }
   .mn-logo .mn-ball {
     width: 34px;
@@ -1837,7 +1924,7 @@ body.is-dialog .tn-root {
     padding-bottom: 7px;
   }
   .mn-buttons {
-    gap: 9px;
+    gap: 7px;
   }
   .mn-pick {
     padding: 3px 10px;
@@ -1846,6 +1933,17 @@ body.is-dialog .tn-root {
   .mn-length {
     padding-top: 6px;
     padding-bottom: 6px;
+  }
+  /* Length + court card: slimmer rows (still 40 px tall targets). */
+  .mn-options .mn-length {
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  .mn-options .mn-seg {
+    padding: 3px;
+  }
+  .mn-options .mn-seg-btn {
+    min-height: 40px;
   }
 }
 
@@ -1939,8 +2037,9 @@ body.is-dialog .tn-root {
 .mn-btn[hidden] {
   display: none;
 }
-/* The online row (beta / developer mode) adds a row too: drop the emblem, and on short phones the "tap a game" line. */
-@media (max-height: 900px) {
+/* The online row (beta / developer mode) adds a row too: drop the emblem, and on short phones the "tap a game" line.
+   (960 px: with the court row, long French/Portuguese titles need the emblem's room on ~915 px phones.) */
+@media (max-height: 960px) {
   .mn-root.has-online .mn-logo,
   .mn-root.has-online.has-rejoin .mn-tagline,
   .mn-root.has-online.has-rejoin .mn-pick {
@@ -2115,6 +2214,9 @@ body.is-dialog .tn-root {
   width: auto;
   min-height: 48px;
   font-size: 17px;
+}
+.ol-box .mn-venue {
+  margin-top: -6px;
 }
 .ol-screen.is-guest .mn-length,
 .ol-screen.is-guest .ol-or,
@@ -2793,5 +2895,39 @@ body.is-dialog .tn-root {
 @media (prefers-reduced-motion: reduce) {
   .ih-card {
     animation: none;
+  }
+}
+
+/* ==========================================================================
+   Court loading pill during a game (src/app/venueSwitch.ts): under the ⋯
+   button, inside #hud (so it hides with it on the menu).
+   ========================================================================== */
+.vn-loading {
+  position: absolute;
+  z-index: 10;
+  top: calc(var(--safe-top) + var(--edge) + 52px);
+  right: calc(var(--safe-right) + var(--edge));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 46vw;
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+  background: var(--glass);
+  box-shadow: var(--shadow-sm);
+  font: 800 12px/1.2 var(--font-body);
+  color: var(--ink-2);
+  pointer-events: none;
+}
+.vn-loading[hidden] {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vn-spinner,
+  .mn-venue-loading::before,
+  .mn-venue.is-loading .mn-seg-btn[aria-checked='true'] .mn-venue-swatch {
+    animation: none;
+    border-right-color: currentColor;
+    opacity: 0.6;
   }
 }

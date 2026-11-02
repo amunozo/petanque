@@ -187,7 +187,15 @@ In progress: **`exp-derborence`** (started 2026-10-31) — second, purely visual
 experimental venue recreating the real court at Derborence (Valais) from the
 owner's photos: log-framed gravel court, limestone rocks, dark Valais chalet
 ("1920"), spruces + autumn larches, big boulder, cliffs. No people/tarps.
-Selected only by URL `?venue=derborence` (default village; no UI/i18n yet).
+Player-facing court picker (2026-11-02, uncommitted): menu card "Match length + Court"
+(Provence / Alps, swatches; `src/app/venuePicker.ts`, saved pref; picking switches the
+scene behind the menu; `src/app/venueSwitch.ts` shows "Loading court…" after 250 ms:
+label row + spinner swatch in the menu, a pill under ⋯ in game; matches never wait for
+the art). Online: host picks the court in the sheet, lobby reads "Quick · 7 · Alps",
+the invite line names it (`src/app/venueText.ts`); back on the menu the player's own
+court returns. `?venue=` still overrides at boot (dev). Short-phone menu tightened
+(≤680 px: title 42 px, top padding clears the language pills; emblem hides with the
+online row up to 960 px).
 Plumbing committed fdae5d1: `art/lib/venues.py` + `npm run art -- --venue
 derborence …` (outputs in `public/models/derborence/`, excluded from the PWA
 precache), `src/render/venues.ts` holds every per-venue render constant.
