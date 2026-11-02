@@ -183,6 +183,15 @@ setting. Preview: https://petanque.amunozo.com/exp/exp-landing/ — built
 counterintuitive… more complicated and less fun". Classic slingshot controls
 stay. Branch kept for reference only; do not merge or revive without the
 owner asking.
+In progress: **`exp-derborence`** (started 2026-10-31) — second, purely visual,
+experimental venue recreating the real court at Derborence (Valais) from the
+owner's photos: log-framed gravel court, limestone rocks, dark Valais chalet
+("1920"), spruces + autumn larches, big boulder, cliffs. No people/tarps.
+Selected only by URL `?venue=derborence` (default village; no UI/i18n yet).
+Plumbing committed fdae5d1: `art/lib/venues.py` + `npm run art -- --venue
+derborence …` (outputs in `public/models/derborence/`, excluded from the PWA
+precache), `src/render/venues.ts` holds every per-venue render constant.
+Art is being made by an Opus subagent in `art/assets/derborence/`. Not pushed yet.
 Online play: server DEPLOYED 2026-10-08 at
 https://petanque-server.amunozo-gamedev.workers.dev (GitHub secrets
 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID; deploy-server.yml deploys on

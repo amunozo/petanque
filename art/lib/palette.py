@@ -124,5 +124,85 @@ HEX = {
     "sky_horizon": "#c6d6e4",
 }
 
+# --- Derborence (alpine forest court, Valais), late October afternoon ---------------------
+# Natural, slightly cool colours of a shaded larch / spruce forest under pale limestone cliffs:
+# grey fine gravel, rusty fallen larch needles, yellow birch / aspen leaves, silver-grey
+# weathered logs, bluish-grey limestone, a dark weathered log chalet with honey shutters.
+HEX_DERBORENCE = {
+    # Court: grey fine gravel, fallen larch needles, small yellow leaves
+    "d_gravel": "#8f8c85",
+    "d_gravel_light": "#a19e97",
+    "d_gravel_dark": "#73716b",
+    "d_needles": "#9a7150",        # fallen larch needles (rusty orange-brown)
+    "d_needles_gold": "#aa8459",
+    "d_needles_dark": "#76573e",
+    "d_leaf_yellow": "#d9b53c",
+    "d_leaf_gold": "#c79a32",
+    "d_leaf_pale": "#e0c869",
+    "d_leaf_brown": "#9a7442",
+    "d_leaf_red": "#b0482f",
+    # Forest floor
+    "d_soil": "#6c5e4c",
+    "d_soil_dark": "#4f4538",
+    "d_litter": "#7b6a56",         # needle litter
+    "d_grass_dry": "#9a9067",
+    "d_grass": "#82814f",
+    "d_grass_green": "#6f7a42",
+    "d_moss": "#6a7739",
+    "d_moss_dark": "#4b5630",
+    "d_fern": "#a8914a",           # yellowing bracken / ferns
+    "d_root": "#6e6151",
+    # Weathered round logs (bark gone, silver-grey, deep checks)
+    "d_log": "#a9a49a",
+    "d_log_light": "#cbc6bb",
+    "d_log_grey": "#8a857c",
+    "d_log_dark": "#5f5b54",
+    "d_log_crack": "#38352f",
+    "d_log_end": "#b5a88f",
+    # Limestone (bluish grey, angular)
+    "d_rock": "#9da4aa",
+    "d_rock_light": "#b5babd",
+    "d_rock_dark": "#68707a",
+    "d_rock_warm": "#a5a199",
+    "d_lichen": "#a3a585",
+    # Chalet (Valais blockbau)
+    "d_chalet": "#4b3d32",
+    "d_chalet_dark": "#33291f",
+    "d_chalet_grey": "#5e5349",
+    "d_stone_wall": "#c6c3ba",     # whitewashed / pale stone foundation
+    "d_stone_wall_dark": "#9a968c",
+    "d_shutter": "#c39a5c",        # pale honey shutters
+    "d_shutter_dark": "#9f7a45",
+    "d_plank": "#c8aa77",          # newer planks (bench)
+    "d_roof": "#403d3b",
+    "d_roof_edge": "#56524e",
+    "d_white": "#e2dfd6",
+    "d_glass": "#272b2e",
+    # Trees
+    "d_spruce": "#2c3d28",
+    "d_spruce_mid": "#3b5030",
+    "d_spruce_light": "#5a6c3e",
+    "d_larch": "#d3a13a",
+    "d_larch_orange": "#c6822f",
+    "d_larch_green": "#a59f4b",
+    "d_pine": "#4c5d3b",
+    "d_bark_spruce": "#5c5047",
+    "d_bark_larch": "#6f5444",
+    "d_bark_pine": "#86685a",
+    "d_bark_pine_grey": "#7b766e",
+    "d_bark_deep": "#3c332d",
+    # Backdrop (pre-lit and pre-hazed: drawn unlit)
+    "d_cliff_lit": "#dfbd8e",      # pale limestone in warm evening light
+    "d_cliff_lit_pale": "#eedac0",
+    "d_cliff_shade": "#8d97a6",    # the same rock in the valley's shade, hazed blue
+    "d_cliff_dark": "#7d8899",
+    "d_scree": "#b4b2ad",
+    "d_forest_far": "#2f3d35",     # far spruce slopes in shade, hazed
+    "d_forest_far_lit": "#6f7449",
+    "d_larch_far": "#b3954f",
+    "d_sky_horizon": "#d5e0ea",    # keep in sync with src/render/venues.ts (derborence sky.horizon)
+}
+HEX.update(HEX_DERBORENCE)
+
 # Linear versions, `P["ochre"]` etc.
 P: dict[str, Color] = {k: lin(v) for k, v in HEX.items()}

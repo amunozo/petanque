@@ -128,20 +128,28 @@ const VILLAGE: Venue = {
 };
 
 /**
- * An alpine forest court. The art is not made yet (derborence has no assets and an empty layout
- * yet), so everything below is a copy of the village values and the game falls back to the plain
- * court + sky: it must stay playable while the assets are missing.
+ * An alpine forest court: the petanque court at Derborence (Valais) on a late October afternoon.
+ * Grey gravel framed by weathered logs and limestone stones, spruces and golden larches around, a
+ * log chalet up the bank behind the far end and the cirque's limestone cliffs beyond (art/assets/
+ * derborence/, art/lib/layout_derborence.py). Cooler sky and fill than the village: the clearing is
+ * mostly in shade, with the low sun raking through the trees.
  */
 const DERBORENCE: Venue = {
   id: 'derborence',
   modelsDir: 'models/derborence',
-  // placeholder until the derborence art lands
-  staticModels: [{ file: 'houses.glb' }, { file: 'mairie.glb' }, { file: 'cafe.glb' }, { file: 'props.glb' }, { file: 'hills.glb', unlit: true }],
-  // placeholder until the derborence art lands
-  court: { file: 'court.glb', groundMeshes: ['court_gravel', 'court_surround'] },
-  // placeholder until the derborence art lands (the layout has no placements, so nothing is fetched)
-  instanced: instancedModels(DERBORENCE_INSTANCED),
-  // placeholder until the derborence art lands
+  staticModels: [
+    { file: 'terrain.glb' },
+    { file: 'chalet.glb' },
+    { file: 'props.glb' },
+    { file: 'boulders.glb' },
+    { file: 'backdrop.glb', unlit: true },
+  ],
+  court: { file: 'court.glb', groundMeshes: ['court_gravel', 'court_surround', 'court_litter'] },
+  instanced: [
+    { file: 'spruce.glb', prefix: 'spruce_', placements: DERBORENCE_INSTANCED.spruce ?? [], leaves: true },
+    { file: 'larch.glb', prefix: 'larch_', placements: DERBORENCE_INSTANCED.larch ?? [], leaves: true },
+    { file: 'pine.glb', prefix: 'pine_', placements: DERBORENCE_INSTANCED.pine ?? [], leaves: true },
+  ],
   textures: {
     groundLight: 'ground_light.png',
     courtLight: 'court_light.webp',
@@ -151,22 +159,23 @@ const DERBORENCE: Venue = {
     groundDetail: 'ground_detail.png',
     leaves: 'leaves.png',
   },
-  // placeholder until the derborence art lands (the layout copies the village sun and rects)
   sun: DERBORENCE_SUN,
   groundLightRect: DERBORENCE_GROUND_LIGHT_RECT,
   courtLightRect: DERBORENCE_COURT_LIGHT_RECT,
-  // placeholder until the derborence art lands
-  groundAlbedo: [0.5, 0.41, 0.27],
+  // grey gravel / forest floor (palette d_gravel, d_soil), linear
+  groundAlbedo: [0.31, 0.29, 0.25],
+  // clear, pale alpine blue; the horizon matches art/lib/palette.py "d_sky_horizon"
   sky: {
-    zenith: 0x3d70b8,
-    mid: 0x6f9ed4,
-    horizon: 0xc6d6e4,
-    glow: 0xfff3dc,
-    hazeBand: 0.16,
+    zenith: 0x5a8acb,
+    mid: 0x8fb4da,
+    horizon: 0xd5e0ea,
+    glow: 0xffe4c0,
+    hazeBand: 0.14,
     midBand: 0.7,
-  }, // placeholder until the derborence art lands
-  fill: { hemiSky: 0xc8d4e2, hemiGround: 0xcdb48e, skyRadius: 70 }, // placeholder until the derborence art lands
-  fallback: { court: 0xbcab8d, ground: 0xac9879 }, // placeholder until the derborence art lands
+  },
+  // cool sky fill in the shade, darker forest-floor bounce
+  fill: { hemiSky: 0xb8c7da, hemiGround: 0x8a7f6c, skyRadius: 70 },
+  fallback: { court: 0xa19e97, ground: 0x6c5e4c },
 };
 
 export const VENUES: Readonly<Record<VenueId, Venue>> = { village: VILLAGE, derborence: DERBORENCE };

@@ -16,16 +16,62 @@ export interface Placement {
 
 /** Unit vector toward the sun (game coordinates) and its elevation / azimuth in degrees. */
 export const BAKED_SUN = {
-  dir: [0.198267, 0.642788, 0.739942] as const,
-  elevationDeg: 40.0,
-  azimuthDeg: 15.0,
+  dir: [-0.548558, 0.453990, 0.702123] as const,
+  elevationDeg: 27.0,
+  azimuthDeg: -38.0,
 };
 
 /** Ground lightmap rectangle (m): x0..x0+size, z0..z0+size. */
-export const GROUND_LIGHT_RECT = { x0: -19.0, z0: -27.0, size: 38.0 };
+export const GROUND_LIGHT_RECT = { x0: -22.0, z0: -30.0, size: 44.0 };
 
 /** High-density court sun-visibility map rectangle (m): x0..x0+w, z0..z0+d. */
 export const COURT_LIGHT_RECT = { x0: -4.0, z0: -12.0, w: 8.0, d: 19.2 };
 
-/** Instanced assets: asset name -> placements (empty until the derborence art lands). */
-export const INSTANCED: Readonly<Record<string, readonly Placement[]>> = {};
+/** Instanced assets (spruce, larch, pine): asset name -> placements. */
+export const INSTANCED: Readonly<Record<string, readonly Placement[]>> = {
+  spruce: [
+    { variant: 'a', x: -6.4, z: 3.4, rotDeg: 20.0, scale: 1.0 },
+    { variant: 'b', x: -9.6, z: -6.8, rotDeg: 140.0, scale: 1.0 },
+    { variant: 'c', x: -8.3, z: -12.6, rotDeg: 30.0, scale: 1.0 },
+    { variant: 'a', x: -12.5, z: -1.5, rotDeg: 250.0, scale: 1.08 },
+    { variant: 'b', x: -11.0, z: 9.5, rotDeg: 80.0, scale: 1.0 },
+    { variant: 'b', x: 6.0, z: 1.4, rotDeg: 200.0, scale: 1.0 },
+    { variant: 'a', x: 9.6, z: 7.0, rotDeg: 310.0, scale: 1.0 },
+    { variant: 'b', x: 10.8, z: -6.2, rotDeg: 15.0, scale: 1.05 },
+    { variant: 'a', x: 5.2, z: -19.5, rotDeg: 100.0, scale: 1.0 },
+    { variant: 'c', x: 4.4, z: 4.8, rotDeg: 170.0, scale: 0.85 },
+    { variant: 'a', x: -12.5, z: -30.0, rotDeg: 60.0, scale: 1.1 },
+    { variant: 'b', x: -9.0, z: -26.5, rotDeg: 190.0, scale: 1.0 },
+    { variant: 'a', x: 7.5, z: -31.0, rotDeg: 280.0, scale: 1.05 },
+    { variant: 'a', x: -4.8, z: 13.0, rotDeg: 120.0, scale: 1.0 },
+    { variant: 'b', x: 5.6, z: 12.5, rotDeg: 330.0, scale: 1.0 },
+    { variant: 'f', x: -18.0, z: -20.0, rotDeg: 0.0, scale: 1.1 },
+    { variant: 'f', x: -22.0, z: -8.0, rotDeg: 50.0, scale: 1.0 },
+    { variant: 'f', x: -21.0, z: 4.0, rotDeg: 100.0, scale: 1.15 },
+    { variant: 'f', x: -16.0, z: 15.0, rotDeg: 150.0, scale: 1.0 },
+    { variant: 'f', x: 16.0, z: -21.0, rotDeg: 200.0, scale: 1.05 },
+    { variant: 'f', x: 20.0, z: -9.0, rotDeg: 250.0, scale: 1.1 },
+    { variant: 'f', x: 19.0, z: 5.0, rotDeg: 300.0, scale: 0.95 },
+    { variant: 'f', x: 14.5, z: 17.0, rotDeg: 350.0, scale: 1.0 },
+    { variant: 'f', x: 14.0, z: -38.0, rotDeg: 20.0, scale: 1.1 },
+    { variant: 'f', x: -17.0, z: -36.0, rotDeg: 70.0, scale: 1.0 },
+    { variant: 'f', x: 12.0, z: -33.0, rotDeg: 120.0, scale: 1.05 },
+    { variant: 'f', x: -27.0, z: -26.0, rotDeg: 170.0, scale: 1.1 },
+    { variant: 'f', x: 26.0, z: -24.0, rotDeg: 220.0, scale: 1.0 },
+  ],
+  larch: [
+    { variant: 'a', x: -6.8, z: -1.8, rotDeg: 0.0, scale: 1.0 },
+    { variant: 'b', x: -5.6, z: -9.2, rotDeg: 120.0, scale: 1.0 },
+    { variant: 'a', x: -12.0, z: -17.0, rotDeg: 240.0, scale: 1.05 },
+    { variant: 'b', x: 6.6, z: -4.6, rotDeg: 60.0, scale: 1.0 },
+    { variant: 'a', x: 11.5, z: -15.0, rotDeg: 180.0, scale: 1.0 },
+    { variant: 'b', x: 3.2, z: -25.5, rotDeg: 300.0, scale: 1.0 },
+    { variant: 'a', x: -14.5, z: 4.5, rotDeg: 90.0, scale: 0.95 },
+    { variant: 'b', x: -2.0, z: 19.0, rotDeg: 30.0, scale: 1.0 },
+    { variant: 'a', x: 15.0, z: 0.5, rotDeg: 150.0, scale: 1.0 },
+    { variant: 'b', x: -16.0, z: -10.5, rotDeg: 210.0, scale: 1.0 },
+  ],
+  pine: [
+    { variant: 'a', x: 3.15, z: -7.7, rotDeg: 0.0, scale: 1.0 },
+  ],
+};

@@ -229,13 +229,13 @@ def bake_scene(assets: dict, venue: venues.Venue, export_fn, quality: float = 1.
     atlas_img = _new_image(atlas, layout.ATLAS_RES)
     gmat = bpy.data.materials.new("GroundReceiver")
     gmat.use_nodes = True
-    _set_albedo(gmat, P["earth"])
+    _set_albedo(gmat, P[venue.ground_albedo])
     receiver.data.materials.append(gmat)
     _bake_target(gmat, ground_img)
     court_img = _new_image("court_light", *layout.COURT_RES)
     cmat = bpy.data.materials.new("CourtReceiver")
     cmat.use_nodes = True
-    _set_albedo(cmat, P["dust"])
+    _set_albedo(cmat, P[venue.court_albedo])
     court_receiver.data.materials.append(cmat)
     _bake_target(cmat, court_img)
     mats = {s.material for o in atlas_objs for s in o.material_slots if s.material}

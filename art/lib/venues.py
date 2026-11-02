@@ -53,6 +53,9 @@ class Venue:
     atlas: str
     # Meshes of the court asset that lie on the planar ground lightmap (the rest uses the atlas).
     court_ground: tuple[str, ...]
+    # Palette entries of the bake's flat ground / court receivers (the albedo they bounce light with).
+    ground_albedo: str = "earth"
+    court_albedo: str = "dust"
 
     def models_dir(self) -> str:
         return os.path.join(ROOT, self.models)
@@ -88,14 +91,14 @@ VILLAGE = Venue(
     court_ground=("court_gravel", "court_surround"),
 )
 
-# An alpine forest court. The art is still to be made: no assets yet, so the game falls back to the
-# placeholder court + sky (src/render/scenery.ts) and the bake has nothing to do.
+# An alpine forest court: the petanque court at Derborence (Valais) under larches and spruces, with
+# a log chalet up the bank behind the far end and the limestone cliffs of the cirque beyond.
 DERBORENCE = Venue(
     id="derborence",
-    assets=(),
-    baked=(),
-    in_bake=(),
-    instanced=(),
+    assets=("court", "spruce", "larch", "pine", "terrain", "chalet", "props", "boulders", "backdrop"),
+    baked=("court", "terrain", "chalet", "props", "boulders"),
+    in_bake=("court", "terrain", "chalet", "props", "boulders", "spruce", "larch", "pine"),
+    instanced=("spruce", "larch", "pine"),
     package="assets.derborence",
     layout_module="lib.layout_derborence",
     models="public/models/derborence",
@@ -103,7 +106,9 @@ DERBORENCE = Venue(
     blend="blend/derborence",
     previews="previews/derborence",
     atlas="derborence",
-    court_ground=("court_gravel", "court_surround"),
+    court_ground=("court_gravel", "court_surround", "court_litter"),
+    ground_albedo="d_soil",
+    court_albedo="d_gravel",
 )
 
 VENUES = {v.id: v for v in (VILLAGE, DERBORENCE)}

@@ -1,13 +1,12 @@
 """
-Scene layout of the derborence venue (an alpine forest court), read by the light bake
-(lib/bake.py) and by the game through the generated src/render/bakedLayoutDerborence.ts - the same
-public shape as lib/layout.py: SUN, the lightmap rectangles and resolutions, the instanced
+Scene layout of the derborence venue (the alpine forest court at Derborence, Valais), read by the
+light bake (lib/bake.py) and by the game through the generated src/render/bakedLayoutDerborence.ts -
+the same public shape as lib/layout.py: SUN, the lightmap rectangles and resolutions, the instanced
 `INSTANCED = {asset_name: [placements...]}` mapping, and to_ts().
 
-PLACEHOLDER: the art has not been made yet. The sun and the lightmap rectangles are copied from the
-village (lib/layout.py) so the bake and the game run unchanged, and there are no instanced assets;
-the art author replaces these values (and fills art/lib/venues.py DERBORENCE.assets / in_bake /
-instanced) when the derborence assets land.
+Late afternoon in October: a low sun from behind the player's left, so the tall spruces and larches
+around the court throw long shadows across it (cool shade with a few warm shafts of light) while
+the tree tops and the limestone cliffs at the far end catch the warm light.
 
 (placements: (variant, x, z, rotation about Y in degrees, scale), metres, Y up, the player throws
 toward -Z.)
@@ -16,8 +15,9 @@ from __future__ import annotations
 
 import math
 
-# PLACEHOLDER: the village sun (elevation / azimuth / angular diameter, degrees).
-SUN = {"elevation": 40.0, "azimuth": 15.0, "angle": 1.1}
+# Sun: elevation above the horizon and azimuth around the court (0 = behind the player (+Z),
+# 90 = from the right (+X)), degrees; angular diameter (deg) sets the softness of the baked shadows.
+SUN = {"elevation": 27.0, "azimuth": -38.0, "angle": 1.2}
 
 
 def sun_direction() -> tuple[float, float, float]:
@@ -26,18 +26,72 @@ def sun_direction() -> tuple[float, float, float]:
     return (math.sin(az) * math.cos(el), math.sin(el), math.cos(az) * math.cos(el))
 
 
-# PLACEHOLDER: no instanced assets yet. Keys are asset names (art/assets/derborence/<name>.py, listed
-# in lib/venues.py DERBORENCE.instanced); the bake instances `<name>_<variant>` from that asset's glb.
-INSTANCED = {}
+# Norway spruces: a/b tall (~26 / ~20 m), c a young bushy one (~7 m), f far low-detail (solid).
+SPRUCES = [
+    # left of the court
+    ("a", -6.4, 3.4, 20.0, 1.0),
+    ("b", -9.6, -6.8, 140.0, 1.0),
+    ("c", -8.3, -12.6, 30.0, 1.0),
+    ("a", -12.5, -1.5, 250.0, 1.08),
+    ("b", -11.0, 9.5, 80.0, 1.0),
+    # right of the court
+    ("b", 6.0, 1.4, 200.0, 1.0),
+    ("a", 9.6, 7.0, 310.0, 1.0),
+    ("b", 10.8, -6.2, 15.0, 1.05),
+    ("a", 5.2, -19.5, 100.0, 1.0),
+    ("c", 4.4, 4.8, 170.0, 0.85),
+    # behind the chalet
+    ("a", -12.5, -30.0, 60.0, 1.1),
+    ("b", -9.0, -26.5, 190.0, 1.0),
+    ("a", 7.5, -31.0, 280.0, 1.05),
+    # behind the player
+    ("a", -4.8, 13.0, 120.0, 1.0),
+    ("b", 5.6, 12.5, 330.0, 1.0),
+    # far ring (low detail)
+    ("f", -18.0, -20.0, 0.0, 1.1),
+    ("f", -22.0, -8.0, 50.0, 1.0),
+    ("f", -21.0, 4.0, 100.0, 1.15),
+    ("f", -16.0, 15.0, 150.0, 1.0),
+    ("f", 16.0, -21.0, 200.0, 1.05),
+    ("f", 20.0, -9.0, 250.0, 1.1),
+    ("f", 19.0, 5.0, 300.0, 0.95),
+    ("f", 14.5, 17.0, 350.0, 1.0),
+    ("f", 14.0, -38.0, 20.0, 1.1),
+    ("f", -17.0, -36.0, 70.0, 1.0),
+    ("f", 12.0, -33.0, 120.0, 1.05),
+    ("f", -27.0, -26.0, 170.0, 1.1),
+    ("f", 26.0, -24.0, 220.0, 1.0),
+]
 
-# PLACEHOLDER: the village's ground lightmap rectangle (x0, z0, size in m) and resolution.
-GROUND_RECT = {"x0": -19.0, "z0": -27.0, "size": 38.0}
+# European larches in autumn gold: a tall (~22 m), b smaller (~15 m).
+LARCHES = [
+    ("a", -6.8, -1.8, 0.0, 1.0),
+    ("b", -5.6, -9.2, 120.0, 1.0),
+    ("a", -12.0, -17.0, 240.0, 1.05),
+    ("b", 6.6, -4.6, 60.0, 1.0),
+    ("a", 11.5, -15.0, 180.0, 1.0),
+    ("b", 3.2, -25.5, 300.0, 1.0),
+    ("a", -14.5, 4.5, 90.0, 0.95),
+    ("b", -2.0, 19.0, 30.0, 1.0),
+    ("a", 15.0, 0.5, 150.0, 1.0),
+    ("b", -16.0, -10.5, 210.0, 1.0),
+]
+
+# The big pine right of the far end (with the floodlight aimed at the court).
+PINES = [
+    ("a", 3.15, -7.7, 0.0, 1.0),
+]
+
+INSTANCED = {"spruce": SPRUCES, "larch": LARCHES, "pine": PINES}
+
+# Ground lightmap: the forest floor around the court (x0, z0, size in m) and its resolution.
+GROUND_RECT = {"x0": -22.0, "z0": -30.0, "size": 44.0}
 GROUND_RES = 2048
-# PLACEHOLDER: the village's court sun-visibility rectangle (x0, z0, w, d) and resolution.
+# The court + ~2 m around it: dense sun-visibility map (~6 mm texels).
 COURT_RECT = {"x0": -4.0, "z0": -12.0, "w": 8.0, "d": 19.2}
 COURT_RES = (1280, 3072)
-# PLACEHOLDER: resolution of the lightmap atlas for the non-ground surfaces.
-ATLAS_RES = 1024
+# Lightmap atlas for the non-ground surfaces (logs, rocks, bank, chalet, props, boulders).
+ATLAS_RES = 1536
 
 
 def to_ts() -> str:
@@ -46,7 +100,7 @@ def to_ts() -> str:
 
     def rows(items):
         return "\n".join(
-            f"  {{ variant: '{v}', x: {x}, z: {z}, rotDeg: {r}, scale: {s} }}," for v, x, z, r, s in items
+            f"    {{ variant: '{v}', x: {x}, z: {z}, rotDeg: {r}, scale: {s} }}," for v, x, z, r, s in items
         )
 
     g = GROUND_RECT
@@ -82,6 +136,6 @@ export const GROUND_LIGHT_RECT = {{ x0: {g["x0"]}, z0: {g["z0"]}, size: {g["size
 /** High-density court sun-visibility map rectangle (m): x0..x0+w, z0..z0+d. */
 export const COURT_LIGHT_RECT = {{ x0: {c["x0"]}, z0: {c["z0"]}, w: {c["w"]}, d: {c["d"]} }};
 
-/** Instanced assets: asset name -> placements (empty until the derborence art lands). */
+/** Instanced assets (spruce, larch, pine): asset name -> placements. */
 export const INSTANCED: Readonly<Record<string, readonly Placement[]>> {instanced_block}
 """

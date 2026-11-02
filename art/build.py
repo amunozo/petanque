@@ -41,8 +41,10 @@ def build_asset(venue: venues.Venue, name: str, preview: bool) -> None:
     objs = mod.build()
     tris = sum(triangle_count(o) for o in objs)
     if name in venue.baked:
-        # exported by the bake, with the lightmap-atlas UVs (an export here would drop them)
-        size = os.path.getsize(os.path.join(venue.models_dir(), f"{mod.NAME}.glb"))
+        # exported by the bake, with the lightmap-atlas UVs (an export here would drop them); 0 until
+        # the first bake has written it
+        path = os.path.join(venue.models_dir(), f"{mod.NAME}.glb")
+        size = os.path.getsize(path) if os.path.exists(path) else 0
     else:
         size = export_glb(objs, os.path.join(venue.models_dir(), f"{mod.NAME}.glb"))
     bpy.context.preferences.filepaths.save_version = 0  # no .blend1 backups
