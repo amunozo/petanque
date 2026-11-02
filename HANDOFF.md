@@ -19,7 +19,7 @@ Full project state lives in `docs/STATUS.md` — read it first.
 
 ## Next steps
 1. Owner checks the live site (v0.6.0) on the phone: Alps download, picker, online room with the Alps court.
-2. Watch the Deploy and Deploy server GitHub Actions runs of the 2026-11-02 push.
+2. (Done 2026-11-02: site deploy, server deploy and Pages all green; live bundle e770faa; live server stores room venue.)
 3. Optional: tagline "Boules in the village square" on the Alps court; mountains warmer/more contrast; big boulder too pale; mid-distance spruces washed by fog.
 4. Optional: one-off +3 textures after switching venues (does not grow; render layer).
 
