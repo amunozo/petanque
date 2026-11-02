@@ -9,7 +9,7 @@ from the palette:
     out at the corners (lighter end grain)
   - the gable front: a wide band of four pale honey shutters (louvred above, boarded below) on the
     ground floor, a white frieze with a row of small tabs at the eaves line, two small shuttered
-    windows in the gable and the carved beam "1920" between them
+    windows in the gable and a plain carved beam between them
   - a low-pitched dark roof with standing seams and wide eaves, plank soffits, purlin ends with
     brackets under the gable overhang, a stone chimney
   - a plank bench along the foundation; smaller shuttered windows and a door on the sides
@@ -247,17 +247,6 @@ def window(m: MeshData, f: Frame, sc, y0, w, h, leaves: int, rng: Rng, louvres: 
         shutter(m, f, sc - w / 2 + lw * k + 0.006, y0, lw - 0.012, h, rng, louvres)
 
 
-def digit_strokes(ch: str):
-    """7-segment strokes of a digit: (x0, y0, x1, y1) in a unit cell 1 wide x 2 tall."""
-    seg = {
-        "a": (0.0, 1.85, 1.0, 2.0), "b": (0.85, 1.0, 1.0, 2.0), "c": (0.85, 0.0, 1.0, 1.0),
-        "d": (0.0, 0.0, 1.0, 0.15), "e": (0.0, 0.0, 0.15, 1.0), "f": (0.0, 1.0, 0.15, 2.0),
-        "g": (0.0, 0.93, 1.0, 1.08),
-    }
-    lit = {"1": "bc", "9": "abcdfg", "2": "abged", "0": "abcdef"}[ch]
-    return [seg[k] for k in lit]
-
-
 def build_gable_details(m: MeshData, rng: Rng) -> None:
     hw = W / 2
     f = Frame((-hw, 0.0, 0.0), (1.0, 0.0, 0.0))
@@ -275,18 +264,10 @@ def build_gable_details(m: MeshData, rng: Rng) -> None:
     # two small shuttered windows in the gable
     for dx in (-1.3, 1.3):
         window(m, f, hw + dx, EAVE + 0.32, 0.62, 0.7, 2, rng, louvres=False)
-    # the carved beam with "1920" between them
+    # a plain carved beam between them
     yb = EAVE + 0.72
     beam = scale(P["d_chalet_dark"], 1.1)
     f.box(m, hw - 0.82, yb, hw + 0.82, yb + 0.3, 0.0, 0.08, beam, top=scale(beam, 1.2))
-    dh = 0.2
-    dw = 0.1
-    x = hw - (4 * dw + 3 * 0.06) / 2
-    for ch in "1920":
-        for (x0, y0, x1, y1) in digit_strokes(ch):
-            f.box(m, x + x0 * dw, yb + 0.05 + y0 * dh / 2, x + max(x1 * dw, x0 * dw + 0.02), yb + 0.05 + y1 * dh / 2,
-                  0.08, 0.087, scale(P["d_white"], 0.88))
-        x += dw + 0.06
     # a wooden bench on the terrace along the foundation: newer larch planks, already silvering, on
     # four sturdy legs dug into the terrace, its backrest on posts against the stone base
     plank = mix(P["d_plank"], P["d_log_grey"], 0.4)
